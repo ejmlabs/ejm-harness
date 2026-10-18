@@ -133,7 +133,8 @@ mod native {
         pub fn sample_all(&mut self) -> io::Result<HashMap<u32, ProcessInfo>> {
             self.system.refresh_processes_specifics(
                 ProcessesToUpdate::All,
-                ProcessRefreshKind::new().with_memory(),
+                true,
+                ProcessRefreshKind::nothing().with_memory(),
             );
             Ok(self
                 .system
@@ -157,7 +158,8 @@ mod native {
             let pids: Vec<_> = tracked.keys().copied().map(Pid::from_u32).collect();
             self.system.refresh_processes_specifics(
                 ProcessesToUpdate::Some(&pids),
-                ProcessRefreshKind::new(),
+                true,
+                ProcessRefreshKind::nothing(),
             );
             for (pid, start) in tracked {
                 if let Some(process) = self.system.process(Pid::from_u32(*pid))

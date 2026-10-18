@@ -52,7 +52,11 @@ fn fixture_request(mode: &str, directory: &Path) -> CommandRequest {
 fn live(pid: u32) -> bool {
     let mut system = System::new();
     let ids = [Pid::from_u32(pid)];
-    system.refresh_processes_specifics(ProcessesToUpdate::Some(&ids), ProcessRefreshKind::new());
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&ids),
+        true,
+        ProcessRefreshKind::nothing(),
+    );
     system
         .process(ids[0])
         .is_some_and(|process| process.status() != ProcessStatus::Zombie)

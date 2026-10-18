@@ -39,12 +39,6 @@ skip = [
     { name = "syn", version = "=2.0.119" },
     # cap-std's Windows IO stack uses 0.59 while current Tokio uses 0.61.
     { name = "windows-sys", version = "=0.59.0" },
-    # sysinfo 0.31 uses windows 0.57; iana-time-zone (via chrono and oauth2) uses windows-core 0.62.
-    # Both are Windows-only. Moving sysinfo to a newer series changes the process monitor API.
-    { name = "windows-core", version = "=0.57.0" },
-    { name = "windows-implement", version = "=0.57.0" },
-    { name = "windows-interface", version = "=0.57.0" },
-    { name = "windows-result", version = "=0.1.2" },
     # oauth2 5.0 requires thiserror 1; current transport crates use thiserror 2.
     { name = "thiserror", version = "=1.0.69" },
     { name = "thiserror-impl", version = "=1.0.69" },
