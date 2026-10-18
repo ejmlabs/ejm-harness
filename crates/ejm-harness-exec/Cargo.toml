@@ -1,0 +1,33 @@
+[package]
+name = "ejm-harness-exec"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+description = "Shared resource admission and bounded native command execution for ejm-harness"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+serde.workspace = true
+schemars.workspace = true
+uuid.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+rustix = { workspace = true, features = ["process", "param"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+procfs-core.workspace = true
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+sysinfo = { version = "0.31.4", default-features = false, features = ["system"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+serde_json.workspace = true
+procfs-core.workspace = true
+sysinfo = { version = "0.31.4", default-features = false, features = ["system"] }

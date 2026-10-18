@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Publisher account | Gerry</title>
+        <link rel="stylesheet" href="/styles.css" />
+        <script type="module" src="/account.js"></script>
+    </head>
+    <body>
+        <header>
+            <a class="brand" href="/">Gerry <span>extensions</span></a>
+            <nav aria-label="Main"><a href="/">Browse extensions</a></nav>
+        </header>
+        <main class="narrow">
+            <h1>Your publisher account</h1>
+            <p id="status" role="status" aria-live="polite">Loading your account.</p>
+            <button id="sign-in" hidden>Sign in with GitHub</button>
+            <section id="account" hidden>
+                <p id="identity"></p>
+                <p id="publisher"></p>
+                <form id="claim" hidden>
+                    <h2>Choose your publisher name</h2>
+                    <p>
+                        This permanent name appears in every package you publish. Each account has
+                        one publisher name.
+                    </p>
+                    <label for="handle">Publisher name</label>
+                    <input
+                        id="handle"
+                        name="handle"
+                        required
+                        minlength="3"
+                        maxlength="39"
+                        pattern="[a-z][a-z0-9-]{1,37}[a-z0-9]"
+                        autocomplete="off"
+                        placeholder="your-name"
+                    />
+                    <label for="display-name">Display name</label>
+                    <input
+                        id="display-name"
+                        name="display_name"
+                        required
+                        maxlength="80"
+                        autocomplete="name"
+                    />
+                    <button>Claim publisher name</button>
+                </form>
+                <section id="publish-help" hidden>
+                    <h2>Publish from your terminal</h2>
+                    <pre><code>gerry pkg login
+gerry pkg publish .</code></pre>
+                    <p>
+                        Package code stays inactive until someone chooses to enable it. Publication
+                        reserves a permanent version.
+                    </p>
+                </section>
+                <button class="secondary" id="sign-out">Sign out of this browser</button>
+                <h2>Signed-in devices</h2>
+                <p>
+                    Sign out every other browser and terminal session. Keep this browser signed in.
+                </p>
+                <button class="secondary" id="revoke-devices">Sign out other devices</button>
+            </section>
+        </main>
+    </body>
+</html>

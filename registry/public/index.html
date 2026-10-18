@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Gerry extensions</title>
+        <link rel="stylesheet" href="/styles.css" />
+        <script type="module" src="/catalog.js"></script>
+    </head>
+    <body>
+        <header>
+            <a class="brand" href="/">Gerry <span>extensions</span></a>
+            <nav aria-label="Main"><a href="/account">Publisher account</a></nav>
+        </header>
+        <main>
+            <section class="intro">
+                <div>
+                    <h1>Make Gerry your own.</h1>
+                    <p>Find tools, skills, themes, and more from independent publishers.</p>
+                </div>
+                <aside>
+                    <span>Install an extension</span><code>gerry pkg add @publisher/package</code>
+                    <p>Review the publisher and package before you enable code.</p>
+                </aside>
+            </section>
+            <form id="search" role="search">
+                <label for="query">Find extensions</label>
+                <div class="form-row">
+                    <input
+                        id="query"
+                        name="q"
+                        maxlength="128"
+                        type="search"
+                        placeholder="Name, publisher, or description"
+                    /><button>Search</button>
+                </div>
+            </form>
+            <p id="status" role="status" aria-live="polite">Loading extensions.</p>
+            <section id="packages" aria-label="Extensions"></section>
+            <button id="more" hidden>Load more</button>
+        </main>
+        <footer>
+            Published versions are permanent. Publisher code runs only when you enable it.
+        </footer>
+    </body>
+</html>

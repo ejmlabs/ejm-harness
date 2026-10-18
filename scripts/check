@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+
+project_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$project_root"
+
+for required in cargo node npm python3 uv; do
+    if ! command -v "$required" >/dev/null 2>&1; then
+        echo "Missing $required. See docs/contributing.md." >&2
+        exit 1
+    fi
+done
+cargo deny --version >/dev/null
+cargo machete --version >/dev/null
+sh -n scripts/check scripts/install-hooks
+
+python3 scripts/check-policy.py --self-test
+python3 scripts/check-policy.py
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+python3 -B -m unittest discover -s crates/ejm-harness-packages/runtime -p test_hosts.py
+cargo build --workspace --all-targets --locked
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
+cargo machete --with-metadata
+cargo deny --locked --all-features check
+python3 scripts/generate-protocol.py --check
+npm run check
+uv run --project sdk/python --group dev --locked ruff check .
+uv run --project sdk/python --group dev --locked ruff format --check .
+uv run --project sdk/python --group dev --locked mypy --strict scripts
+uv run --project sdk/python --group dev --locked mypy --config-file sdk/python/pyproject.toml sdk/python/ejm_harness
+uv run --project sdk/python --group dev --locked python -m unittest discover -s sdk/python/tests
+uv build --project sdk/python --no-sources --out-dir dist/python

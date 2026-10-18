@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: harness-quality
+        name: Harness required quality gate
+        entry: ./scripts/check
+        language: system
+        pass_filenames: false
+        always_run: true

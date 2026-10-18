@@ -1,0 +1,58 @@
+[advisories]
+version = 2
+
+[licenses]
+version = 2
+confidence-threshold = 0.93
+allow = [
+    "MIT",
+    "MIT-0",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "CC0-1.0",
+    "Unlicense",
+    # Mozilla root-certificate data used by the native TLS verifier.
+    "CDLA-Permissive-2.0",
+]
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+highlight = "all"
+skip = [
+    # jsonschema 0.33 uses base64 0.22; reqwest 0.13 uses the incompatible 0.23 API.
+    { name = "base64", version = "=0.22.1" },
+    # ahash 0.8 requires getrandom 0.3; uuid/tempfile use the incompatible 0.4 API.
+    { name = "getrandom", version = "=0.3.4" },
+    # jsonwebtoken 11 and oauth2 5 require getrandom 0.2; uuid/tempfile use 0.4.
+    { name = "getrandom", version = "=0.2.17" },
+    # getrandom 0.3's UEFI backend uses r-efi 5; getrandom 0.4 uses r-efi 6.
+    { name = "r-efi", version = "=5.3.0" },
+    # rusqlite's optional WASM VFS and native hashlink use different hashbrown APIs.
+    { name = "hashbrown", version = "=0.16.1" },
+    # Android jni macros still require syn 2 while current proc macros use syn 3.
+    { name = "syn", version = "=2.0.119" },
+    # cap-std's Windows IO stack uses 0.59 while current Tokio uses 0.61.
+    { name = "windows-sys", version = "=0.59.0" },
+    # sysinfo 0.31 uses windows 0.57; iana-time-zone (via chrono and oauth2) uses windows-core 0.62.
+    # Both are Windows-only. Moving sysinfo to a newer series changes the process monitor API.
+    { name = "windows-core", version = "=0.57.0" },
+    { name = "windows-implement", version = "=0.57.0" },
+    { name = "windows-interface", version = "=0.57.0" },
+    { name = "windows-result", version = "=0.1.2" },
+    # oauth2 5.0 requires thiserror 1; current transport crates use thiserror 2.
+    { name = "thiserror", version = "=1.0.69" },
+    { name = "thiserror-impl", version = "=1.0.69" },
+    # aws-lc-rs 1.18 uses untrusted 0.7; rustls-webpki and ring require 0.9.
+    { name = "untrusted", version = "=0.7.1" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

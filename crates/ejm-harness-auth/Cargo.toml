@@ -1,0 +1,35 @@
+[package]
+name = "ejm-harness-auth"
+description = "Reusable ChatGPT sign-in and credential renewal for local hosts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+tempfile.workspace = true
+futures-util.workspace = true
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "json", "stream", "form", "http2"] }
+jsonwebtoken = { version = "11.1", default-features = false, features = ["aws_lc_rs"] }
+zeroize = "1.9"
+base64 = "0.22"
+oauth2 = { version = "5.0", default-features = false }
+subtle = "2.6"
+
+[target.'cfg(unix)'.dependencies]
+rustix = { workspace = true, features = ["process"] }
+
+[dev-dependencies]
+wiremock.workspace = true
+sha2 = "0.10"
+

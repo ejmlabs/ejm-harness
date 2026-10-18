@@ -1,0 +1,1589 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ProtocolSchema",
+  "description": "Collect every public wire type in one authoritative JSON Schema.",
+  "type": "object",
+  "properties": {
+    "governor": {
+      "$ref": "#/$defs/GovernorSnapshot"
+    },
+    "harness": {
+      "$ref": "#/$defs/HarnessSnapshot"
+    },
+    "hello": {
+      "$ref": "#/$defs/HelloResult"
+    },
+    "notification": {
+      "$ref": "#/$defs/Notification"
+    },
+    "package_page": {
+      "$ref": "#/$defs/PackagePage"
+    },
+    "request": {
+      "$ref": "#/$defs/Request"
+    },
+    "response": {
+      "$ref": "#/$defs/Response"
+    },
+    "run_started": {
+      "$ref": "#/$defs/RunStarted"
+    },
+    "run_summary": {
+      "$ref": "#/$defs/RunSummary"
+    },
+    "session": {
+      "$ref": "#/$defs/Session"
+    },
+    "tool_output": {
+      "$ref": "#/$defs/ToolOutput"
+    },
+    "tool_request": {
+      "$ref": "#/$defs/ToolRequest"
+    }
+  },
+  "required": [
+    "request",
+    "response",
+    "notification",
+    "tool_request",
+    "tool_output",
+    "session",
+    "run_started",
+    "run_summary",
+    "governor",
+    "harness",
+    "hello",
+    "package_page"
+  ],
+  "$defs": {
+    "CommandExport": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "handler": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["name", "description", "handler"]
+    },
+    "ConfigureParams": {
+      "type": "object",
+      "properties": {
+        "allow_shell": {
+          "type": "boolean",
+          "default": false
+        },
+        "allow_write": {
+          "type": "boolean",
+          "default": false
+        },
+        "context_max_bytes": {
+          "type": ["integer", "null"],
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_input_tokens": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "max_model_requests": {
+          "type": ["integer", "null"],
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_output_tokens": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "max_repeated_calls": {
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "max_sessions": {
+          "type": ["integer", "null"],
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_steps": {
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "max_store_bytes": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "packages": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PackageConfig"
+          }
+        },
+        "provider": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resources": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourceLimits"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run_timeout_ms": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "state_dir": {
+          "type": ["string", "null"]
+        },
+        "system_prompt": {
+          "type": ["string", "null"]
+        },
+        "tools": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ToolDefinition"
+          }
+        }
+      }
+    },
+    "Effect": {
+      "type": "string",
+      "enum": ["read", "write", "external"]
+    },
+    "EmptyParams": {
+      "type": "object"
+    },
+    "Event": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": ["string", "null"]
+        },
+        "sequence": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "timestamp_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "prompt": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "run_started"
+            }
+          },
+          "required": ["type", "prompt"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "step": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "model_started"
+            }
+          },
+          "required": ["type", "step"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "text_delta"
+            }
+          },
+          "required": ["type", "text"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "call": {
+              "$ref": "#/$defs/ToolCall"
+            },
+            "type": {
+              "type": "string",
+              "const": "tool_queued"
+            }
+          },
+          "required": ["type", "call"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "call": {
+              "$ref": "#/$defs/ToolCall"
+            },
+            "type": {
+              "type": "string",
+              "const": "tool_started"
+            }
+          },
+          "required": ["type", "call"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "call_id": {
+              "type": "string"
+            },
+            "output": {
+              "$ref": "#/$defs/ToolOutput"
+            },
+            "type": {
+              "type": "string",
+              "const": "tool_finished"
+            }
+          },
+          "required": ["type", "call_id", "output"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "usage"
+            },
+            "usage": {
+              "$ref": "#/$defs/Usage"
+            }
+          },
+          "required": ["type", "usage"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "summary": {
+              "$ref": "#/$defs/RunSummary"
+            },
+            "type": {
+              "type": "string",
+              "const": "run_finished"
+            }
+          },
+          "required": ["type", "summary"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "steered"
+            }
+          },
+          "required": ["type", "text"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "queued"
+            }
+          },
+          "required": ["type", "text"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "call_id": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string",
+              "const": "progress"
+            }
+          },
+          "required": ["type", "call_id", "message"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "after_bytes": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "before_bytes": {
+              "type": "integer",
+              "format": "uint",
+              "minimum": 0
+            },
+            "type": {
+              "type": "string",
+              "const": "context_trimmed"
+            }
+          },
+          "required": ["type", "before_bytes", "after_bytes"]
+        }
+      ],
+      "required": ["sequence", "session_id", "timestamp_ms"]
+    },
+    "EventsParams": {
+      "type": "object",
+      "properties": {
+        "after": {
+          "type": "integer",
+          "format": "uint64",
+          "default": 0,
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "format": "uint",
+          "default": 64,
+          "minimum": 0
+        },
+        "session_id": {
+          "type": "string"
+        }
+      },
+      "required": ["session_id"]
+    },
+    "Exports": {
+      "type": "object",
+      "properties": {
+        "commands": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/CommandExport"
+          }
+        },
+        "hooks": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/HookExport"
+          }
+        },
+        "prompts": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "providers": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/NamedExport"
+          }
+        },
+        "skills": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "themes": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "tools": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ToolExport"
+          }
+        },
+        "widgets": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/NamedExport"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "GovernorSnapshot": {
+      "type": "object",
+      "properties": {
+        "heavy_running": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "queued": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "reserved_cpu_millis": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "reserved_memory_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "reserved_output_bytes": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "reserved_processes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "running": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "running",
+        "queued",
+        "heavy_running",
+        "reserved_cpu_millis",
+        "reserved_memory_bytes",
+        "reserved_processes",
+        "reserved_output_bytes"
+      ]
+    },
+    "HarnessSnapshot": {
+      "type": "object",
+      "properties": {
+        "active_agents": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "model_requests": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "tools": {
+          "$ref": "#/$defs/GovernorSnapshot"
+        },
+        "waiting_model_requests": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": ["active_agents", "model_requests", "waiting_model_requests", "tools"]
+    },
+    "HelloParams": {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": ["protocol"]
+    },
+    "HelloResult": {
+      "type": "object",
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "protocol": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": ["protocol", "version", "capabilities"]
+    },
+    "HookEvent": {
+      "type": "string",
+      "enum": ["run_start", "before_model", "before_tool", "after_tool", "run_end"]
+    },
+    "HookExport": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "$ref": "#/$defs/HookEvent"
+        },
+        "handler": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["event", "handler"]
+    },
+    "Manifest": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "exports": {
+          "$ref": "#/$defs/Exports",
+          "default": {
+            "commands": [],
+            "hooks": [],
+            "prompts": [],
+            "providers": [],
+            "skills": [],
+            "themes": [],
+            "tools": [],
+            "widgets": []
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "runtime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Runtime"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "schema_version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["schema_version", "name", "version", "description"]
+    },
+    "ModelResponse": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "default": ""
+        },
+        "continuation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderContinuation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tool_calls": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ToolCall"
+          }
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage",
+          "default": {
+            "input_tokens": 0,
+            "output_tokens": 0
+          }
+        }
+      }
+    },
+    "NamedExport": {
+      "type": "object",
+      "properties": {
+        "handler": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["name", "handler"]
+    },
+    "Notification": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "event"
+            },
+            "params": {
+              "$ref": "#/$defs/Event"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "tool.cancel"
+            },
+            "params": {
+              "$ref": "#/$defs/ToolCancellation"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "tool.progress"
+            },
+            "params": {
+              "$ref": "#/$defs/ToolProgress"
+            }
+          },
+          "required": ["method", "params"]
+        }
+      ]
+    },
+    "PackageConfig": {
+      "type": "object",
+      "properties": {
+        "grants": {
+          "$ref": "#/$defs/PackageGrants"
+        },
+        "root": {
+          "type": "string"
+        }
+      },
+      "required": ["root", "grants"]
+    },
+    "PackageGrants": {
+      "description": "Host-owned registration allowlists. They do not sandbox trusted native code.",
+      "type": "object",
+      "properties": {
+        "commands": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "hooks": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/HookEvent"
+          }
+        },
+        "providers": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "tools": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "widgets": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PackageInfo": {
+      "type": "object",
+      "properties": {
+        "grants": {
+          "$ref": "#/$defs/PackageGrants"
+        },
+        "manifest": {
+          "$ref": "#/$defs/Manifest"
+        },
+        "root": {
+          "type": "string"
+        }
+      },
+      "required": ["root", "manifest", "grants"]
+    },
+    "PackageInvokeParams": {
+      "type": "object",
+      "properties": {
+        "arguments": {
+          "default": null
+        },
+        "name": {
+          "type": "string"
+        },
+        "package": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        }
+      },
+      "required": ["package", "name", "session_id"]
+    },
+    "PackageListParams": {
+      "type": "object",
+      "properties": {
+        "after": {
+          "type": "integer",
+          "format": "uint",
+          "default": 0,
+          "minimum": 0
+        },
+        "limit": {
+          "type": "integer",
+          "format": "uint",
+          "default": 16,
+          "minimum": 0
+        }
+      }
+    },
+    "PackagePage": {
+      "type": "object",
+      "properties": {
+        "next": {
+          "type": ["integer", "null"],
+          "format": "uint",
+          "minimum": 0
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PackageInfo"
+          }
+        }
+      },
+      "required": ["packages"]
+    },
+    "PackageParams": {
+      "type": "object",
+      "properties": {
+        "package": {
+          "type": "string"
+        }
+      },
+      "required": ["package"]
+    },
+    "ProtocolError": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": ["code", "message"]
+    },
+    "ProviderConfig": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "echo"
+            }
+          },
+          "required": ["kind"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "replay"
+            },
+            "responses": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ModelResponse"
+              }
+            }
+          },
+          "required": ["kind", "responses"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "api_key": {
+              "type": "string"
+            },
+            "base_url": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "openai"
+            },
+            "model": {
+              "type": "string"
+            }
+          },
+          "required": ["kind", "base_url", "api_key", "model"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "api_key": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "responses"
+            },
+            "model": {
+              "type": "string"
+            },
+            "reasoning_effort": {
+              "type": ["string", "null"]
+            }
+          },
+          "required": ["kind", "api_key", "model"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "api_key": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "anthropic"
+            },
+            "model": {
+              "type": "string"
+            }
+          },
+          "required": ["kind", "api_key", "model"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "package"
+            },
+            "name": {
+              "type": "string"
+            },
+            "package": {
+              "type": "string"
+            }
+          },
+          "required": ["kind", "package", "name"]
+        }
+      ]
+    },
+    "ProviderContinuation": {
+      "description": "Provider state that must survive a stateless tool exchange and journal replay.",
+      "oneOf": [
+        {
+          "description": "Encrypted reasoning items are passed only to the Responses adapter.",
+          "type": "object",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "const": "open_ai_responses"
+            },
+            "reasoning": {
+              "type": "array",
+              "items": true
+            }
+          },
+          "required": ["provider", "reasoning"]
+        }
+      ]
+    },
+    "Request": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "hello"
+            },
+            "params": {
+              "$ref": "#/$defs/HelloParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "configure"
+            },
+            "params": {
+              "$ref": "#/$defs/ConfigureParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "session.create"
+            },
+            "params": {
+              "$ref": "#/$defs/SessionOptions"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "session.list"
+            },
+            "params": {
+              "$ref": "#/$defs/EmptyParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "run.start"
+            },
+            "params": {
+              "$ref": "#/$defs/StartParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "run.cancel"
+            },
+            "params": {
+              "$ref": "#/$defs/SessionParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "run.steer"
+            },
+            "params": {
+              "$ref": "#/$defs/TextParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "run.queue"
+            },
+            "params": {
+              "$ref": "#/$defs/TextParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "events.list"
+            },
+            "params": {
+              "$ref": "#/$defs/EventsParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "governor.status"
+            },
+            "params": {
+              "$ref": "#/$defs/EmptyParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "harness.status"
+            },
+            "params": {
+              "$ref": "#/$defs/EmptyParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "package.list"
+            },
+            "params": {
+              "$ref": "#/$defs/PackageListParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "package.reload"
+            },
+            "params": {
+              "$ref": "#/$defs/PackageParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "package.command"
+            },
+            "params": {
+              "$ref": "#/$defs/PackageInvokeParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "package.widget"
+            },
+            "params": {
+              "$ref": "#/$defs/PackageInvokeParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "shutdown"
+            },
+            "params": {
+              "$ref": "#/$defs/EmptyParams"
+            }
+          },
+          "required": ["method", "params"]
+        }
+      ],
+      "required": ["id"]
+    },
+    "ResourceLimits": {
+      "description": "Aggregate admission budgets shared by every session and executor.",
+      "type": "object",
+      "properties": {
+        "cpu_millis": {
+          "type": "integer",
+          "format": "uint32",
+          "default": 2000,
+          "minimum": 0
+        },
+        "max_artifact_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "default": 67108864,
+          "minimum": 0
+        },
+        "max_heavy_jobs": {
+          "type": "integer",
+          "format": "uint",
+          "default": 1,
+          "minimum": 0
+        },
+        "max_job_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "default": 120000,
+          "minimum": 0
+        },
+        "max_jobs": {
+          "type": "integer",
+          "format": "uint",
+          "default": 4,
+          "minimum": 0
+        },
+        "max_output_bytes": {
+          "type": "integer",
+          "format": "uint",
+          "default": 1048576,
+          "minimum": 0
+        },
+        "max_processes": {
+          "type": "integer",
+          "format": "uint32",
+          "default": 32,
+          "minimum": 0
+        },
+        "max_queue": {
+          "type": "integer",
+          "format": "uint",
+          "default": 256,
+          "minimum": 0
+        },
+        "memory_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "default": 536870912,
+          "minimum": 0
+        }
+      }
+    },
+    "Response": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "result": true
+          },
+          "required": ["result"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "error": {
+              "$ref": "#/$defs/ProtocolError"
+            }
+          },
+          "required": ["error"]
+        }
+      ],
+      "required": ["id"]
+    },
+    "RunStarted": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        }
+      },
+      "required": ["run_id", "session_id"]
+    },
+    "RunStatus": {
+      "type": "string",
+      "enum": ["completed", "cancelled", "failed", "interrupted", "budget_exhausted"]
+    },
+    "RunSummary": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": ["string", "null"]
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/RunStatus"
+        },
+        "steps": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "text": {
+          "type": "string"
+        },
+        "usage": {
+          "$ref": "#/$defs/Usage"
+        }
+      },
+      "required": ["run_id", "status", "steps", "text", "usage"]
+    },
+    "Runtime": {
+      "type": "object",
+      "properties": {
+        "entry": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/RuntimeKind"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["kind", "entry"]
+    },
+    "RuntimeKind": {
+      "type": "string",
+      "enum": ["node", "python"]
+    },
+    "Session": {
+      "type": "object",
+      "properties": {
+        "created_at_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/SessionStatus"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "title", "cwd", "created_at_ms", "status"]
+    },
+    "SessionOptions": {
+      "type": "object",
+      "properties": {
+        "cwd": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": ["cwd"]
+    },
+    "SessionParams": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": ["string", "null"]
+        },
+        "session_id": {
+          "type": "string"
+        }
+      },
+      "required": ["session_id"]
+    },
+    "SessionStatus": {
+      "type": "string",
+      "enum": ["idle", "running", "interrupted"]
+    },
+    "StartParams": {
+      "type": "object",
+      "properties": {
+        "prompt": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        }
+      },
+      "required": ["session_id", "prompt"]
+    },
+    "TextParams": {
+      "type": "object",
+      "properties": {
+        "run_id": {
+          "type": ["string", "null"]
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": ["session_id", "text"]
+    },
+    "ToolCall": {
+      "type": "object",
+      "properties": {
+        "arguments": true,
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "name", "arguments"]
+    },
+    "ToolCancellation": {
+      "type": "object",
+      "properties": {
+        "call_id": {
+          "type": "string"
+        }
+      },
+      "required": ["call_id"]
+    },
+    "ToolDefinition": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "effect": {
+          "$ref": "#/$defs/Effect"
+        },
+        "input_schema": true,
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": ["name", "description", "input_schema", "effect", "version"]
+    },
+    "ToolEffect": {
+      "type": "string",
+      "enum": ["read", "write", "external"]
+    },
+    "ToolExport": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "effect": {
+          "$ref": "#/$defs/ToolEffect"
+        },
+        "handler": {
+          "type": "string"
+        },
+        "input_schema": true,
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["name", "description", "input_schema", "effect", "version", "handler"]
+    },
+    "ToolInvocation": {
+      "type": "object",
+      "properties": {
+        "arguments": true,
+        "call_id": {
+          "type": "string"
+        },
+        "deadline_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "name": {
+          "type": "string"
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "session_id": {
+          "type": "string"
+        }
+      },
+      "required": ["session_id", "run_id", "call_id", "name", "arguments", "deadline_ms"]
+    },
+    "ToolMethod": {
+      "type": "string",
+      "enum": ["tool.invoke"]
+    },
+    "ToolOutput": {
+      "type": "object",
+      "properties": {
+        "artifact": {
+          "type": ["string", "null"]
+        },
+        "content": {
+          "type": "string"
+        },
+        "data": {
+          "default": null
+        },
+        "is_error": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": ["content"]
+    },
+    "ToolProgress": {
+      "type": "object",
+      "properties": {
+        "call_id": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": ["call_id", "message"]
+    },
+    "ToolRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "method": {
+          "$ref": "#/$defs/ToolMethod"
+        },
+        "params": {
+          "$ref": "#/$defs/ToolInvocation"
+        }
+      },
+      "required": ["id", "method", "params"]
+    },
+    "Usage": {
+      "type": "object",
+      "properties": {
+        "cached_input_tokens": {
+          "description": "Reported subset of input tokens served from the provider's cache.",
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "input_tokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "output_tokens": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "reasoning_output_tokens": {
+          "description": "Reported subset of output tokens spent on reasoning.",
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": ["input_tokens", "output_tokens"]
+    }
+  }
+}

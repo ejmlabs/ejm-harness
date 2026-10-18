@@ -1,0 +1,29 @@
+[package]
+name = "ejm-harness-worker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+default-run = "ejm-harness-worker"
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+schemars.workspace = true
+uuid.workspace = true
+ejm-harness-auth.workspace = true
+ejm-harness.workspace = true
+ejm-harness-coding.workspace = true
+ejm-harness-exec.workspace = true
+ejm-harness-packages.workspace = true
+ejm-harness-package-spec.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

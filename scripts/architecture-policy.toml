@@ -1,0 +1,45 @@
+version = 1
+
+[crates.ejm-harness-exec]
+internal = []
+forbidden = ["ejm-harness", "ejm-harness-coding", "ejm-harness-worker", "clap", "ratatui", "crossterm", "reqwest", "axum"]
+reason = "Admission and native process ownership work without an engine, provider, transport, or UI."
+
+[crates.ejm-harness]
+internal = ["ejm-harness-exec", "ejm-harness-auth"]
+forbidden = ["ejm-harness-coding", "ejm-harness-worker", "clap", "ratatui", "crossterm", "axum"]
+reason = "The engine owns policy and ports; hosts inject providers and tools through public traits."
+
+[crates.ejm-harness-auth]
+internal = []
+forbidden = ["ejm-harness-exec", "ejm-harness", "ejm-harness-coding", "ejm-harness-worker", "clap", "ratatui", "crossterm", "axum"]
+reason = "Authentication owns credentials and identity validation without agent execution, browser UI, or terminal code."
+
+[crates.ejm-harness-coding]
+internal = ["ejm-harness-exec", "ejm-harness"]
+forbidden = ["ejm-harness-worker", "clap", "ratatui", "crossterm", "axum"]
+reason = "Coding tools depend on the reusable engine and shared executor, without a frontend."
+
+[crates.ejm-harness-worker]
+internal = ["ejm-harness-exec", "ejm-harness-auth", "ejm-harness", "ejm-harness-coding", "ejm-harness-packages", "ejm-harness-package-spec"]
+forbidden = ["clap", "ratatui", "crossterm", "axum"]
+reason = "The worker is a transport adapter over public harness APIs and contains no terminal UI."
+
+[crates.ejm-harness-bench]
+internal = ["ejm-harness-exec", "ejm-harness", "ejm-harness-coding"]
+forbidden = ["ejm-harness-worker", "clap", "ratatui", "crossterm", "axum"]
+reason = "Deterministic acceptance measures public engine and coding APIs without a frontend."
+
+[crates.ejm-harness-package-spec]
+internal = []
+forbidden = ["ejm-harness-exec", "ejm-harness", "ejm-harness-packages", "ejm-harness-worker", "tokio", "reqwest", "clap", "ratatui", "crossterm", "axum"]
+reason = "Package validation is portable to the native installer and Cloudflare Wasm without execution or networking."
+
+[crates.ejm-harness-packages]
+internal = ["ejm-harness-package-spec", "ejm-harness", "ejm-harness-exec", "ejm-harness-auth"]
+forbidden = ["ejm-harness-worker", "ejm-harness-coding", "clap", "ratatui", "crossterm", "axum"]
+reason = "Package installation and language hosts adapt public engine ports without owning the run loop or frontend."
+
+[unsafe]
+files = []
+reason = "Safe Rustix APIs own native page-size and process-signal calls. Project code has no unsafe exceptions."

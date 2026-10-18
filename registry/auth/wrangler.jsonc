@@ -1,0 +1,22 @@
+{
+    "$schema": "../node_modules/wrangler/config-schema.json",
+    "name": "gerry-registry-auth",
+    "main": "src/index.ts",
+    "compatibility_date": "2026-10-18",
+    "compatibility_flags": ["nodejs_compat"],
+    "workers_dev": false,
+    "preview_urls": false,
+    "vars": {
+        "REGISTRY_ORIGIN": "https://harness.meetgerry.ai",
+        "OPERATOR_SUBJECT_IDS": "",
+    },
+    "d1_databases": [
+        {
+            "binding": "DB",
+            "database_name": "gerry-registry-auth",
+            "database_id": "00000000-0000-0000-0000-000000000002",
+            "migrations_dir": "migrations",
+        },
+    ],
+    "observability": { "enabled": false },
+}

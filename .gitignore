@@ -1,0 +1,17 @@
+/target/
+/dist/
+node_modules/
+.venv/
+__pycache__/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.ejm-harness/
+.DS_Store
+
+**/.mypy_cache/
+**/.ruff_cache/
+/registry/target/
+/registry/build/
+**/.wrangler/
+**/.dev.vars

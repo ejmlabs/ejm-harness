@@ -1,0 +1,7 @@
+/build/
+/node_modules/
+/.wrangler/
+/dist/
+/.dev.vars
+/auth/.dev.vars
+/auth/.wrangler/

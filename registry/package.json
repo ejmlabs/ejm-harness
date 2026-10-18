@@ -1,0 +1,31 @@
+{
+  "name": "@gerry/registry-development",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "check:types": "tsc --noEmit",
+    "schema:auth": "node --import tsx auth/scripts/generate-schema.ts",
+    "check:schema": "node --import tsx auth/scripts/generate-schema.ts --check",
+    "test": "vitest run",
+    "test:auth": "vitest run --config vitest.auth.config.ts",
+    "test:schema": "python3 -m unittest discover -s tests -p 'test_*.py'",
+    "dev": "wrangler dev -c wrangler.jsonc -c auth/wrangler.jsonc",
+    "build:auth": "wrangler deploy --dry-run -c auth/wrangler.jsonc",
+    "build": "wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "better-auth": "1.7.10"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.4.4",
+    "@cloudflare/workers-types": "5.20261018.1",
+    "@types/node": "26.6.5",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5",
+    "wrangler": "4.151.1"
+  }
+}

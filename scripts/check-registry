@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project_root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$project_root"
+registry_rustc=$(rustup which rustc)
+export PATH="$(dirname "$registry_rustc"):$PATH"
+export CARGO_BUILD_JOBS=2
+export CARGO_INCREMENTAL=0
+export CARGO_PROFILE_DEV_DEBUG=line-tables-only
+export CARGO_PROFILE_TEST_DEBUG=line-tables-only
+export WRANGLER_LOG_PATH="$project_root/registry/.wrangler/check.log"
+
+node -e 'if (Number(process.versions.node.split(".")[0]) < 24) { console.error("Registry checks require Node 24 or later."); process.exit(1); }'
+
+cargo fmt --manifest-path registry/Cargo.toml -- --check
+cargo clippy --manifest-path registry/Cargo.toml --all-targets --locked -- -D warnings
+cargo test --manifest-path registry/Cargo.toml --lib --locked
+cargo clippy --manifest-path registry/Cargo.toml --target wasm32-unknown-unknown --lib --locked -- -D warnings
+cargo machete registry
+cargo deny --manifest-path registry/Cargo.toml --locked check
+npm --prefix registry run check:types
+npm --prefix registry run check:schema
+npm --prefix registry run test:schema
+npm exec -- eslint registry --max-warnings 0
+npm exec -- prettier --check registry
+npm --prefix registry audit --audit-level=moderate
+npm --prefix registry run build
+npm --prefix registry run build:auth
+npm --prefix registry test

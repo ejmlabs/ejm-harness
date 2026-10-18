@@ -1,0 +1,15 @@
+target/
+node_modules/
+sdk/typescript/dist/
+sdk/python/.venv/
+sdk/protocol.schema.json
+sdk/typescript/src/protocol.ts
+sdk/python/ejm_harness/protocol.py
+Cargo.lock
+uv.lock
+registry/target/
+registry/build/
+registry/.wrangler/
+registry/auth/.wrangler/
+registry/Cargo.lock
+site/.wrangler/

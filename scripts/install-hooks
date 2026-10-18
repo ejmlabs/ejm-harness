@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+project_root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$project_root"
+if ! command -v pre-commit >/dev/null 2>&1; then
+    echo "Install pre-commit as described in docs/contributing.md." >&2
+    exit 1
+fi
+pre-commit install --install-hooks

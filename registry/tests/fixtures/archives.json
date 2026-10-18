@@ -1,0 +1,16 @@
+{
+  "manifest": {
+    "schema_version": 1,
+    "name": "@alice/test",
+    "version": "1.0.0",
+    "description": "Local registry fixture",
+    "exports": {
+      "skills": ["SKILL.md"]
+    }
+  },
+  "base64": "H4sIAAAAAAAA/+3UTUsDMRAG4J79Fct4LTGrtcKevIp78ygiIR23sfvFJJUW6X93cLWgHkSoreD7XBImgQkJbyoWWZve+YWr2DzGrh3tnFXTyeR1VJ9He2q3a0M9z8/Op6PM7v4oXy1jcqLt99HrD3qm6OfcuPsnlhi6lop8TK1rmAq6dHXwfJI4JhrTdgPlxhqrlRlHL6FPQ7XsvKsz4SrEJOvsIazSUli38arvJEUqtNci1LXObunm+qosTTOju83m0Hfwn72/w2/2+C7/+gF8zL+90A8A+d+H42zI7Vtcjw59HgAAAAAAAAAAAAAAAAAAAAD4mReIYxh7ACgAAA==",
+  "sha256": "858beb48c2d0dd46e24d8b8da5c0f9d2db81c821c3310df15278a0e1415bb776",
+  "size": 256,
+  "linked_archive": "H4sIAAAAAAAA/+3UPWvDMBAGYM/9Fea6BkVO0gQ8dS3x1rGUIuyro8ZfSHJIKPnvFXUbaDpkiZ3SvM8icRbcIfMqZ2N2olHpWuUs3mxdBWcnvfls9rl6x6ucyMO3rh5F07t5EMrzj/Jba50yvv0Qvf6gd7Lpikv1smFjdV1RHI2oUiVTTPeq0CmPHVtHIzocoEhIIX0lY5sa3biumtSpKkLDubbO7MJXvXWtYX+Mt01tnKXY91rrovC7J3pcPiSJKDN63u8vfQfX7Ps/9NnjVP79A/Az/3LhHwDkfwi3YZfbr7jeXHoeGJZ/wlXD/fY4mf/jfSQXUxmEEyHGdeusznoc8MrzDwAAAAAAAAAAAAAAAAAA/8MHqZHEhgAoAAA=",
+  "ancestor_conflict_archive": "H4sIAAAAAAAA/+3WQUvDMBgG4J39FSVeR5es64SePAnibh5FJKRfu7isLUkmG7L/brA4cB56WduB73NJSQPfR8rbpCRrD3Ej1UaWFL+7uppcHA+Wi8X3GJyPfM5P79p5IZJ0OYn45Vv5a+e8tKH8ELWu0Cdzak1b+fZB1um6YpmYskpuiWXsXhqtaObJeTZlpwVMxDzmYSYnp6xufDu7qpU0kaVSO28PUaH3fmcpLKN9U1vvWBZqbbQx4emFPT89rlbxNmevx+PYe/Cf/XyHPmt05Z+L+e/88zuRIP+DuI0e2qDejN0JjKGRlirfb43O/J+f/yH/aYL8D6HQhsbuAcbT5n+m1trksd/38ifoPv/5+f2fpwL5H4KqqyLc8ns+AQAAAAAAAAAAAAAAAGAoX051U5EAKAAA"
+}
