@@ -36,3 +36,5 @@ Create and test the shared repository first. Add pinned consumers and version me
 ## Harness adapter
 
 Use ejm-cli consistently in device code, polling, consent UI, and real auth fixtures. Add request-body and unregistered-client regressions. Run the registry gate in an isolated CI job alongside the workspace gate. Apply protected path checks to reads and listings before returning data, including canonical symlink aliases. Include MIT text and repository metadata in language SDK distributions.
+
+The root lint gate checks registry TypeScript, but the registry is outside the root npm workspace. Install both locked npm trees during setup. Before root npm checks, `scripts/check` fills an absent `registry/node_modules` with `npm --prefix registry ci --ignore-scripts` and stops if installation fails. Existing dependency trees are reused; rerun the locked install after dependency changes. This keeps the previous trusted caller's root-only setup compatible while preserving all lint coverage. Hosted acceptance remains pending.

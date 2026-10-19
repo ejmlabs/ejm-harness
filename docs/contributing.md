@@ -19,6 +19,7 @@ cargo install --locked --jobs 2 --version 0.20.2 cargo-deny
 cargo install --locked --jobs 2 --version 0.9.2 cargo-machete
 uv tool install pre-commit==4.3.0
 npm ci --ignore-scripts
+npm --prefix registry ci --ignore-scripts
 uv sync --project sdk/python --group dev --locked
 ./scripts/install-hooks
 ```
@@ -28,6 +29,12 @@ Run the same required gate locally, in pre-commit, and in CI:
 ```sh
 ./scripts/check
 ```
+
+Root ESLint also checks registry TypeScript, which needs the separate registry
+dependencies. If `registry/node_modules` is absent, the gate installs its locked
+dependencies with lifecycle scripts disabled before npm checks. An install
+failure stops the gate. Existing dependency trees are reused; rerun the matching
+`npm ci --ignore-scripts` command after dependency changes.
 
 The gate checks crate boundaries and skill references, rustfmt, Clippy, Rust
 tests and builds, rustdoc, unused dependencies, dependency advisories, licenses,
