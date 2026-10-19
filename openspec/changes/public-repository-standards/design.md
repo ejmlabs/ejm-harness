@@ -79,3 +79,22 @@ The protected base has no `publish-host-auth-apis` plan. This follow-up stays in
 its existing repository standards change; the separate API plan is context,
 not source imported into this candidate. Keep task 2.8 open until its required
 verification and adoption pass. See [contributor CI setup](../../../docs/contributing.md#shared-ci-caller-prerequisite).
+
+## Caller review source evidence
+
+Both admitted AI reports for harness caller head
+`28401e93b79824d13bda697b805ceca05ea65d04` explicitly said the previous
+and proposed external workflow implementations were absent and review was
+incomplete. Successful wrappers and zero findings do not complete review.
+Task 2.8 and exact-source hosted acceptance remain open.
+
+Include [exact plaintext source evidence](../../../docs/ci/shared-workflow-review/README.md)
+for the two called workflows and their generator inputs in the normal consumer
+source archive. Retain original paths, full revisions, Git blob IDs, SHA-256
+digests and the MIT notice; share only byte-identical blobs. Text suffixes and
+ordinary data modes keep the copies outside executable configuration and
+product code. No caller, runtime, manifest, lock, tool or gate input changes.
+
+Require the normal hook, fresh exact-head admission, Linux/macOS/Windows
+quality, two complete reviews and explicit approval before protected adoption.
+The evidence is source context, not completed review or native certification.

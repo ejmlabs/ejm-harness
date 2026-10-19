@@ -106,11 +106,25 @@ and adoption require its owner's separate authorization. Keep workstation
 credentials local and preserve all existing admission, approval and secret
 boundaries.
 
-This is contributor CI guidance. It changes no product API, setup or runtime
-behavior, so the public product page needs no change. Static preparation checks
-alone do not establish a full gate, hosted result, protected adoption or public
-site publication. The normal commit hook and exact-source hosted gates remain
-required.
+The normal commit hook passed for caller head
+`28401e93b79824d13bda697b805ceca05ea65d04`. Both admitted AI reports for
+that head explicitly called review incomplete because the old and new external
+workflow implementations were absent. Successful wrapper jobs and zero findings
+do not complete review or establish acceptance.
+
+The [shared workflow source evidence](ci/shared-workflow-review/README.md)
+supplies exact plaintext copies of both called workflows and their readable
+source. Its manifest binds original paths and full revisions to Git blob IDs
+and SHA-256 digests, with byte-identical sources shared once and the MIT notice
+preserved. These are review data, outside executable paths. Caller pins,
+product code, manifests, locks, tools and gates stay unchanged.
+
+The corrected head requires the normal hook, fresh admission, Linux/macOS/Windows
+quality checks, two complete reviews, exact-head explicit approval and protected
+adoption. This contributor CI guidance changes no product API, setup or runtime
+behavior, so the public product page needs no change. Source preparation does
+not establish a new full gate, hosted acceptance, native key-service acceptance
+or public site publication.
 
 ## Plan changes
 

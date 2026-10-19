@@ -19,6 +19,8 @@
 
 - [ ] 2.8 Prepare and adopt the paired PR/release caller pins and release standards-ref on protected harness main `ee1d2e3df5d77027be226d20830f6c5ea84d0d1d` using reviewed central implementation `ae903129564926a14287f75d2012610c59cccb65`; its required checks and exact-head human approval passed, protected merge `8c304c8cdfc8b6fe50f3e442507215e615944f2b` has reviewed tree `91b7f5c0990e27f2e0fdfcce26aac18afdcf6b81`, and its exact workflow-pins ref is retained under active update/delete rule `25369476` without bypass actors. Preserve all product, manifest, lock and gate inputs and unchanged main protections; harness caller adoption and exact-source hosted Linux/macOS/Windows checks remain pending before separately rebasing and readmitting the host-auth API source. Record static and hosted limits without treating local macOS evidence as Linux or native acceptance.
 
+    - Both admitted AI reports for caller head `28401e93b79824d13bda697b805ceca05ea65d04` explicitly said the old/new external workflow source was absent and review was incomplete. Successful wrappers with zero findings are not acceptance. Supply [exact readable source context](../../../docs/ci/shared-workflow-review/README.md) without changing execution inputs, then repeat the normal hook, fresh admission, exact-head hosted quality, two complete reviews and explicit approval. Keep 2.8 open.
+
 ## 3. Verification
 
 - [x] 3.1 Run focused tests, workspace gate and registry gate with at most two Cargo jobs, plus strict OpenSpec validation; record any unavailable evidence.

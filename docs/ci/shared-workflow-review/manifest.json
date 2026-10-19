@@ -1,0 +1,318 @@
+{
+  "schemaVersion": 1,
+  "repository": "ejmlabs/.github",
+  "oldRevision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+  "newRevision": "ae903129564926a14287f75d2012610c59cccb65",
+  "purpose": "Immutable shared-workflow source evidence; documentation data only",
+  "snapshotFiles": 21,
+  "snapshotBytes": 537572,
+  "sourcePathsPerRevision": 17,
+  "files": [
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": ".github/workflows/governance.yml",
+      "snapshot": "old/workflows/governance.yml.txt",
+      "gitBlobSha1": "dce2cf5146ea5857b749c784a0d4694d43828e4f",
+      "sha256": "8b7e0a3163b420f8ad90677c3ec73ed08616cfdf79279ac39acee56f925cddc0",
+      "bytes": 159981,
+      "lines": 467
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": ".github/workflows/governance.yml",
+      "snapshot": "new/workflows/governance.yml.txt",
+      "gitBlobSha1": "621e50eab89345a72ef9dfab9ad0eb4eebd04a4d",
+      "sha256": "fb3aa24a8eb3ebe6713fd8dc294d2cdd1b6ec4769f1c3f1ff1bfebddbad7e6fb",
+      "bytes": 163928,
+      "lines": 481
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": ".github/workflows/draft-release.yml",
+      "snapshot": "old/workflows/draft-release.yml.txt",
+      "gitBlobSha1": "cf8830457f180fd1bfa4f915a27cd0f1ff9a2fea",
+      "sha256": "26db55b0fd3c9747b20bdf7bcc6c5ecfe2c3c1b878b275860e95e521c77a7151",
+      "bytes": 53682,
+      "lines": 63
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": ".github/workflows/draft-release.yml",
+      "snapshot": "new/workflows/draft-release.yml.txt",
+      "gitBlobSha1": "35fea4d70d5015ef6c12d9fc789c51a12c6a6a90",
+      "sha256": "31dacec14d77bba653cf9bec32baaf1992066d9b1bf4696f7ddf025dfbedbb74",
+      "bytes": 57269,
+      "lines": 65
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "scripts/build_workflows.py",
+      "snapshot": "old/scripts/build_workflows.py.txt",
+      "gitBlobSha1": "8f71a4790bd806c224bf8345b1832f5c681e1506",
+      "sha256": "3f4b545d378296142c5f731d264c3a644a38a9683cac4e9ba911818a03975d12",
+      "bytes": 15511,
+      "lines": 220
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "scripts/build_workflows.py",
+      "snapshot": "new/scripts/build_workflows.py.txt",
+      "gitBlobSha1": "ef556603367efb5351d9d937fecc680e64f7d3fb",
+      "sha256": "2ef4866a2833a0161dab49710dc1df3ddf30735a2666f3419d1eabb96f328816",
+      "bytes": 16220,
+      "lines": 226
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "scripts/governance.py",
+      "snapshot": "common/scripts/governance.py.txt",
+      "gitBlobSha1": "a5dc545e535136320c584e72838cb12bdd50f5ee",
+      "sha256": "682071c05228c2ca8724a38781a09b4929d4df7ba8a53df57a7f2e9e1429154b",
+      "bytes": 12533,
+      "lines": 256
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "scripts/governance.py",
+      "snapshot": "common/scripts/governance.py.txt",
+      "gitBlobSha1": "a5dc545e535136320c584e72838cb12bdd50f5ee",
+      "sha256": "682071c05228c2ca8724a38781a09b4929d4df7ba8a53df57a7f2e9e1429154b",
+      "bytes": 12533,
+      "lines": 256
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "scripts/prepare.py",
+      "snapshot": "common/scripts/prepare.py.txt",
+      "gitBlobSha1": "ddeb838296f8c91825cbb889ab1c1c29305cb7e3",
+      "sha256": "1c9029a02f24b30f843591932e7e8ca7fb60487064d3feac2b97265fa3b5c2be",
+      "bytes": 4454,
+      "lines": 101
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "scripts/prepare.py",
+      "snapshot": "common/scripts/prepare.py.txt",
+      "gitBlobSha1": "ddeb838296f8c91825cbb889ab1c1c29305cb7e3",
+      "sha256": "1c9029a02f24b30f843591932e7e8ca7fb60487064d3feac2b97265fa3b5c2be",
+      "bytes": 4454,
+      "lines": 101
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "scripts/release.py",
+      "snapshot": "common/scripts/release.py.txt",
+      "gitBlobSha1": "70d62ee78882a8ac1be8326ce36214918920d50e",
+      "sha256": "16b0af49a06c1f7a6fd621e14e55f67a50c06c95af947ce9aaa0b924f3292563",
+      "bytes": 6463,
+      "lines": 117
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "scripts/release.py",
+      "snapshot": "common/scripts/release.py.txt",
+      "gitBlobSha1": "70d62ee78882a8ac1be8326ce36214918920d50e",
+      "sha256": "16b0af49a06c1f7a6fd621e14e55f67a50c06c95af947ce9aaa0b924f3292563",
+      "bytes": 6463,
+      "lines": 117
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "scripts/review_result.py",
+      "snapshot": "common/scripts/review_result.py.txt",
+      "gitBlobSha1": "a991a8d51501c969218ae956a93b6410bed9f4b3",
+      "sha256": "2d3afc2557f298095f9c6ffed772753c2cc2aa2db9fdac45656c36ed54856f70",
+      "bytes": 2293,
+      "lines": 44
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "scripts/review_result.py",
+      "snapshot": "common/scripts/review_result.py.txt",
+      "gitBlobSha1": "a991a8d51501c969218ae956a93b6410bed9f4b3",
+      "sha256": "2d3afc2557f298095f9c6ffed772753c2cc2aa2db9fdac45656c36ed54856f70",
+      "bytes": 2293,
+      "lines": 44
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "scripts/standards.py",
+      "snapshot": "old/scripts/standards.py.txt",
+      "gitBlobSha1": "b40ad937c41510c7385b9730f09562dc6cf625a6",
+      "sha256": "9d1a0e5ff4e9b87406f71195247bd50a3a8bc76bdde3ff607511b379acf2997c",
+      "bytes": 15572,
+      "lines": 324
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "scripts/standards.py",
+      "snapshot": "new/scripts/standards.py.txt",
+      "gitBlobSha1": "08dc7c58255fa66cc8bd5bf4c827e923ed64f5e3",
+      "sha256": "689c42fe36c4696c839e0c1f651480e977c8a4e44417888b2170c659d08e965c",
+      "bytes": 18091,
+      "lines": 370
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "review/prompt.md",
+      "snapshot": "common/review/prompt.md.txt",
+      "gitBlobSha1": "6bd159b52ccc0f5064857c74bb0a04f040bb79cb",
+      "sha256": "e00b5bcc3fd21fc9b036be31b9e08d79f9b4de00df83c984e3be275f0ee3c426",
+      "bytes": 1360,
+      "lines": 19
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "review/prompt.md",
+      "snapshot": "common/review/prompt.md.txt",
+      "gitBlobSha1": "6bd159b52ccc0f5064857c74bb0a04f040bb79cb",
+      "sha256": "e00b5bcc3fd21fc9b036be31b9e08d79f9b4de00df83c984e3be275f0ee3c426",
+      "bytes": 1360,
+      "lines": 19
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "review/schema.json",
+      "snapshot": "common/review/schema.json.txt",
+      "gitBlobSha1": "33e58eaeda2d2163168bf9a08368ef1c939f9a41",
+      "sha256": "ad587e879602cbf62d49053934a07920eef3683e5ca0dbb7a508d9a040cc5fb6",
+      "bytes": 734,
+      "lines": 25
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "review/schema.json",
+      "snapshot": "common/review/schema.json.txt",
+      "gitBlobSha1": "33e58eaeda2d2163168bf9a08368ef1c939f9a41",
+      "sha256": "ad587e879602cbf62d49053934a07920eef3683e5ca0dbb7a508d9a040cc5fb6",
+      "bytes": 734,
+      "lines": 25
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "LICENSE",
+      "snapshot": "LICENSE.txt",
+      "gitBlobSha1": "cd60b28410659a74eac98926f070c6776104305a",
+      "sha256": "8bee1685a9dc9c595b85cbf685fad0889006727568839437fbfbb249a95a43dc",
+      "bytes": 1077,
+      "lines": 21
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "LICENSE",
+      "snapshot": "LICENSE.txt",
+      "gitBlobSha1": "cd60b28410659a74eac98926f070c6776104305a",
+      "sha256": "8bee1685a9dc9c595b85cbf685fad0889006727568839437fbfbb249a95a43dc",
+      "bytes": 1077,
+      "lines": 21
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "templates/community/CODE_OF_CONDUCT.md",
+      "snapshot": "common/templates/community/CODE_OF_CONDUCT.md.txt",
+      "gitBlobSha1": "b35bd0bbf2daab636744f009d9f600d6a247acf2",
+      "sha256": "d49a959861c1b24fb0b711466701001626a52b9cf9b344010ff13350f6b913e3",
+      "bytes": 820,
+      "lines": 5
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "templates/community/CODE_OF_CONDUCT.md",
+      "snapshot": "common/templates/community/CODE_OF_CONDUCT.md.txt",
+      "gitBlobSha1": "b35bd0bbf2daab636744f009d9f600d6a247acf2",
+      "sha256": "d49a959861c1b24fb0b711466701001626a52b9cf9b344010ff13350f6b913e3",
+      "bytes": 820,
+      "lines": 5
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "templates/community/CONTRIBUTING.md",
+      "snapshot": "common/templates/community/CONTRIBUTING.md.txt",
+      "gitBlobSha1": "18e25e8c6695114323710db094d55dec7132fe07",
+      "sha256": "750c33e33c7c7af428bc9056ac81038a509c600c69649ab789641f2c44fed70d",
+      "bytes": 2276,
+      "lines": 15
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "templates/community/CONTRIBUTING.md",
+      "snapshot": "common/templates/community/CONTRIBUTING.md.txt",
+      "gitBlobSha1": "18e25e8c6695114323710db094d55dec7132fe07",
+      "sha256": "750c33e33c7c7af428bc9056ac81038a509c600c69649ab789641f2c44fed70d",
+      "bytes": 2276,
+      "lines": 15
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "templates/community/RELEASING.md",
+      "snapshot": "common/templates/community/RELEASING.md.txt",
+      "gitBlobSha1": "ebca44ecc26781a5debe7e74fa32d42d927216ae",
+      "sha256": "c6c99c93a2d88dd15d859e353835e1ed0bf38661939dafdd312700512c8a045f",
+      "bytes": 2125,
+      "lines": 15
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "templates/community/RELEASING.md",
+      "snapshot": "common/templates/community/RELEASING.md.txt",
+      "gitBlobSha1": "ebca44ecc26781a5debe7e74fa32d42d927216ae",
+      "sha256": "c6c99c93a2d88dd15d859e353835e1ed0bf38661939dafdd312700512c8a045f",
+      "bytes": 2125,
+      "lines": 15
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "templates/community/SECURITY.md",
+      "snapshot": "common/templates/community/SECURITY.md.txt",
+      "gitBlobSha1": "2f68316b0ec77a50cacc1a06267b216343906e46",
+      "sha256": "c7a6845f7bf0120fef673f8cfce120d518a4f2f6f546f9f91c7d69fcef321834",
+      "bytes": 1847,
+      "lines": 17
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "templates/community/SECURITY.md",
+      "snapshot": "common/templates/community/SECURITY.md.txt",
+      "gitBlobSha1": "2f68316b0ec77a50cacc1a06267b216343906e46",
+      "sha256": "c7a6845f7bf0120fef673f8cfce120d518a4f2f6f546f9f91c7d69fcef321834",
+      "bytes": 1847,
+      "lines": 17
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "templates/community/SUPPORT.md",
+      "snapshot": "common/templates/community/SUPPORT.md.txt",
+      "gitBlobSha1": "403caa9ec7f6ffa217d0b526bd87675b32dcdf54",
+      "sha256": "012081f5061250207b56e66afa1b12ab0b3498237703768efa7ea032dd5dcc2b",
+      "bytes": 611,
+      "lines": 5
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "templates/community/SUPPORT.md",
+      "snapshot": "common/templates/community/SUPPORT.md.txt",
+      "gitBlobSha1": "403caa9ec7f6ffa217d0b526bd87675b32dcdf54",
+      "sha256": "012081f5061250207b56e66afa1b12ab0b3498237703768efa7ea032dd5dcc2b",
+      "bytes": 611,
+      "lines": 5
+    },
+    {
+      "revision": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "sourcePath": "templates/community/THIRD_PARTY_NOTICES.md",
+      "snapshot": "common/templates/community/THIRD_PARTY_NOTICES.md.txt",
+      "gitBlobSha1": "368a214f12f4819661f85632d0217c92bc450beb",
+      "sha256": "4a37737dd1b3abfd1c2059cbd7d89c3e705c61470cdfbb772ff25c0237871367",
+      "bytes": 725,
+      "lines": 5
+    },
+    {
+      "revision": "ae903129564926a14287f75d2012610c59cccb65",
+      "sourcePath": "templates/community/THIRD_PARTY_NOTICES.md",
+      "snapshot": "common/templates/community/THIRD_PARTY_NOTICES.md.txt",
+      "gitBlobSha1": "368a214f12f4819661f85632d0217c92bc450beb",
+      "sha256": "4a37737dd1b3abfd1c2059cbd7d89c3e705c61470cdfbb772ff25c0237871367",
+      "bytes": 725,
+      "lines": 5
+    }
+  ]
+}
