@@ -177,7 +177,11 @@ fn read_legacy(root: &Path) -> Result<Option<Zeroizing<Vec<u8>>>> {
     }
     let file = match fs::OpenOptions::new()
         .read(true)
-        .custom_flags(rustix::fs::OFlags::NOFOLLOW.bits().cast_signed())
+        .custom_flags(
+            (rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK)
+                .bits()
+                .cast_signed(),
+        )
         .open(&path)
     {
         Ok(file) => file,

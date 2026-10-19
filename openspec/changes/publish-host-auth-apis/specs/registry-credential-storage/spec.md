@@ -29,6 +29,12 @@ The system SHALL import a legacy registry session only after the host confirms o
 - **WHEN** a caller requests migration without confirming older clients have stopped
 - **THEN** migration fails before changing either credential source
 
+#### Scenario: Legacy source is a FIFO
+
+- **WHEN** the legacy registry source is a FIFO without a writer
+- **THEN** migration rejects it without waiting for a writer or reading credentials
+- **AND** the source and existing encrypted destination remain unchanged
+
 #### Scenario: Cleanup is interrupted
 
 - **WHEN** encrypted migration commits but legacy source deletion fails

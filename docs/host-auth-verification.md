@@ -15,16 +15,21 @@ setup and strict complete-review enforcement. The caller change completed its
 required hosted checks and separate exact-head approval before protected merge.
 That acceptance covers the caller change, not this API source.
 
-This isolated preparation merges that protected commit into API head
-`4aeff321c3ab1148bfc92776471552308d3e62da` without rewriting its ancestry,
-then applies the exact ten-path vault correction ending at frozen tree
-`4b84fa8790ba8b53c61d0e6270a182b687501bc0`. The initial merged preparation matched all 87 runtime inputs and file modes
-of that corrected source. The fixture-only follow-up below changes the
-existing deadline test; the other 86 inputs remain identical. Both workflow files, all 33 canonical
-review-context files, the current lint exclusions and the checked standards
-task history remain unchanged. After the initial merge, the isolated follow-up
-also makes the fixture-only correction below. No local gate, hosted run, commit
-or publication has been performed for that follow-up. OpenSpec task 3.5 stays open.
+The ancestry-preserving API merge and resumed-clock fixture correction passed
+the normal local hook and became commit
+`90aa7350e30eaad908d14e8b3260610d5f15f2fe`, tree
+`a2a65b0fd54cd666d25c863c184d2f69a1f6af0b`. Its parents are API head
+`4aeff321c3ab1148bfc92776471552308d3e62da` and the adopted caller above.
+It includes the ten-path vault correction ending at frozen tree
+`4b84fa8790ba8b53c61d0e6270a182b687501bc0`. Of that correction's 87 runtime
+inputs, 86 remained identical; only the existing deadline fixture changed.
+Both workflow files, all 33 canonical review-context files, lint exclusions
+and checked standards task history stayed unchanged.
+
+Hosted run [39299507686](https://github.com/ejmlabs/ejm-harness/actions/runs/39299507686)
+then exposed the two registry issues below. The current correction preserves
+that committed source and caller while addressing those findings. It has not
+run its local gate or fresh hosted review. OpenSpec task 3.5 stays open.
 
 ## Paused-clock deadline fixture follow-up
 
@@ -52,8 +57,48 @@ production deadline and every lock-ownership, ciphertext and recovery assertion.
 Only `crates/ejm-harness-auth/src/store/tests.rs` changes among the 87 runtime
 inputs; the other 86, including all production source, manifests and the lock,
 remain byte-for-byte and mode-for-mode identical. The new ordered input receipt
-is `6ead7566688e18e4bbfc5806148372951024a79795765e3876eff5aea0670a45`. No focused test, full gate or hook has run for this follow-up.
-Task 3.5 remains open for root-owned verification and fresh hosted acceptance.
+is `6ead7566688e18e4bbfc5806148372951024a79795765e3876eff5aea0670a45`.
+
+The root-owned focused deadline test then passed: 1 passed, none failed or
+ignored, in 0.11 seconds. The normal commit's required quality hook also
+reported **Passed**, without a bypass, and produced `90aa7350e30eaad908d14e8b3260610d5f15f2fe`.
+Its successful hook output suppresses individual suite counts; the earlier
+202-test result below must not be attributed to this run. The normal log is
+`normal-commit-clean-metadata.log`, SHA-256
+`36d3bb3e44d1eb3a4a9f0989c3d5eda59632934b47e61ac7598d6d5e20d72266`.
+The matching receipt is `normal-commit-clean-metadata-receipt.json`, SHA-256
+`742d166872881e9cd1c4477418a72dc413d419a539be0cfb1ea7cf9113c01397`.
+
+## Hosted registry correction
+
+Both raw AI reports for exact head `90aa7350e30eaad908d14e8b3260610d5f15f2fe`
+marked their review complete. Pass 1 reported no findings. Pass 2 reported two
+medium defects, which remain required corrections despite the clean first pass:
+
+- The ordinary `registry_tokens_are_origin_bound_and_redacted` integration test
+  calls the native OS key service. The completed Ubuntu job failed this test
+  when no usable Secret Service was available: 8 integration tests passed and
+  1 failed. The existing injected-key test
+  `encrypted_registry_sessions_are_origin_bound_and_deletion_is_permanent`
+  passed in the same job and already protects round-trip, origin separation,
+  redaction, encryption, deletion and stale-import behavior. Remove only the
+  redundant native-store-dependent case; preserve explicitly opt-in native
+  key-service acceptance.
+- A legacy registry FIFO with no writer can block the read-only open before
+  descriptor validation, while holding the vault transaction. Open the Unix
+  source without blocking before checking that it is a private regular file.
+  A bounded Linux regression must reject the FIFO, join its watchdog and preserve
+  both source and existing encrypted destination.
+
+These changes use the existing injected key boundary and maintained Rustix
+adapter. They change no public API, dependency, workflow, vault deadline or
+native key-service requirement. At the retained Linux analysis snapshot, the
+macOS, Windows and registry jobs were still running; their acceptance is not
+established here. The sanitized Linux log is
+`linux-job-118220920291-sanitized.log`, SHA-256
+`c1080495a78af781c63c623128b5f32f162e9d17fb020562d986121a0ef6e9e8`.
+Task 3.5 remains open for the corrected source's focused and full local checks
+and fresh exact-head hosted acceptance.
 
 ## Prior native-key wait correction
 
@@ -93,10 +138,11 @@ documentation updates. The local log is
 
 Prior gate results below belong to their named earlier source snapshots.
 The Linux D-Bus setup and trusted caller prerequisite are now adopted as
-recorded above. The merged API preparation still needs its normal local gate,
-fresh exact-head admission and every required hosted check. Real native
-key-service acceptance remains unproved. Commit and publication remain pending.
-OpenSpec task 3.5 stays open for the new source acceptance.
+recorded above. The later `90aa7350e30eaad908d14e8b3260610d5f15f2fe` normal hook
+passed, but its hosted findings require the new correction above. Real native
+key-service acceptance remains unproved. Task 3.5 stays open for the corrected
+source's local gate and fresh exact-head hosted acceptance; package release and
+docs publication remain separate.
 
 ## Prior protected-parent preparation
 
@@ -246,9 +292,12 @@ The active CLI and IDE checkouts and locks were not changed by these checks.
 Their owners must adopt the matching locks with the reviewed harness revision.
 These checks prove local API compilation; they are not host runtime, UI,
 packaging, native terminal or PTY acceptance. The full consuming-host gates remain
-separate. Hosted checks must use the final reviewed immutable harness source and
-a suitably scoped private checkout credential; this record does not claim that
-credential is configured.
+separate. A later CLI dependency transition also needs reviewed CI dependency
+selection so each harness revision uses its matching lock; that consumer change
+is outside this harness correction. Hosted checks must use the final reviewed
+immutable harness source and any checkout credential required by the repository's
+actual access policy. The owner authorized public source rollout separately;
+this API correction does not change repository visibility.
 
 ## Remaining native and release evidence
 

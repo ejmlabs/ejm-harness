@@ -166,6 +166,70 @@ fn unsafe_legacy_source_is_not_imported_or_deleted() -> Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn legacy_fifo_is_rejected_without_waiting_or_changing_credentials() -> Result<()> {
+    use std::{
+        os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt},
+        sync::mpsc::{self, RecvTimeoutError},
+        thread,
+        time::Duration,
+    };
+
+    use rustix::fs::{CWD, Mode, OFlags, mkfifoat};
+
+    let fixture = Fixture::new()?;
+    let token = SecretString::new("preserved-registry-fixture-token");
+    save(&fixture.vault, &fixture.root, ORIGIN, &token)?;
+    let encrypted = fs::read(fixture.root.join("credentials/vault.bin"))?;
+    let path = fixture.root.join(LEGACY);
+    mkfifoat(CWD, &path, Mode::RUSR | Mode::WUSR)?;
+    let before = fs::symlink_metadata(&path)?;
+
+    let (finished, completion) = mpsc::channel();
+    let rescue_path = path.clone();
+    let watchdog = thread::spawn(move || -> Result<bool> {
+        match completion.recv_timeout(Duration::from_secs(2)) {
+            Ok(()) => Ok(false),
+            Err(RecvTimeoutError::Disconnected) => bail!("FIFO fixture lost completion"),
+            Err(RecvTimeoutError::Timeout) => {
+                // Release a regressed blocking open so the test fails instead of hanging.
+                let reader = fs::OpenOptions::new()
+                    .read(true)
+                    .custom_flags(OFlags::NONBLOCK.bits().cast_signed())
+                    .open(&rescue_path)?;
+                let writer = fs::OpenOptions::new()
+                    .write(true)
+                    .custom_flags(OFlags::NONBLOCK.bits().cast_signed())
+                    .open(&rescue_path)?;
+                drop(writer);
+                drop(reader);
+                Ok(true)
+            }
+        }
+    });
+    let result = migrate(&fixture.vault, &fixture.root, ORIGIN);
+    let _ = finished.send(());
+    let rescued = watchdog
+        .join()
+        .map_err(|_| anyhow::anyhow!("FIFO fixture watchdog panicked"))??;
+
+    assert!(result.is_err());
+    let after = fs::symlink_metadata(&path)?;
+    assert!(after.file_type().is_fifo());
+    assert_eq!((after.dev(), after.ino()), (before.dev(), before.ino()));
+    assert_eq!(
+        fs::read(fixture.root.join("credentials/vault.bin"))?,
+        encrypted
+    );
+    assert_eq!(
+        load(&fixture.vault, &fixture.root, ORIGIN)?.expose_secret(),
+        token.expose_secret()
+    );
+    assert!(!rescued, "legacy FIFO waited for the fixture writer");
+    Ok(())
+}
+
 #[cfg(target_os = "macos")]
 #[test]
 fn legacy_allow_acl_is_not_imported_or_deleted() -> Result<()> {
