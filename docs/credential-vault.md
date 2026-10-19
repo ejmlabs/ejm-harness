@@ -122,9 +122,25 @@ measurements remain acceptance work.
 ## Transactions and migration
 
 Every read or update holds the stable `.lock`, including first key creation,
-refresh exchanges, and persistence. Lock waits stop on cancellation or after
-30 seconds, with a 25 ms retry interval. Transactions save only on explicit
-commit. First-time key setup persists and reopens an empty encrypted vault
+refresh exchanges, and persistence. Async acquisition stops on cancellation or
+after 30 seconds from the initial request, including time spent waiting for the
+native key service. File-lock contention uses a 25 ms retry interval.
+
+The blocking worker owns the prepared transaction through each synchronous
+native call. Cancelling or dropping the async wait does not stop an already-started
+OS call or release its file lock. The worker checks cancellation and the deadline
+before later key or durable changes and before delivering a transaction. An
+in-flight key save may still finish; its bootstrap marker remains recoverable
+without replacing that key. Competing acquisition remains bounded while the
+worker holds the lock. Runtime shutdown may wait for that native call to return.
+The synchronous `lock_blocking` boundary checks cancellation and its deadline
+between calls but cannot interrupt them; keep it off async and UI event threads.
+The existing native stores expose synchronous operations without a cancellation
+token. This uses Tokio's maintained blocking pool and cancellation primitives,
+with no extra runtime, helper process or replacement key-store adapter. See
+[Tokio's blocking-task limits](https://docs.rs/tokio/1.53.3/tokio/task/fn.spawn_blocking.html).
+
+Transactions save only on explicit commit. First-time key setup persists and reopens an empty encrypted vault
 before exposing its first transaction. An existing key with missing ciphertext
 is a recovery error, preserving migration history instead of silently starting
 an empty store. A bounded nonsecret `.bootstrap` marker is persisted before key

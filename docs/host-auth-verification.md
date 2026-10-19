@@ -5,9 +5,102 @@ Snapshot: **October 19, 2026**. This record separates the current
 announce a package release, native platform certification, hosted CI success
 or a deployed docs page.
 
-## Current protected-parent preparation
+## Current adopted-caller preparation
 
-The current candidate is based on protected standards merge
+Protected caller PR #13 merged as
+`99ba4575ad9070a7a0f3296a35e746858af904b0`, with reviewed tree
+`c05980717cd691025eebe6f9514b607d40ca01ae`. Its retained shared caller
+`c4f2873ef0eef5bc3c7d75cf71fa3489a911d134` includes Linux D-Bus build
+setup and strict complete-review enforcement. The caller change completed its
+required hosted checks and separate exact-head approval before protected merge.
+That acceptance covers the caller change, not this API source.
+
+This isolated preparation merges that protected commit into API head
+`4aeff321c3ab1148bfc92776471552308d3e62da` without rewriting its ancestry,
+then applies the exact ten-path vault correction ending at frozen tree
+`4b84fa8790ba8b53c61d0e6270a182b687501bc0`. The initial merged preparation matched all 87 runtime inputs and file modes
+of that corrected source. The fixture-only follow-up below changes the
+existing deadline test; the other 86 inputs remain identical. Both workflow files, all 33 canonical
+review-context files, the current lint exclusions and the checked standards
+task history remain unchanged. After the initial merge, the isolated follow-up
+also makes the fixture-only correction below. No local gate, hosted run, commit
+or publication has been performed for that follow-up. OpenSpec task 3.5 stays open.
+
+## Paused-clock deadline fixture follow-up
+
+The normal pre-commit gate for staged tree
+`b15bcb59da50138126be64b2f2c8eeb4fc4c5936` failed before commit at
+`native_key_read_obeys_the_original_lock_deadline`: the assertion
+`native call must retain ownership` failed. That auth test binary reported
+33 passed, 1 failed and 2 ignored in 6.00 seconds. The retained log is
+`normal-commit-pinned.log`, SHA-256
+`4588283e3bf3bca22b8b41b33aee3eab458e08d4e74fb52112aeaee8c7a0b202`.
+This is a failed gate, not acceptance of that preparation.
+
+The fixture advanced a paused Tokio clock, then awaited a one-second Tokio
+completion guard while its blocking key stand-in used a five-second wall-clock
+watchdog. Released Tokio 1.53.3 rounds timer deadlines up to a millisecond and
+inhibits paused-clock auto-advance during a blocking task. A jump can stop short
+of the rounded timer tick, leaving the completion guard stationary until the
+real watchdog returns and the worker releases its lock. This is a reachable
+fixture failure path consistent with the observed duration; the exact failing
+interleaving was not instrumented or reproduced.
+
+The isolated follow-up resumes Tokio immediately after the deadline jump,
+before awaiting the completion guard. It retains the watchdog, the original
+production deadline and every lock-ownership, ciphertext and recovery assertion.
+Only `crates/ejm-harness-auth/src/store/tests.rs` changes among the 87 runtime
+inputs; the other 86, including all production source, manifests and the lock,
+remain byte-for-byte and mode-for-mode identical. The new ordered input receipt
+is `6ead7566688e18e4bbfc5806148372951024a79795765e3876eff5aea0670a45`. No focused test, full gate or hook has run for this follow-up.
+Task 3.5 remains open for root-owned verification and fresh hosted acceptance.
+
+## Prior native-key wait correction
+
+Hosted run [39245467732](https://github.com/ejmlabs/ejm-harness/actions/runs/39245467732)
+reviewed exact API head `4aeff321c3ab1148bfc92776471552308d3e62da`.
+AI pass 1 reported that cancellation and the original 30-second deadline were
+not observed while synchronous native key access blocked. The independent
+second pass completed with no findings. The first finding remains a required
+correction; a clean second pass does not dismiss it.
+
+The isolated follow-up keeps the blocking worker's stable lock through the OS
+call, bounds the async caller and checks cancellation and the deadline before
+later key or durable changes and transaction delivery. An already-started key
+write can finish after cancellation, leaving its bootstrap marker for recovery
+with the same key. Synchronous OS calls and runtime shutdown remain subject to
+native completion. Key initialization remains serialized. No dependency or
+storage namespace changes are part of this correction.
+
+New injected-key fixtures cover a blocked read cancelled by its caller, a read
+that reaches the original deadline, retained file-lock ownership and committed
+state, and recovery after cancelling or abandoning an already-started first key
+save. All four passed in the root-owned required `./scripts/check` run on runtime
+source tree `de80bf8d9a67d54041cb7d167ece5faf55c42ecc`. That gate exited **0**
+on macOS with Rust **1.99.1**, Node **26.12.0** and Python SDK **3.14.2**, with
+at most two Cargo jobs. It passed **202 Rust tests** with **3 ignored**, **15
+TypeScript SDK tests**, **4 policy tests**, **11 Python language-host tests**
+and **16 Python SDK tests**, plus the required lint, build, Rustdoc, dependency,
+formatting and generated-protocol checks and Python source/wheel builds.
+
+The same ordered 87 Rust workspace inputs have canonical JSON content-receipt
+SHA-256 `752e0b103d746df4e527892062a7728d5113fe6d2f43471bc519034cdfcd0a97`.
+Only `store/vault.rs` and `store/tests.rs` differ from the prior 87-input receipt
+below. This receipt identifies runtime inputs independently of later
+documentation updates. The local log is
+`ejm-harness-vault-cancel-full-gate-20261019.log`, SHA-256
+`ec8daa2e0b5e38edfdfdd4962cc9fedf26ce06a9821b7a2a5fe3101a64280e0e`.
+
+Prior gate results below belong to their named earlier source snapshots.
+The Linux D-Bus setup and trusted caller prerequisite are now adopted as
+recorded above. The merged API preparation still needs its normal local gate,
+fresh exact-head admission and every required hosted check. Real native
+key-service acceptance remains unproved. Commit and publication remain pending.
+OpenSpec task 3.5 stays open for the new source acceptance.
+
+## Prior protected-parent preparation
+
+The prior final-parent candidate is based on protected standards merge
 `ee1d2e3df5d77027be226d20830f6c5ea84d0d1d`. Its tree matches reviewed PR #1
 head `6da46394f29b3d0d1f068175b1715e8c6b048d23`. Reapplying only the original
 source changes from `b97d5838a68a56495ba17f413a566b7122aabb24` to
@@ -21,7 +114,7 @@ Node **26.12.0** and Python SDK **3.14.2**, with at most two Cargo jobs. It pass
 198 Rust tests, 15 TypeScript SDK tests, 4 policy checks, 11 Python language-host
 fixtures and 16 Python SDK tests, plus all required lint, build, documentation,
 dependency and generated-protocol checks. Three Rust fixtures remain ignored.
-The current 87 tracked Rust workspace inputs have canonical JSON content-receipt
+That candidate's 87 tracked Rust workspace inputs have canonical JSON content-receipt
 SHA-256 `5c3a37097ec868392e0b776ad607fe4a97375dcf49c18c8541f071627127554f`.
 Only the parent's hook-test source differs from the original input receipt.
 

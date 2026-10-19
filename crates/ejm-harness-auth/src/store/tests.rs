@@ -5,6 +5,7 @@ use std::{
     sync::{
         Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
+        mpsc,
     },
     time::Duration,
 };
@@ -39,6 +40,98 @@ impl VaultKeyStore for Keys {
             .insert(id.into(), value.clone());
         Ok(())
     }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum KeyCall {
+    Read,
+    Save,
+}
+
+struct KeyGate {
+    entered: tokio::sync::oneshot::Sender<()>,
+    release: mpsc::Receiver<()>,
+}
+
+struct BlockedKeys {
+    inner: Arc<Keys>,
+    call: KeyCall,
+    gate: Mutex<Option<KeyGate>>,
+}
+
+struct ReleaseKeyCall(mpsc::Sender<()>);
+
+impl Drop for ReleaseKeyCall {
+    fn drop(&mut self) {
+        let _ = self.0.send(());
+    }
+}
+
+impl BlockedKeys {
+    fn new(
+        inner: Arc<Keys>,
+        call: KeyCall,
+    ) -> (
+        Arc<Self>,
+        tokio::sync::oneshot::Receiver<()>,
+        ReleaseKeyCall,
+    ) {
+        let (entered, reached) = tokio::sync::oneshot::channel();
+        let (release, wait) = mpsc::channel();
+        (
+            Arc::new(Self {
+                inner,
+                call,
+                gate: Mutex::new(Some(KeyGate {
+                    entered,
+                    release: wait,
+                })),
+            }),
+            reached,
+            ReleaseKeyCall(release),
+        )
+    }
+
+    fn block(&self, call: KeyCall) -> Result<()> {
+        if self.call == call {
+            let gate = self
+                .gate
+                .lock()
+                .map_err(|_| anyhow::anyhow!("test key gate poisoned"))?
+                .take();
+            if let Some(gate) = gate {
+                let _ = gate.entered.send(());
+                gate.release
+                    .recv_timeout(Duration::from_secs(5))
+                    .context("blocked test key call was not released")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl VaultKeyStore for BlockedKeys {
+    fn get(&self, id: &str) -> Result<Option<SecretString>> {
+        self.block(KeyCall::Read)?;
+        self.inner.get(id)
+    }
+
+    fn set(&self, id: &str, value: &SecretString) -> Result<()> {
+        self.inner.set(id, value)?;
+        self.block(KeyCall::Save)
+    }
+}
+
+async fn released_lock(vault: &SecretVault) -> Result<Prepared> {
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Some(prepared) = vault.try_lock()? {
+                return Ok(prepared);
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await?
 }
 
 fn sample() -> StoredAuth {
@@ -234,6 +327,131 @@ async fn blocked_lock_times_out_without_changing_committed_state() -> Result<()>
         "committed-value"
     );
     Ok(())
+}
+
+async fn blocked_key_read_stops_waiting(cancel_wait: bool) -> Result<()> {
+    let root = tempfile::tempdir()?;
+    let path = root.path().join("vault");
+    let keys = Arc::new(Keys::default());
+    let mut held = SecretVault::open_with_key_store(&path, keys.clone())?
+        .lock(CancellationToken::new())
+        .await?;
+    held.set(id()?, SecretString::new("committed-before-key-wait"))?;
+    held.commit()?;
+    drop(held);
+    let ciphertext = fs::read(path.join("vault.bin"))?;
+    let (blocked, entered, release) = BlockedKeys::new(keys.clone(), KeyCall::Read);
+    let vault = SecretVault::open_with_key_store(&path, blocked)?;
+    let cancel = CancellationToken::new();
+    let waiting = tokio::spawn({
+        let vault = vault.clone();
+        let cancel = cancel.clone();
+        async move { vault.lock(cancel).await }
+    });
+    tokio::time::timeout(Duration::from_secs(2), entered).await??;
+    if cancel_wait {
+        cancel.cancel();
+    } else {
+        // Pause only after the real blocking worker has reached the injected boundary.
+        tokio::time::pause();
+        tokio::time::advance(LOCK_WAIT).await;
+        // Let rounded deadlines and the completion guard progress while the
+        // blocking key call still inhibits paused-clock auto-advance.
+        tokio::time::resume();
+    }
+    let outcome = tokio::time::timeout(Duration::from_secs(1), waiting).await;
+    assert!(
+        outcome??.is_err(),
+        "native key wait must not expose a transaction"
+    );
+    assert!(
+        vault.try_lock()?.is_none(),
+        "native call must retain ownership"
+    );
+    assert_eq!(fs::read(path.join("vault.bin"))?, ciphertext);
+    drop(release);
+    let held = released_lock(&vault).await?;
+    assert_eq!(fs::read(path.join("vault.bin"))?, ciphertext);
+    assert_eq!(keys.writes.load(Ordering::SeqCst), 1);
+    drop(held);
+    let transaction = vault.lock(CancellationToken::new()).await?;
+    assert_eq!(
+        transaction
+            .get(&id()?)
+            .context("committed secret missing")?
+            .expose_secret(),
+        "committed-before-key-wait"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn native_key_read_cancels_without_releasing_the_inflight_lock() -> Result<()> {
+    blocked_key_read_stops_waiting(true).await
+}
+
+#[tokio::test]
+async fn native_key_read_obeys_the_original_lock_deadline() -> Result<()> {
+    blocked_key_read_stops_waiting(false).await
+}
+
+async fn interrupted_native_key_save_leaves_recoverable_bootstrap(drop_wait: bool) -> Result<()> {
+    let root = tempfile::tempdir()?;
+    let path = root.path().join("vault");
+    let keys = Arc::new(Keys::default());
+    let (blocked, entered, release) = BlockedKeys::new(keys.clone(), KeyCall::Save);
+    let vault = SecretVault::open_with_key_store(&path, blocked)?;
+    let cancel = CancellationToken::new();
+    let waiting = tokio::spawn({
+        let vault = vault.clone();
+        let cancel = cancel.clone();
+        async move { vault.lock(cancel).await }
+    });
+    tokio::time::timeout(Duration::from_secs(2), entered).await??;
+    assert_eq!(keys.writes.load(Ordering::SeqCst), 1);
+    if drop_wait {
+        waiting.abort();
+        let error = tokio::time::timeout(Duration::from_secs(1), waiting)
+            .await?
+            .err()
+            .context("caller task was not aborted")?;
+        ensure!(
+            error.is_cancelled(),
+            "aborted caller did not report cancellation"
+        );
+    } else {
+        cancel.cancel();
+        assert!(
+            tokio::time::timeout(Duration::from_secs(1), waiting)
+                .await??
+                .is_err()
+        );
+    }
+    assert!(
+        vault.try_lock()?.is_none(),
+        "native call must retain ownership"
+    );
+    drop(release);
+    let held = released_lock(&vault).await?;
+    assert_eq!(fs::read(path.join(".bootstrap"))?, BOOTSTRAP);
+    assert!(!path.join("vault.bin").exists());
+    drop(held);
+    let mut transaction = vault.lock(CancellationToken::new()).await?;
+    assert!(!path.join(".bootstrap").exists());
+    transaction.set(id()?, SecretString::new("after-native-key-recovery"))?;
+    transaction.commit()?;
+    assert_eq!(keys.writes.load(Ordering::SeqCst), 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn cancelled_native_key_save_leaves_recoverable_bootstrap() -> Result<()> {
+    interrupted_native_key_save_leaves_recoverable_bootstrap(false).await
+}
+
+#[tokio::test]
+async fn abandoned_native_key_save_leaves_recoverable_bootstrap() -> Result<()> {
+    interrupted_native_key_save_leaves_recoverable_bootstrap(true).await
 }
 
 #[tokio::test]

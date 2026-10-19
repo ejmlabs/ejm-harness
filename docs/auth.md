@@ -116,8 +116,17 @@ DACL creation, pinned directory/file handles, reparse rejection, file flush,
 and write-through publication. Native Windows acceptance is still pending.
 Use trusted local filesystems with reliable locking and atomic publication.
 
-Lock waiting is cancellable and bounded to thirty seconds. Native key-service
-access runs on a Tokio blocking worker and may require a user unlock prompt.
+Async lock waiting, including native key access, is cancellable and bounded to
+thirty seconds from the initial request. Native key-service access runs on a
+Tokio blocking worker and may require a user unlock prompt. An already-started
+OS call cannot be stopped: the caller returns, but its worker keeps the stable
+lock until that call returns. It checks cancellation and the deadline before
+later key or durable changes and before returning a transaction. A cancelled
+first key write can still finish; its bootstrap marker permits recovery with
+the same key. Do not remove that marker or initialize a competing key.
+`SecretVault::lock_blocking` is synchronous and cannot interrupt OS key calls;
+hosts must keep it off async and UI event threads. Runtime shutdown may also
+wait for an in-flight blocking call.
 An existing vault with a missing, replaced, malformed, or unavailable key fails
 without reset or plaintext fallback. Unknown formats, authentication failures,
 and oversized payloads fail before state becomes available. Preserve the vault

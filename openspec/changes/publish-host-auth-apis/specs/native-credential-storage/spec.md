@@ -37,6 +37,13 @@ The system SHALL serialize credential mutation across processes sharing a vault.
 - **WHEN** a caller cancels while another process holds the vault lock
 - **THEN** that caller stops waiting without altering state or leaving lock ownership behind
 
+#### Scenario: Native key access does not return
+
+- **WHEN** native key access blocks during asynchronous transaction acquisition
+- **THEN** the asynchronous caller returns when cancelled or when its original 30-second deadline expires
+- **AND** the blocking worker retains exclusive ownership until its already-started native call returns and checks cancellation and the deadline before later key or durable changes or transaction delivery
+- **AND** an already-started key write may finish without exposing a credential transaction, while its bootstrap marker remains available for recovery without key replacement
+
 ### Requirement: Atomic bounded authenticated persistence
 
 The system SHALL authenticate encrypted state before decoding or using it, reject unknown versions and oversized data, and atomically commit complete updates. It SHALL retain the provider-state limits of 1 MiB and 64 registrations and impose explicit limits on other namespaces and encrypted files.

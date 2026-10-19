@@ -86,7 +86,8 @@ impl fmt::Debug for SecretId {
     }
 }
 
-/// Injected OS key boundary. Methods run while the stable vault lock is held.
+/// Injected synchronous OS key boundary, called while the stable vault lock is held.
+/// An in-flight method cannot be interrupted; asynchronous callers can stop waiting.
 pub trait VaultKeyStore: Send + Sync {
     /// Read an existing base64-encoded 32-byte key; only absence returns `None`.
     ///
@@ -228,26 +229,33 @@ impl SecretVault {
         }
     }
 
-    /// Acquire ownership, including native key setup, with bounded cancellable lock waiting.
+    /// Acquire ownership, including native key setup, with bounded cancellable waiting.
+    /// An in-flight native call retains the lock until it returns, even if this wait ends.
     ///
     /// # Errors
     /// Reports cancellation, timeout, key-service failure, or corrupt/unsafe state.
     pub async fn lock(&self, cancel: CancellationToken) -> Result<VaultTransaction> {
         let deadline = tokio::time::Instant::now() + LOCK_WAIT;
+        let worker_cancel = cancel.child_token();
+        let _cancel_on_drop = worker_cancel.clone().drop_guard();
         loop {
-            ensure!(!cancel.is_cancelled(), "credential store lock cancelled");
-            ensure!(
-                tokio::time::Instant::now() < deadline,
-                "credential store lock timed out"
-            );
+            check_lock_wait(&cancel, tokio::time::Instant::now() >= deadline)?;
             if let Some(prepared) = self.try_lock()? {
                 let backend = self.backend.clone();
-                let transaction =
-                    tokio::task::spawn_blocking(move || finish_lock(backend, prepared))
-                        .await
-                        .map_err(|_| anyhow::anyhow!("credential store operation interrupted"))??;
-                ensure!(!cancel.is_cancelled(), "credential store lock cancelled");
-                return Ok(transaction);
+                let mut operation = tokio::task::spawn_blocking(move || {
+                    finish_lock(backend, prepared, || {
+                        check_lock_wait(&worker_cancel, tokio::time::Instant::now() >= deadline)
+                    })
+                });
+                let result = tokio::select! {
+                    biased;
+                    () = cancel.cancelled() => bail!("credential store lock cancelled"),
+                    () = tokio::time::sleep_until(deadline) => bail!("credential store lock timed out"),
+                    result = &mut operation => result,
+                };
+                check_lock_wait(&cancel, tokio::time::Instant::now() >= deadline)?;
+                return result
+                    .map_err(|_| anyhow::anyhow!("credential store operation interrupted"))?;
             }
             tokio::select! {
                 biased;
@@ -258,17 +266,20 @@ impl SecretVault {
     }
 
     /// Acquire at a synchronous host boundary. Do not call on a UI event thread.
+    /// Native key calls cannot be interrupted; cancellation and the deadline are
+    /// checked before and after them, while the calling thread retains ownership.
     ///
     /// # Errors
     /// Reports the same failures as [`Self::lock`].
     pub fn lock_blocking(&self, cancel: &CancellationToken) -> Result<VaultTransaction> {
         let deadline = Instant::now() + LOCK_WAIT;
         loop {
-            ensure!(!cancel.is_cancelled(), "credential store lock cancelled");
-            ensure!(Instant::now() < deadline, "credential store lock timed out");
+            check_lock_wait(cancel, Instant::now() >= deadline)?;
             if let Some(prepared) = self.try_lock()? {
-                let transaction = finish_lock(self.backend.clone(), prepared)?;
-                ensure!(!cancel.is_cancelled(), "credential store lock cancelled");
+                let transaction = finish_lock(self.backend.clone(), prepared, || {
+                    check_lock_wait(cancel, Instant::now() >= deadline)
+                })?;
+                check_lock_wait(cancel, Instant::now() >= deadline)?;
                 return Ok(transaction);
             }
             std::thread::sleep(LOCK_RETRY.min(deadline.saturating_duration_since(Instant::now())));
@@ -291,7 +302,40 @@ enum Prepared {
     Memory(OwnedMutexGuard<VaultState>),
 }
 
-fn finish_lock(backend: Backend, prepared: Prepared) -> Result<VaultTransaction> {
+fn check_lock_wait(cancel: &CancellationToken, timed_out: bool) -> Result<()> {
+    ensure!(!cancel.is_cancelled(), "credential store lock cancelled");
+    ensure!(!timed_out, "credential store lock timed out");
+    Ok(())
+}
+
+fn decode_vault(
+    secret: &SecretString,
+    encoded: Option<Zeroizing<Vec<u8>>>,
+    identity: &str,
+) -> Result<(Zeroizing<Vec<u8>>, VaultState)> {
+    ensure!(
+        secret.expose_secret().len() <= 128,
+        "invalid vault key record"
+    );
+    let key = Zeroizing::new(
+        STANDARD
+            .decode(secret.expose_secret())
+            .map_err(|_| anyhow::anyhow!("invalid vault key record"))?,
+    );
+    ensure!(key.len() == 32, "invalid vault key record");
+    let state = encoded.map_or_else(
+        || Ok(VaultState::default()),
+        |encoded| decrypt(&encoded, &key, identity),
+    )?;
+    Ok((key, state))
+}
+
+fn finish_lock(
+    backend: Backend,
+    prepared: Prepared,
+    check_wait: impl Fn() -> Result<()>,
+) -> Result<VaultTransaction> {
+    check_wait()?;
     match (backend, prepared) {
         (Backend::Memory(_), Prepared::Memory(guard)) => Ok(VaultTransaction {
             state: guard.clone(),
@@ -307,7 +351,10 @@ fn finish_lock(backend: Backend, prepared: Prepared) -> Result<VaultTransaction>
                 bootstrap.as_deref().is_none_or(|bytes| bytes == BOOTSTRAP),
                 "invalid credential bootstrap marker; preserve the vault and key"
             );
-            let existing = keys.get(&identity).map_err(|_| {
+            check_wait()?;
+            let existing = keys.get(&identity);
+            check_wait()?;
+            let existing = existing.map_err(|_| {
                 anyhow::anyhow!(
                     "vault key service unavailable; unlock macOS Keychain or Windows Credential Manager, or start an unlocked Linux Secret Service in the user's D-Bus session"
                 )
@@ -332,6 +379,7 @@ fn finish_lock(backend: Backend, prepared: Prepared) -> Result<VaultTransaction>
             if new_vault && bootstrap.is_none() {
                 // Persist before creating a key. No credential transaction is exposed
                 // until this marker has been durably retired.
+                check_wait()?;
                 raw.write(".bootstrap", BOOTSTRAP, BOOTSTRAP.len())?;
             }
             let secret = if let Some(secret) = existing {
@@ -340,11 +388,16 @@ fn finish_lock(backend: Backend, prepared: Prepared) -> Result<VaultTransaction>
                 let mut bytes = Zeroizing::new([0u8; 32]);
                 fill(bytes.as_mut()).map_err(|_| anyhow::anyhow!("cannot generate vault key"))?;
                 let secret = SecretString::new(STANDARD.encode(bytes.as_ref()));
-                keys.set(&identity, &secret).map_err(|_| {
+                check_wait()?;
+                let saved = keys.set(&identity, &secret);
+                check_wait()?;
+                saved.map_err(|_| {
                     anyhow::anyhow!("cannot save vault key in OS credential service")
                 })?;
-                let confirmed = keys
-                    .get(&identity)
+                check_wait()?;
+                let confirmed = keys.get(&identity);
+                check_wait()?;
+                let confirmed = confirmed
                     .map_err(|_| anyhow::anyhow!("cannot verify saved vault key"))?
                     .context("saved vault key is missing")?;
                 ensure!(
@@ -356,20 +409,7 @@ fn finish_lock(backend: Backend, prepared: Prepared) -> Result<VaultTransaction>
                 );
                 secret
             };
-            ensure!(
-                secret.expose_secret().len() <= 128,
-                "invalid vault key record"
-            );
-            let key = Zeroizing::new(
-                STANDARD
-                    .decode(secret.expose_secret())
-                    .map_err(|_| anyhow::anyhow!("invalid vault key record"))?,
-            );
-            ensure!(key.len() == 32, "invalid vault key record");
-            let state = encoded.map_or_else(
-                || Ok(VaultState::default()),
-                |encoded| decrypt(&encoded, &key, &identity),
-            )?;
+            let (key, state) = decode_vault(&secret, encoded, &identity)?;
             let mut transaction = VaultTransaction {
                 raw: Some(raw),
                 memory: None,
@@ -380,16 +420,20 @@ fn finish_lock(backend: Backend, prepared: Prepared) -> Result<VaultTransaction>
             if new_vault {
                 // Once a key exists, absence of ciphertext is never treated as
                 // an empty store. Finish bootstrap before exposing a transaction.
+                check_wait()?;
                 transaction.commit()?;
+                check_wait()?;
                 transaction.verify_saved()?;
             }
             if new_vault || bootstrap.is_some() {
+                check_wait()?;
                 transaction
                     .raw
                     .as_ref()
                     .context("credential transaction has no storage")?
                     .remove(".bootstrap", BOOTSTRAP.len())?;
             }
+            check_wait()?;
             Ok(transaction)
         }
         _ => bail!("invalid credential transaction backend"),
