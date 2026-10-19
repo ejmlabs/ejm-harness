@@ -1,4 +1,4 @@
-use super::{Harness, ModelWaiter, ToolContext, hooks::bound_output};
+use super::{Harness, ModelWaiter, RunCompletion, ToolContext, hooks::bound_output};
 use crate::{
     Effect, EventKind, HookContext, Message, ModelDelta, ModelRequest, ModelResponse, RunStatus,
     RunSummary, Session, StepDecision, ToolCall, ToolOutput, Usage, types::timestamp_ms,
@@ -21,7 +21,7 @@ impl Harness {
         mut prompt: String,
         mut cancel: CancellationToken,
         mut steering: mpsc::Receiver<String>,
-        mut done: watch::Sender<Option<RunSummary>>,
+        mut done: watch::Sender<Option<RunCompletion>>,
     ) {
         loop {
             let context = HookContext {
@@ -85,7 +85,10 @@ impl Harness {
             }
             let mut active = self.inner.active.lock().await;
             let Some(entry) = active.get_mut(&session.id) else {
-                let _ = done.send(Some(summary));
+                let _ = done.send(Some(RunCompletion {
+                    summary,
+                    queued_successor: false,
+                }));
                 break;
             };
             while let Ok(text) = steering.try_recv() {
@@ -99,14 +102,18 @@ impl Harness {
             } else {
                 None
             };
-            let _ = done.send(Some(summary));
+            let _ = done.send(Some(RunCompletion {
+                summary,
+                queued_successor: next.is_some(),
+            }));
             if let Some(next) = next {
                 prompt = next;
                 run_id = uuid::Uuid::new_v4().to_string();
                 entry.id.clone_from(&run_id);
                 cancel = self.inner.stopped.child_token();
                 entry.cancel = cancel.clone();
-                let (tx, _) = watch::channel(None);
+                let (tx, result) = watch::channel(None);
+                entry.done = result;
                 done = tx;
                 drop(active);
             } else {

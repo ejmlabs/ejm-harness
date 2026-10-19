@@ -9,7 +9,7 @@ mod types;
 
 pub use config::HarnessConfig;
 pub use ejm_harness_exec;
-pub use engine::{Harness, RunHandle, Tool, ToolContext};
+pub use engine::{Harness, RunCompletion, RunHandle, Tool, ToolContext};
 pub use hooks::{Hook, HookContext, ToolDecision};
 pub use policy::{ContextPolicy, RecentContext, RunStrategy, StepDecision, ToolLoop};
 pub use provider::{

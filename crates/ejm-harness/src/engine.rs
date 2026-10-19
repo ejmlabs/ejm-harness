@@ -57,6 +57,7 @@ struct Inner {
 struct ActiveRun {
     id: String,
     cancel: CancellationToken,
+    done: watch::Receiver<Option<RunCompletion>>,
     steering: mpsc::Sender<String>,
     queued: VecDeque<String>,
 }
@@ -66,25 +67,50 @@ struct ProviderSelection {
     binding_initialized: bool,
 }
 
+/// One run's completion and its driver's local queue decision.
+#[derive(Clone)]
+pub struct RunCompletion {
+    pub summary: RunSummary,
+    /// Whether the driver handed off to an internally queued successor.
+    /// A false value does not assert that the session is still idle.
+    pub queued_successor: bool,
+}
+
+/// An observer and cancellation handle for one run. Clones share the same run.
+/// Dropping a handle does not cancel work.
+#[derive(Clone)]
 pub struct RunHandle {
     pub id: String,
     pub session_id: String,
     cancel: CancellationToken,
-    done: watch::Receiver<Option<RunSummary>>,
+    done: watch::Receiver<Option<RunCompletion>>,
 }
 
 impl RunHandle {
     pub fn cancel(&self) {
         self.cancel.cancel();
     }
-    /// Wait for this run, including durable completion.
+    /// Wait for durable completion and bounded run-end observers.
+    ///
+    /// Another locally queued run may already be current when this returns.
     ///
     /// # Errors
     /// Returns an error if the run driver stops without a summary.
     pub async fn wait(&mut self) -> Result<RunSummary> {
+        Ok(self.wait_completion().await?.summary)
+    }
+
+    /// Wait for completion and the driver's atomic queued-successor decision.
+    ///
+    /// Hosts must still validate their own target, revocation and admission.
+    /// The result is retained even if a queued successor has already finished.
+    ///
+    /// # Errors
+    /// Returns an error if the run driver stops without a summary.
+    pub async fn wait_completion(&mut self) -> Result<RunCompletion> {
         loop {
-            if let Some(summary) = self.done.borrow_and_update().clone() {
-                return Ok(summary);
+            if let Some(completion) = self.done.borrow_and_update().clone() {
+                return Ok(completion);
             }
             self.done
                 .changed()
@@ -451,6 +477,7 @@ impl Harness {
             ActiveRun {
                 id: id.clone(),
                 cancel: cancel.clone(),
+                done: result.clone(),
                 steering,
                 queued: VecDeque::new(),
             },
@@ -468,6 +495,22 @@ impl Harness {
             session_id: session_id.into(),
             cancel,
             done: result,
+        })
+    }
+
+    /// Subscribe to the exact current run, including its bounded run-end cleanup.
+    ///
+    /// Returns `None` when the named session and run are not the current pair.
+    /// This is not evidence of success. Use durable replay to inspect old results.
+    /// Waiting includes run-end observers; journaled completion alone does not.
+    pub async fn subscribe_run(&self, session_id: &str, run_id: &str) -> Option<RunHandle> {
+        let active = self.inner.active.lock().await;
+        let run = active.get(session_id).filter(|run| run.id == run_id)?;
+        Some(RunHandle {
+            id: run.id.clone(),
+            session_id: session_id.into(),
+            cancel: run.cancel.clone(),
+            done: run.done.clone(),
         })
     }
 

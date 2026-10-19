@@ -6,6 +6,8 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ### Added
 
+- Add exact current-run completion subscriptions and clonable run handles for native hosts, including internally queued successors. Detailed completion also preserves the atomic local-successor decision; summary-only wait stays compatible. Waiting includes bounded run-end observers; the source revision still requires its local gate, hosted review and protected publication.
+
 - Add the encrypted credential vault and controlled registry-session migration APIs.
 - Add official Claude Code authentication and supervised structured inference.
 - Add optional provider readiness and idle provider replacement with durable continuation binding.
