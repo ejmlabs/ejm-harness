@@ -1,4 +1,13 @@
 {
   "printWidth": 100,
-  "proseWrap": "preserve"
+  "proseWrap": "preserve",
+  "overrides": [
+    {
+      "files": "site/public/index.html",
+      "options": {
+        "printWidth": 2000,
+        "tabWidth": 2
+      }
+    }
+  ]
 }
