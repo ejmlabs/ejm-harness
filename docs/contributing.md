@@ -51,6 +51,67 @@ A missing tool or stale lock is a failed gate, not a skipped check. The advisory
 check needs access to the RustSec database. Report network or platform limits
 as unverified evidence instead of describing a partial run as green.
 
+## Shared CI caller prerequisite
+
+This source prerequisite starts from protected harness main
+`ee1d2e3df5d77027be226d20830f6c5ea84d0d1d`. It updates both canonical
+workflow `uses` pins and the release `standards-ref` together from
+`5fae851502c2e3c31d4df9a44f8d56c2cb49e098` to reviewed central PR #11 implementation
+`ae903129564926a14287f75d2012610c59cccb65`. The earlier `5309137` and
+`0adffdf5` central targets are obsolete history. Product code, manifests,
+locks, tools and gate commands stay at the protected base.
+
+Central PR #11 passed required checks and exact-head human approval, then
+merged through protected main as
+`8c304c8cdfc8b6fe50f3e442507215e615944f2b`. The merge and reviewed head share
+tree `91b7f5c0990e27f2e0fdfcce26aac18afdcf6b81`. The exact implementation
+is retained at
+`refs/heads/workflow-pins/ae903129564926a14287f75d2012610c59cccb65` under
+active update/delete rule `25369476`, with no bypass actors and unchanged main
+protections. Harness caller adoption and its hosted checks remain pending.
+
+The retained central quality workflow installs `pkg-config` and
+`libdbus-1-dev` with the runner's package manager only for the admitted
+`ejm-harness` profile on Linux, before Rust tool setup and the existing gate.
+The fixed step comes from the reviewed central workflow. It does not execute a
+harness-local action or give product code installation authority. The central
+CLI setup hook remains restricted to its existing CLI profile.
+
+The separate host-auth API candidate needs these D-Bus development files for
+its native Secret Service key adapter. Its Linux hosted run `118036420366`
+failed to find `dbus-1.pc`. Passing local macOS checks do not verify that Linux
+build. This caller prerequisite contains no new auth API, credential migration,
+key-service behavior or dependency lock resolution.
+
+Adopt the prerequisites in this order:
+
+1. Verify the central merge and retention receipt above against the exact
+   implementation at all three pin sites. The central prerequisite is complete.
+   Keep its retained source; a later reviewed revision requires fresh checks,
+   exact approval and protected retention.
+2. Recheck all three caller pin sites against the retained implementation.
+   Publish and admit the caller-only change through the existing human and
+   protected merge gates. Each new head needs fresh decisions and checks.
+3. Obtain exact-source Linux, macOS and Windows quality results for this caller.
+   Then rebase the separately reviewed host-auth API source onto the adopted
+   prerequisite and run fresh locked gates. A passing caller-only result does
+   not prove the later API source or native key service.
+
+Private CLI dependency checkout still requires reviewed harness source and a
+dedicated, expiring Contents: read credential limited to `ejmlabs/ejm-harness`.
+The user authorized private API publication and provided `EJM_HARNESS_TOKEN`;
+successful CLI source preparation does not verify that credential's scope or
+expiry. Validate those separately through protected secret handling. IDE access
+and adoption require its owner's separate authorization. Keep workstation
+credentials local and preserve all existing admission, approval and secret
+boundaries.
+
+This is contributor CI guidance. It changes no product API, setup or runtime
+behavior, so the public product page needs no change. Static preparation checks
+alone do not establish a full gate, hosted result, protected adoption or public
+site publication. The normal commit hook and exact-source hosted gates remain
+required.
+
 ## Plan changes
 
 Read [the repository contribution policy](../CONTRIBUTING.md). Feature and bugfix
