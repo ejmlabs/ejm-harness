@@ -6,6 +6,8 @@ small pool of local commands. It does not mean 100 concurrent builds.
 
 ## Reproduce
 
+The RSS and PTY benchmark runner requires Linux or macOS.
+
 Build both sibling projects in release mode, then run from ejm-harness:
 
 ```sh

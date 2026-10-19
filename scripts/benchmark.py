@@ -79,6 +79,9 @@ def measure_workload(binary: Path, agents: int, parked: bool) -> dict[str, Any]:
 
 
 def first_paint(binary: Path, state: Path) -> float:
+    if sys.platform == "win32":
+        raise RuntimeError("first-paint measurements require Linux or macOS")
+
     import fcntl
     import pty
     import struct
