@@ -34,3 +34,9 @@ hosts, but they do not prove Linux execution behavior. Report that distinction.
 Run `cargo test -p ejm-harness-exec` and strict all-target Clippy before the full gate.
 
 Update [harness-maintenance](../harness-maintenance/SKILL.md) when the guarantee changes.
+
+## Private input and native ownership
+
+Use `Executor::run_with_input` for bounded private stdin. Keep it outside serialized command requests and artifacts, write it while both output pipes drain, and retain supervisor ownership through cancellation and cleanup.
+
+Use `process::spawn_owned` for shared native child ownership. Root `wait()` does not finish descendant cleanup. Retain children, pipes and guards through `kill().await`, including confirmed empty Windows Job membership. See the [native ownership contract](../../../docs/native-process-support.md) for maintained packages, creation flags and missing native evidence.

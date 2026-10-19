@@ -37,3 +37,7 @@ Verify unauthorized writes, namespace takeover, upload races, hostile archives,
 quarantine, origin checks, and real Better Auth device/session behavior with
 local Cloudflare bindings. Run strict checks and dependency audits. Deployment,
 DNS, account provisioning, and publication require authorization.
+
+## Registry account storage
+
+Store origin-scoped account sessions through the shared vault APIs. Do not create or automatically load plaintext sessions. Legacy import requires older clients stopped, source privacy and origin validation, verified encrypted persistence and a permanent destination marker. Keep markers after logout and replacement so leftover legacy sources cannot restore revoked sessions. See [registry credentials](../../../docs/packages.md#registry-credentials).

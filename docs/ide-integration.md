@@ -7,8 +7,12 @@ diagnostic retention, and its UI. ejm-cli demonstrates the same public APIs.
 ## Authentication and provider selection
 
 Use `ejm_harness_auth::AuthEngine` with an injected `CredentialStore`. The supplied
-`FileStore` is supported on Unix. An OS keychain adapter must retain the same
-exclusive cross-process transaction through refresh and atomic replacement.
+`FileStore` uses the shared encrypted vault and the current user's native key
+service on macOS, Windows and Linux. Lock ownership covers refresh and atomic
+replacement. Linux requires an unlocked Secret Service; native Windows
+acceptance remains pending. Explicit memory-only storage does not persist or
+import credentials. See the [vault contract](credential-vault.md) for limits,
+migration, recovery and platform evidence.
 See [the auth contract](auth.md) for the callback flow, typed `RetryRequired`,
 rotation, logout, and safe status types.
 
@@ -29,9 +33,13 @@ attach per-call capture while sharing the client and credential source.
 
 Use native Responses for OpenAI profiles. Other vendors using a compatible
 endpoint can use `OpenAiProvider`, which implements Chat Completions.
-`AnthropicProvider` uses native API keys. Anthropic subscription sign-in belongs
-to unmodified external Claude Code and is not a credential source for this
-provider. Do not present external execution as governed by this harness.
+`AnthropicProvider` uses native API keys. Subscription sign-in belongs to
+unmodified Claude Code and is not a credential source for that HTTP provider.
+Use `ClaudeCodeClient` for its account controls and `ClaudeCodeProvider` with an
+executor from the harness's shared governor for structured subscription
+inference. The harness retains conversation state and tool admission. This is
+native execution with documented managed-client and containment limits; see
+the [official-client contract](claude-code.md).
 
 ## Models and usage
 

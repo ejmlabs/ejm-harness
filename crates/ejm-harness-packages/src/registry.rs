@@ -1,6 +1,6 @@
 //! Native registry client. Account tokens are never sent to package download hosts.
 
-use std::{fmt, path::Path, time::Duration};
+use std::{fmt, time::Duration};
 
 use anyhow::{Context, Result, bail, ensure};
 use ejm_harness_auth::SecretString;
@@ -12,6 +12,11 @@ use reqwest::{Client, Response, Url, redirect::Policy};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
 use tokio_util::sync::CancellationToken;
+
+mod credentials;
+pub use credentials::{
+    delete_registry_token, load_registry_token, migrate_registry_token, save_registry_token,
+};
 
 pub const DEFAULT_REGISTRY: &str = "https://harness.meetgerry.ai";
 const MAX_JSON_BYTES: usize = 64 * 1024;
@@ -63,23 +68,7 @@ impl RegistryClient {
     /// # Errors
     /// Rejects unsafe origins, credentials in URLs, and HTTP client setup errors.
     pub fn new(origin: &str) -> Result<Self> {
-        let mut origin = Url::parse(origin)?;
-        ensure!(
-            origin.username().is_empty()
-                && origin.password().is_none()
-                && origin.query().is_none()
-                && origin.fragment().is_none()
-                && matches!(origin.path(), "" | "/"),
-            "registry must be a plain origin without credentials"
-        );
-        let loopback = origin
-            .host_str()
-            .is_some_and(|host| matches!(host, "localhost" | "127.0.0.1" | "[::1]"));
-        ensure!(
-            origin.scheme() == "https" || (origin.scheme() == "http" && loopback),
-            "registry requires HTTPS"
-        );
-        origin.set_path("/");
+        let origin = parse_origin(origin)?;
         let http = Client::builder()
             .redirect(Policy::none())
             .connect_timeout(Duration::from_secs(10))
@@ -331,54 +320,25 @@ impl RegistryClient {
     }
 }
 
-/// Save a registry-scoped bearer in the private package store with atomic replacement.
-///
-/// # Errors
-/// Returns private-directory or storage failures.
-pub fn save_registry_token(root: &Path, origin: &str, token: &SecretString) -> Result<()> {
-    use std::io::Write;
-    super::manager::private_directory(root)?;
-    let mut file = tempfile::NamedTempFile::new_in(root)?;
-    serde_json::to_writer(
-        &mut file,
-        &json!({"origin":origin,"token":token.expose_secret()}),
-    )?;
-    file.flush()?;
-    file.as_file().sync_all()?;
-    file.persist(root.join("registry-session.json"))?;
-    Ok(())
-}
-
-/// Load credentials only for the origin that created them.
-///
-/// # Errors
-/// Rejects missing sessions, exposed file permissions, or mismatched origins.
-pub fn load_registry_token(root: &Path, origin: &str) -> Result<SecretString> {
-    let path = root.join("registry-session.json");
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        ensure!(
-            std::fs::symlink_metadata(&path)?
-                .permissions()
-                .mode()
-                .trailing_zeros()
-                >= 6,
-            "registry session file must be private"
-        );
-    }
-    let bytes = super::manager::read_bounded(&path, 8192)
-        .context("sign in with ejm-cli package login first")?;
-    let value: Value = serde_json::from_slice(&bytes)?;
+fn parse_origin(value: &str) -> Result<Url> {
+    let mut origin = Url::parse(value)?;
     ensure!(
-        value["origin"] == origin,
-        "saved registry session belongs to another origin"
+        origin.username().is_empty()
+            && origin.password().is_none()
+            && origin.query().is_none()
+            && origin.fragment().is_none()
+            && matches!(origin.path(), "" | "/"),
+        "registry must be a plain origin without credentials"
     );
-    Ok(SecretString::new(
-        value["token"]
-            .as_str()
-            .context("invalid saved registry session")?,
-    ))
+    let loopback = origin
+        .host_str()
+        .is_some_and(|host| matches!(host, "localhost" | "127.0.0.1" | "[::1]"));
+    ensure!(
+        origin.scheme() == "https" || (origin.scheme() == "http" && loopback),
+        "registry requires HTTPS"
+    );
+    origin.set_path("/");
+    Ok(origin)
 }
 
 async fn json_response<T: DeserializeOwned>(response: Response) -> Result<T> {

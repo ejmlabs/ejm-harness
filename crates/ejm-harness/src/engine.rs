@@ -26,6 +26,7 @@ use crate::{
 
 const MAX_PROMPT: usize = 16 * 1024;
 const MAX_CONTROLS: usize = 8;
+const MAX_PROVIDER_BINDING: usize = 1024;
 
 #[derive(Clone)]
 pub struct Harness {
@@ -34,7 +35,7 @@ pub struct Harness {
 
 struct Inner {
     config: HarnessConfig,
-    provider: Arc<dyn Provider>,
+    provider: Mutex<ProviderSelection>,
     tools: BTreeMap<String, Arc<dyn Tool>>,
     definitions: Vec<ToolDefinition>,
     validators: HashMap<String, jsonschema::Validator>,
@@ -45,7 +46,7 @@ struct Inner {
     governor: Arc<Governor>,
     model_slots: Arc<Semaphore>,
     events: broadcast::Sender<Event>,
-    active: Mutex<HashMap<String, ActiveRun>>,
+    active: Arc<Mutex<HashMap<String, ActiveRun>>>,
     stopped: CancellationToken,
     changed: Notify,
     // Effects in one working directory are serialized across sessions. Dormant directories use no lock.
@@ -58,6 +59,11 @@ struct ActiveRun {
     cancel: CancellationToken,
     steering: mpsc::Sender<String>,
     queued: VecDeque<String>,
+}
+
+struct ProviderSelection {
+    provider: Option<Arc<dyn Provider>>,
+    binding_initialized: bool,
 }
 
 pub struct RunHandle {
@@ -141,6 +147,32 @@ impl Harness {
         )
     }
 
+    /// Create a host that may configure its provider after sign-in.
+    ///
+    /// A missing provider rejects turns without persisting their prompts. Use
+    /// [`Self::configure_provider`] before starting work to bind durable reasoning
+    /// to the selected provider, account, model and endpoint.
+    /// Starting with an unbound provider invalidates any earlier durable binding
+    /// and its opaque continuation before admitting the turn.
+    ///
+    /// # Errors
+    /// Rejects invalid budgets, tool schemas, hooks, or an unavailable state directory.
+    pub fn with_optional_provider(
+        config: HarnessConfig,
+        provider: Option<Arc<dyn Provider>>,
+        tools: Vec<Arc<dyn Tool>>,
+        hooks: Vec<Arc<dyn Hook>>,
+    ) -> Result<Self> {
+        Self::build(
+            config,
+            provider,
+            tools,
+            Arc::new(RecentContext),
+            Arc::new(ToolLoop),
+            hooks,
+        )
+    }
+
     /// Create a harness with host policies and hooks in registration order.
     ///
     /// # Errors
@@ -148,6 +180,17 @@ impl Harness {
     pub fn with_policies_and_hooks(
         config: HarnessConfig,
         provider: Arc<dyn Provider>,
+        tools: Vec<Arc<dyn Tool>>,
+        context: Arc<dyn ContextPolicy>,
+        strategy: Arc<dyn RunStrategy>,
+        hooks: Vec<Arc<dyn Hook>>,
+    ) -> Result<Self> {
+        Self::build(config, Some(provider), tools, context, strategy, hooks)
+    }
+
+    fn build(
+        config: HarnessConfig,
+        provider: Option<Arc<dyn Provider>>,
         tools: Vec<Arc<dyn Tool>>,
         context: Arc<dyn ContextPolicy>,
         strategy: Arc<dyn RunStrategy>,
@@ -225,7 +268,10 @@ impl Harness {
         Ok(Self {
             inner: Arc::new(Inner {
                 config,
-                provider,
+                provider: Mutex::new(ProviderSelection {
+                    provider,
+                    binding_initialized: false,
+                }),
                 tools: registry,
                 definitions,
                 validators,
@@ -236,13 +282,63 @@ impl Harness {
                 governor,
                 model_slots: Arc::new(Semaphore::new(slots)),
                 events,
-                active: Mutex::new(HashMap::new()),
+                active: Arc::new(Mutex::new(HashMap::new())),
                 stopped: CancellationToken::new(),
                 changed: Notify::new(),
                 writes: std::sync::Mutex::new(HashMap::new()),
                 model_waiters: AtomicUsize::new(0),
             }),
         })
+    }
+
+    /// Replace or remove the provider only while every managed run is idle.
+    ///
+    /// `binding` is a stable, nonsecret identity covering provider, account, model
+    /// and endpoint. It must contain 1 to 1024 printable UTF-8 bytes. A changed
+    /// binding clears opaque continuation while retaining readable history and
+    /// tool evidence. The same binding preserves continuation across restart.
+    ///
+    /// After admission, configuration completes even if the caller drops this
+    /// future. Run admission remains locked through the journal transaction and
+    /// provider replacement, so cancellation cannot expose a partial change.
+    ///
+    /// # Errors
+    /// Rejects invalid bindings, active or queued runs, shutdown, and journal
+    /// failures. A rejected change leaves the previous provider configured.
+    pub async fn configure_provider(
+        &self,
+        provider: Option<Arc<dyn Provider>>,
+        binding: &str,
+    ) -> Result<()> {
+        ensure!(
+            !binding.trim().is_empty()
+                && binding.len() <= MAX_PROVIDER_BINDING
+                && !binding.chars().any(char::is_control),
+            "provider binding must contain 1 to 1024 printable UTF-8 bytes"
+        );
+        let admission = self.inner.active.clone().lock_owned().await;
+        ensure!(!self.inner.stopped.is_cancelled(), "harness is shut down");
+        ensure!(
+            admission.is_empty(),
+            "wait for all managed runs and queued turns to finish before changing providers"
+        );
+        let harness = self.clone();
+        let binding = binding.to_owned();
+        tokio::spawn(async move {
+            let _admission = admission;
+            harness
+                .inner
+                .store
+                .configure_provider_binding(Some(binding))
+                .await?;
+            *harness.inner.provider.lock().await = ProviderSelection {
+                provider,
+                binding_initialized: true,
+            };
+            Ok::<(), anyhow::Error>(())
+        })
+        .await
+        .context("provider configuration task stopped")?
     }
 
     /// Report shutdown or a journal failure that stopped further effects.
@@ -321,12 +417,18 @@ impl Harness {
     /// Start a turn. Dropping its handle does not cancel the turn.
     ///
     /// # Errors
-    /// Rejects invalid prompts, busy sessions, exhausted agent capacity, or shutdown.
+    /// Rejects invalid prompts, a missing provider, busy sessions, exhausted agent
+    /// capacity, or shutdown.
     pub async fn start(&self, session_id: &str, prompt: String) -> Result<RunHandle> {
         validate_prompt(&prompt)?;
         let session = self.inner.store.session(session_id).await?;
         let mut active = self.inner.active.lock().await;
         ensure!(!self.inner.stopped.is_cancelled(), "harness is shut down");
+        let mut selection = self.inner.provider.lock().await;
+        ensure!(
+            selection.provider.is_some(),
+            "no model provider is configured; sign in or select a provider before sending a prompt"
+        );
         ensure!(
             !active.contains_key(session_id),
             "session already has a running turn; use steer or queue"
@@ -335,6 +437,11 @@ impl Harness {
             active.len() < self.inner.config.max_sessions,
             "managed agent limit reached"
         );
+        if !selection.binding_initialized {
+            self.inner.store.configure_provider_binding(None).await?;
+            selection.binding_initialized = true;
+        }
+        drop(selection);
         let id = uuid::Uuid::new_v4().to_string();
         let cancel = self.inner.stopped.child_token();
         let (steering, receiver) = mpsc::channel(MAX_CONTROLS);

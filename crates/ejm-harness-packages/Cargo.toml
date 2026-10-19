@@ -32,9 +32,13 @@ tempfile.workspace = true
 base64.workspace = true
 sha2.workspace = true
 zip.workspace = true
+zeroize = "1.9"
 
 [target.'cfg(unix)'.dependencies]
-rustix = { workspace = true, features = ["process"] }
+rustix = { workspace = true, features = ["process", "fs"] }
+
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+rightkit-fs = { version = "=0.4.4", default-features = false, features = ["fs"] }
 
 [dev-dependencies]
 wiremock.workspace = true

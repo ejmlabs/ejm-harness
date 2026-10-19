@@ -24,9 +24,26 @@ This is the integration contract for the initial implementation. Rust source typ
 - `CommandOutput: Clone + Serialize + Deserialize`: `exit_code: Option<i32>`, `stdout: String`, `stderr: String`, `truncated: bool`, `cancelled: bool`, `timed_out: bool`, `artifact: Option<PathBuf>`, `duration_ms: u64`, `peak_memory_bytes: u64`, `peak_processes: u32`.
 - All new fields on requests use defaults. Requested unsupported restrictions fail before launch. Native execution is never called a security sandbox. Linux hard control and external isolation can be optional backends with explicit requirements.
 
+`ejm_harness_exec::process::spawn_owned(tokio::process::Command) -> std::io::Result<OwnedChild>`
+is the lower-level child owner for supervised host processes.
+`OwnedChild` exposes `id`, `take_stdin`, `take_stdout`, `take_stderr`, `wait`,
+`try_wait`, `start_kill`, and async `kill`. Root status does not mean descendant
+cleanup is complete. Retain the child, pipe tasks, and host leases until `kill`
+finishes, including after normal root exit. Unix uses process groups; Windows
+uses suspended Job assignment and confirms empty Job membership before returning.
+Use the host's existing Tokio runtime. Read the
+[native ownership contract](native-process-support.md) for errors, limits, and
+the creation flags controlled by the Windows adapter.
+
 ## Engine public API
 
 `Harness::new(config: HarnessConfig, provider: Arc<dyn Provider>, tools: Vec<Arc<dyn Tool>>) -> Result<Self>`; harness is Clone, owns one shared governor and store.
+
+`Harness::with_optional_provider(config: HarnessConfig, provider: Option<Arc<dyn Provider>>, tools: Vec<Arc<dyn Tool>>, hooks: Vec<Arc<dyn Hook>>) -> Result<Self>` allows an interactive host to open before sign-in. Without a provider, submitting or queuing a turn fails before the prompt or run-start event is persisted.
+
+`Harness::configure_provider(&self, provider: Option<Arc<dyn Provider>>, binding: &str) -> async Result<()>` changes or removes the shared provider only while all managed runs and queued turns are idle. The host supplies a stable, nonsecret binding of 1 to 1024 printable UTF-8 bytes covering provider, account, model and endpoint. A changed binding atomically clears opaque message continuation while retaining readable conversation and tool evidence; the same binding preserves continuation across restart. Invalid configuration or a journal failure retains the prior provider and binding. Once admitted, configuration completes even if its caller drops the future.
+
+Providers supplied through constructors are unbound until explicitly configured. Before their first admitted turn, an earlier durable binding and its opaque continuation are cleared together. Journals that have never been explicitly bound retain legacy continuation behavior.
 
 `HarnessConfig: Default + Clone`: `state_dir: PathBuf`, `resources: ResourceLimits`, `max_sessions: usize`, `max_model_requests: usize`, `context_max_bytes: usize`, `max_steps: u32`, `max_repeated_calls: u32`, `run_timeout_ms: u64`, `system_prompt: String`, `max_store_bytes: u64`. Core validates all limits.
 
@@ -62,6 +79,7 @@ Provider exports:
 - `ReplayProvider::new(responses: Vec<ModelResponse>) -> Self`; deterministic runs, no model charge. `ReplayProvider::echo()` for smoke usage.
 - `OpenAiProvider::new(config: OpenAiConfig) -> Result<Self>`; config `base_url: String`, `api_key: String`, `model: String`. Chat Completions SSE, compatible with hosted DeepSeek and other compatible endpoints. `AnthropicProvider` is also included.
 - `ResponsesProvider::new(ResponsesConfig, Arc<dyn CredentialSource>) -> Result<Self>` uses the public OpenAI Responses API, per-request model/effort, encrypted stateless continuation, and optional redacted HTTP capture. See [the host integration contract](ide-integration.md).
+- `ClaudeCodeProvider::new(ClaudeCodeConfig, Executor) -> Result<Self>` delegates structured inference to an installed official Claude Code client. Use an executor from the harness's shared governor and `ejm_harness_auth::ClaudeCodeClient` for subscription status/sign-in. Read [the official-client contract](claude-code.md) before composing it. This Rust adapter is not a worker provider descriptor.
 
 Tools:
 

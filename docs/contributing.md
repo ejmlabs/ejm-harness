@@ -9,7 +9,11 @@ to their language.
 
 Use Rust 1.99.1 with rustfmt and Clippy, Node 24 or later, Python 3.11 or later,
 and uv. `rust-toolchain.toml` and workspace `rust-version` agree on Rust 1.99.1.
-An older compiler is not a supported configuration. Cargo, npm, and Python
+An older compiler is not a supported configuration. Linux builds require `pkg-config`
+and D-Bus development headers for the native Secret Service key adapter. On
+Debian/Ubuntu install `pkg-config` and `libdbus-1-dev` before the Cargo gate.
+Offline fixtures inject key storage and do not require a desktop secret service;
+real persistent use still requires an unlocked user Secret Service. Cargo, npm, and Python
 development locks belong in version control.
 
 Install the quality tools once:

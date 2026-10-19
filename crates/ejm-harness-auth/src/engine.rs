@@ -1113,6 +1113,6 @@ pub(crate) fn timestamp() -> u64 {
         .as_secs()
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 #[path = "tests.rs"]
 mod tests;

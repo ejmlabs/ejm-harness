@@ -26,7 +26,11 @@ is removed immediately. A lease releases every reserved dimension on drop.
 ## Native execution and capabilities
 
 Native execution inherits the host environment with explicit per-command
-overrides, uses an explicit working directory, and provides no terminal input.
+overrides and uses an explicit working directory. Ordinary command execution
+closes stdin. `Executor::run_with_input` accepts at most 8 MiB of private bytes,
+writes them while both output pipes drain, then closes stdin. Input stays out of
+serialized requests and artifacts. Its environment removals apply before explicit
+request overrides. It provides no interactive terminal.
 It never changes the host process's cwd or environment. Direct argv execution
 does not interpret a shell language. A shell tool must select and invoke the
 actual shell.
@@ -67,16 +71,23 @@ children whose original parent has exited. Background children are cleaned up
 even after an otherwise successful command. The caller cannot leave a daemon
 behind by appending `&`.
 
+Windows commands start suspended, join a kill-on-close Job Object, and resume
+only after assignment. Cleanup kills the Job, reaps the root, and retains the
+Job handle until a successful membership query reports no processes. Failed
+queries keep cleanup pending. A Job assignment failure terminates the suspended
+child and fails launch; the executor never falls back to an uncontained child.
+
 Process groups and sampling are not escape-proof containment. A child can change
-its group and become reparented between samples. On other platforms the sampler
-can clean up observed descendants, but there is no native Job Object backend in
-this release. Process-tree cancellation is therefore reported as monitored.
+its group and become reparented between samples. The common capability contract
+therefore keeps process-tree cancellation at `monitored`. See
+[native process support](native-process-support.md) for the package choice,
+low-level child API, nested-Job behavior, and native verification limits.
 The native executor supplies no filesystem or network isolation and is never
 called a security sandbox.
 
 Every true field in `RequiredCapabilities` requires an enforced guarantee.
 An unsupported or monitored requested restriction fails before admission and
-launch. Linux cgroups, isolated helpers, Windows Job Objects, and external
+launch. Linux cgroups, isolated helpers, and external
 container/VM executors can be added behind explicit backend capability checks.
 No backend is silently substituted for a requested isolation mode.
 
@@ -96,6 +107,11 @@ Hosts that serialize workspace effects can use `Executor::run_with_retained`
 to move an owned guard into the supervisor. The guard stays alive through child
 and drainer cleanup even when the caller future is dropped. Ordinary `run`
 uses the same path with an empty retained value.
+
+Private-input execution uses the same supervisor. A child that ignores stdin
+cannot block cancellation or output draining; its input writer is reaped with
+the other pipe tasks. Hosts should pass credentials through their dedicated
+auth interfaces rather than model input.
 
 ## Output and artifacts
 
@@ -135,10 +151,12 @@ must not be described as kernel-enforced limits or exact resource usage.
 The focused test suite checks session rotation, aggregate reservation dimensions,
 queue limits, cancellation/drop release, one heavy job, 100 managed admissions,
 dual-pipe noisy output, invalid UTF-8, shared artifact quotas, prelaunch rejection,
-spawn errors, queue deadlines, ordinary Unix descendant cleanup, abandoned
+spawn errors, queue deadlines, ordinary descendant cleanup, abandoned
 caller cleanup, parent exit with inherited pipes, and sampled process abuse.
 Linux stat adapter fixtures cover parentheses and non-UTF-8 process names,
 raw start ticks, malformed resident-page counts, and incomplete records. They run on
 every host; actual Linux execution still needs Linux platform verification.
+The lifecycle fixtures also compile for Windows, but local macOS runs do not
+prove Windows Job cleanup or native Windows terminal behavior.
 No hosted model or external service is used. OS isolation and old-machine
 capacity claims need separate platform evidence.

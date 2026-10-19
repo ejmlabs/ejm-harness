@@ -6,6 +6,7 @@
 mod executor;
 mod governor;
 mod monitor;
+pub mod process;
 mod processes;
 
 use std::{collections::BTreeMap, path::PathBuf};

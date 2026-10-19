@@ -7,12 +7,10 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail, ensure};
-#[cfg(unix)]
-use rustix::process::{Pid, Signal, kill_process_group};
 use tokio::{
     fs::{File, OpenOptions},
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
-    process::{Child, Command},
+    process::Command,
     sync::Mutex as AsyncMutex,
     task::JoinSet,
     time::{Instant as TokioInstant, sleep_until, timeout},
@@ -24,12 +22,20 @@ use crate::{
     CommandOutput, CommandRequest, ExecutorCapabilities, Governor, Lease, RequiredCapabilities,
     RestrictionState,
     governor::{ARTIFACT_OVERHEAD, lock},
+    process::{OwnedChild, spawn_owned},
     processes,
 };
 
 const TERMINATE_GRACE: Duration = Duration::from_millis(100);
 const DRAIN_GRACE: Duration = Duration::from_secs(1);
 const READ_BYTES: usize = 8192;
+const MAX_INPUT_BYTES: usize = 8 * 1024 * 1024;
+
+#[derive(Default)]
+struct ProcessInput {
+    bytes: Option<Vec<u8>>,
+    env_remove: Vec<String>,
+}
 
 #[derive(Clone)]
 pub struct Executor {
@@ -99,6 +105,44 @@ impl Executor {
         self.run_with_retained(request, cancel, ()).await
     }
 
+    /// Feed private input to a supervised command and close its stdin at EOF.
+    ///
+    /// Input is limited to 8 MiB and is never included in command artifacts or
+    /// serialized requests. Environment removals apply before explicit overrides
+    /// in `request.env`. Writing input and draining output run concurrently.
+    ///
+    /// # Errors
+    /// Returns an error for oversized input, invalid environment names, or any
+    /// request, admission, execution, or output error returned by [`Self::run`].
+    pub async fn run_with_input(
+        &self,
+        request: CommandRequest,
+        input: Vec<u8>,
+        env_remove: Vec<String>,
+        cancel: CancellationToken,
+    ) -> Result<CommandOutput> {
+        ensure!(
+            input.len() <= MAX_INPUT_BYTES,
+            "command input exceeds 8 MiB"
+        );
+        ensure!(
+            env_remove
+                .iter()
+                .all(|key| !key.is_empty() && !key.contains(['=', '\0'])),
+            "invalid command environment removal"
+        );
+        self.run_configured(
+            request,
+            ProcessInput {
+                bytes: Some(input),
+                env_remove,
+            },
+            cancel,
+            (),
+        )
+        .await
+    }
+
     /// Retain host ownership, such as a workspace write guard, through cleanup.
     ///
     /// The retained value moves into the supervisor after admission. Dropping
@@ -109,6 +153,17 @@ impl Executor {
     pub async fn run_with_retained<T: Send + 'static>(
         &self,
         request: CommandRequest,
+        cancel: CancellationToken,
+        retained: T,
+    ) -> Result<CommandOutput> {
+        self.run_configured(request, ProcessInput::default(), cancel, retained)
+            .await
+    }
+
+    async fn run_configured<T: Send + 'static>(
+        &self,
+        request: CommandRequest,
+        input: ProcessInput,
         cancel: CancellationToken,
         retained: T,
     ) -> Result<CommandOutput> {
@@ -136,7 +191,7 @@ impl Executor {
         let executor = self.clone();
         tokio::spawn(async move {
             let result = executor
-                .supervise(request, local_cancel, deadline, start, lease)
+                .supervise(request, input, local_cancel, deadline, start, lease)
                 .await;
             drop(retained);
             result
@@ -148,6 +203,7 @@ impl Executor {
     async fn supervise(
         &self,
         request: CommandRequest,
+        input: ProcessInput,
         cancel: CancellationToken,
         deadline: TokioInstant,
         start: Instant,
@@ -160,22 +216,8 @@ impl Executor {
             return Ok(unlaunched_output(start, false, true));
         }
 
-        let mut command = Command::new(&request.program);
-        command
-            .args(&request.args)
-            .current_dir(&request.cwd)
-            .envs(&request.env)
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
-        #[cfg(unix)]
-        command.process_group(0);
-        let mut child = command
-            .spawn()
-            .with_context(|| format!("launch command {}", request.program))?;
+        let mut child = spawn_command(&request, &input)?;
         let pid = child.id().context("spawned command has no process ID")?;
-        let _process_scope = ProcessScope { pid };
         let observed =
             self.governor
                 .monitor
@@ -188,7 +230,7 @@ impl Executor {
             path: None,
             truncated: false,
         }));
-        let mut drainers = start_drainers(&mut child, &capture, &spool)?;
+        let mut drainers = start_pipes(&mut child, &capture, &spool, input.bytes)?;
 
         let mut cancelled = false;
         let mut timed_out = false;
@@ -213,7 +255,7 @@ impl Executor {
             }
         };
 
-        let status = reap(&mut child, pid, status).await?;
+        let status = reap(&mut child, status).await;
         observed.kill_known_descendants().await;
         let drained = timeout(DRAIN_GRACE, async {
             while let Some(result) = drainers.join_next().await {
@@ -230,6 +272,7 @@ impl Executor {
         }
         let usage = observed.usage();
         drop(observed);
+        let status = status?;
         if let Some(message) = usage.violation {
             bail!(message);
         }
@@ -256,44 +299,76 @@ impl Executor {
     }
 }
 
-fn start_drainers(
-    child: &mut Child,
+fn spawn_command(request: &CommandRequest, input: &ProcessInput) -> Result<OwnedChild> {
+    let mut command = Command::new(&request.program);
+    for key in &input.env_remove {
+        command.env_remove(key);
+    }
+    command
+        .args(&request.args)
+        .current_dir(&request.cwd)
+        .envs(&request.env)
+        .stdin(if input.bytes.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    spawn_owned(command).with_context(|| format!("launch command {}", request.program))
+}
+
+fn start_pipes(
+    child: &mut OwnedChild,
     capture: &Arc<Mutex<Capture>>,
     spool: &Arc<AsyncMutex<Spool>>,
+    input: Option<Vec<u8>>,
 ) -> Result<JoinSet<Result<()>>> {
     let mut drainers = JoinSet::new();
     for (reader, stream) in [
         (
-            Box::new(child.stdout.take().context("stdout pipe missing")?)
+            Box::new(child.take_stdout().context("stdout pipe missing")?)
                 as Box<dyn AsyncRead + Send + Unpin>,
             Stream::Stdout,
         ),
         (
-            Box::new(child.stderr.take().context("stderr pipe missing")?)
+            Box::new(child.take_stderr().context("stderr pipe missing")?)
                 as Box<dyn AsyncRead + Send + Unpin>,
             Stream::Stderr,
         ),
     ] {
         drainers.spawn(drain(reader, stream, capture.clone(), spool.clone()));
     }
+    if let Some(bytes) = input {
+        let mut stdin = child.take_stdin().context("stdin pipe missing")?;
+        drainers.spawn(async move {
+            // A command may close stdin on authentication failure. Its exit
+            // status remains authoritative while output continues to drain.
+            match stdin.write_all(&bytes).await {
+                Ok(()) => Ok(()),
+                Err(error) if error.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
+                Err(error) => Err(error).context("write command input"),
+            }
+        });
+    }
     Ok(drainers)
 }
 
-async fn reap(child: &mut Child, pid: u32, status: Option<ExitStatus>) -> Result<ExitStatus> {
+async fn reap(child: &mut OwnedChild, status: Option<ExitStatus>) -> Result<ExitStatus> {
     let status = if let Some(status) = status {
-        status
+        Ok(status)
     } else {
-        signal_group(pid, true);
+        let _ = child.terminate();
         if let Ok(result) = timeout(TERMINATE_GRACE, child.wait()).await {
-            result.context("reap terminated command")?
+            result.context("reap terminated command")
         } else {
-            signal_group(pid, false);
-            let _ = child.start_kill();
-            child.wait().await.context("reap killed command")?
+            child.kill().await.context("reap killed command")
         }
     };
     // A command's background children cannot outlive its execution scope.
-    signal_group(pid, false);
+    let cleanup = child.kill().await.context("clean up command descendants");
+    let status = status?;
+    cleanup?;
     Ok(status)
 }
 
@@ -409,9 +484,7 @@ fn drain_error(
 ) -> Option<anyhow::Error> {
     match result {
         Some(Ok(Err(error))) => Some(error),
-        Some(Err(error)) => {
-            Some(anyhow::Error::from(error).context("command output drainer failed"))
-        }
+        Some(Err(error)) => Some(anyhow::Error::from(error).context("command pipe task failed")),
         _ => None,
     }
 }
@@ -422,32 +495,6 @@ impl Drop for CancelOnDrop {
     fn drop(&mut self) {
         self.0.cancel();
     }
-}
-
-struct ProcessScope {
-    pid: u32,
-}
-
-impl Drop for ProcessScope {
-    fn drop(&mut self) {
-        signal_group(self.pid, false);
-    }
-}
-
-fn signal_group(pid: u32, graceful: bool) {
-    #[cfg(unix)]
-    {
-        if let Ok(pid) = i32::try_from(pid)
-            && let Some(pid) = Pid::from_raw(pid)
-        {
-            // The child entered a new group before exec. Signal that group,
-            // not the parent harness's process group.
-            let signal = if graceful { Signal::TERM } else { Signal::KILL };
-            let _ = kill_process_group(pid, signal);
-        }
-    }
-    #[cfg(not(unix))]
-    let _ = (pid, graceful);
 }
 
 #[derive(Clone, Copy)]

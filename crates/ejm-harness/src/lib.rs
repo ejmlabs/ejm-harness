@@ -13,8 +13,8 @@ pub use engine::{Harness, RunHandle, Tool, ToolContext};
 pub use hooks::{Hook, HookContext, ToolDecision};
 pub use policy::{ContextPolicy, RecentContext, RunStrategy, StepDecision, ToolLoop};
 pub use provider::{
-    AnthropicConfig, AnthropicProvider, AvailableModel, HttpObserver, HttpTraceHeader,
-    HttpTracePhase, HttpTraceRecord, OpenAiConfig, OpenAiProvider, Provider, REASONING_EFFORTS,
-    ReplayProvider, ResponsesConfig, ResponsesProvider,
+    AnthropicConfig, AnthropicProvider, AvailableModel, ClaudeCodeConfig, ClaudeCodeProvider,
+    HttpObserver, HttpTraceHeader, HttpTracePhase, HttpTraceRecord, OpenAiConfig, OpenAiProvider,
+    Provider, REASONING_EFFORTS, ReplayProvider, ResponsesConfig, ResponsesProvider,
 };
 pub use types::*;

@@ -43,3 +43,7 @@ Use the owning code as evidence of current behavior.
   them. Add a rule for a demonstrated failure or a deliberate architecture choice.
 - Do not turn an ordinary fix or one user's preference into a new global rule.
   No paid calls, publication, or deployment is implied by a quality change.
+
+## Credential compatibility
+
+Treat the [credential vault](../../../docs/credential-vault.md) format, stable legacy lock, migration barriers and permanent markers as compatibility contracts. Never reset an unavailable key, remove a barrier to permit downgrade, or reimport stale credentials after logout. Keep native key-service, filesystem, lifecycle and resource evidence separate from injected-key fixtures. Publication of the API does not certify another operating system or release a host.

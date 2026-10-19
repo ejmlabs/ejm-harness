@@ -10,8 +10,10 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{Message, ModelDelta, ModelRequest, ModelResponse, Role, ToolCall};
 
+mod claude;
 mod observe;
 mod responses;
+pub use claude::{ClaudeCodeConfig, ClaudeCodeProvider};
 pub use observe::{HttpObserver, HttpTraceHeader, HttpTracePhase, HttpTraceRecord};
 pub use responses::{AvailableModel, REASONING_EFFORTS, ResponsesConfig, ResponsesProvider};
 

@@ -186,20 +186,3 @@ fn package_snapshot_is_deterministic_and_removal_keeps_active_files() -> Result<
     assert!(installation.root.join("extension.mjs").is_file());
     Ok(())
 }
-
-#[test]
-fn registry_tokens_are_origin_bound_and_redacted() -> Result<()> {
-    use ejm_harness_auth::SecretString;
-    use ejm_harness_packages::{load_registry_token, save_registry_token};
-    let store = tempfile::tempdir()?;
-    let manager = PackageManager::new(store.path().join("packages"))?;
-    let token = SecretString::new("not-a-real-credential");
-    save_registry_token(manager.root(), "https://harness.meetgerry.ai/", &token)?;
-    assert_eq!(
-        load_registry_token(manager.root(), "https://harness.meetgerry.ai/")?.expose_secret(),
-        token.expose_secret()
-    );
-    assert!(load_registry_token(manager.root(), "https://other.example/").is_err());
-    assert!(!format!("{token:?}").contains("not-a-real"));
-    Ok(())
-}
