@@ -62,7 +62,11 @@ Providers supplied through constructors are unbound until explicitly configured.
 - `Harness::governor(&self) -> Arc<Governor>`
 - `Harness::shutdown(&self) -> async Result<()>` cancels runs and waits for resource cleanup.
 
-`RunHandle`: public `id: String`, `session_id: String`; `cancel(&self)`; `wait(&mut self) -> async Result<RunSummary>`.
+`RunHandle: Clone`: public `id: String`, `session_id: String`; `cancel(&self)`; `wait(&mut self) -> async Result<RunSummary>`; `wait_completion(&mut self) -> async Result<RunCompletion>`.
+
+`RunCompletion: Clone`: public `summary: RunSummary`, `queued_successor: bool`. Detailed completion records whether the driver handed off to a local queued successor, decided after draining late steering and applying continuation rules under active admission ownership, before notifying waiters. That decision survives the successor finishing. `wait` returns the same summary. A false flag does not assert current idleness or authorize another action; hosts still check their authority and target.
+
+`Harness::subscribe_run(&self, session_id: &str, run_id: &str) -> async Option<RunHandle>` observes only that exact current run, including an internally queued successor and its bounded run-end cleanup. `None` means absent or superseded, not successful completion. Use durable replay for old outcomes. A durable `RunFinished` event and session `Idle` can precede run-end observers; `wait` includes those observers. Handles share one completion result and cancellation token. Dropping or cloning a handle does not cancel work; `cancel` on any clone targets that same run. Retained receivers preserve the error when a driver ends without a summary. A new local queued run may already be current when a wait returns, so hosts must still validate admission.
 
 `RunSummary`: `run_id: String`, `status: RunStatus` (`completed`, `cancelled`, `failed`, `interrupted`, `budget_exhausted`), `steps: u32`, `text: String`, `usage: Usage`, `error: Option<String>`.
 

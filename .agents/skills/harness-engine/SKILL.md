@@ -18,6 +18,11 @@ and code differ.
   shutdown. Do not release a lease before the resource it owns finishes cleanup.
 - Durable history is the recovery source. Live broadcasts are bounded hints;
   consumers recover gaps through replay.
+- Exact-run completion uses `subscribe_run` and cloned `RunHandle` receivers.
+  Keep `wait` summary-compatible; `wait_completion` also reports the driver's
+  immutable queued-successor decision. Decide it under the active lock after
+  draining steering and applying continuation rules, before notifying waiters.
+  A durable finish or session Idle can precede bounded run-end cleanup.
 - Keep stable system and tool prefixes. Context reduction changes request copies,
   preserves complete tool exchanges and the latest intent, and exposes omissions.
   Preserve error status and artifact references through provider conversion.

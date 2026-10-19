@@ -254,3 +254,14 @@ exceptions. Review still supplies the judgment that these checks cannot encode.
 
 For a new decision, add a dated row with the changed contract and a link to its
 test or recorded measurement. Update an existing row when it is superseded.
+
+The 2026-10-19 completion-sharing change uses the engine's existing Tokio watch
+receiver for exact-run host subscriptions, including internal queued successors.
+A receiver in each already bounded active entry preserves sender-drop errors;
+it adds no task, channel or history map. Detailed completion records the
+queued-successor decision under active admission ownership before notification,
+so a fast local successor cannot disappear from that result. Summary-only wait
+is unchanged. The public
+[completion regression](../crates/ejm-harness/tests/run_completion.rs) covers
+wrong identities and a blocked run-end observer. Its runtime result and the
+normal local and hosted gates remain pending for this prepared source.

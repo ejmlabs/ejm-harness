@@ -41,6 +41,31 @@ inference. The harness retains conversation state and tool admission. This is
 native execution with documented managed-client and containment limits; see
 the [official-client contract](claude-code.md).
 
+## Exact run completion
+
+Use `harness.subscribe_run(session_id, run_id).await` to observe only that exact
+current run, including a successor started by the local harness queue. It returns
+`Option<RunHandle>`. `None` means the run is absent or superseded; inspect durable
+events for its outcome. It does not prove success.
+
+`RunHandle` is clonable. Each handle waits on the existing completion result,
+including bounded run-end observers, and shares the same cancellation token.
+Cloning or dropping one does not cancel work. A durable `RunFinished` event or
+session `Idle` is earlier than this barrier. Another locally queued run may
+already be current when the wait returns.
+
+Bound retained handles. If a host owns a revocable pending queue, wait outside
+its admission lock, then recheck the current target, revocation and expiry before
+admitting work. Keep that queue in the host. Use `wait_completion` when that queue
+must not follow another local run. Its `RunCompletion` includes `summary` and
+`queued_successor`, decided under engine admission ownership before notification.
+Discard dependent prompts when the flag is true, even if the successor has
+already finished. A false flag records that transition only; it is not an idle
+check or permission for a later action. The legacy `wait` still returns the same
+summary. The source API and regression are prepared here; fresh local gates,
+hosted review, protected publication, consumer
+adoption and live docs publication remain pending.
+
 ## Models and usage
 
 `ResponsesProvider::available_models(credentials, cancel)` returns
