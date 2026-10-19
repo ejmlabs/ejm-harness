@@ -1,0 +1,24 @@
+name: Draft source release
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Full protected main commit SHA
+        required: true
+        type: string
+      version:
+        description: SemVer version matching VERSION
+        required: true
+        type: string
+permissions: {}
+jobs:
+  release:
+    permissions:
+      contents: write
+      pull-requests: read
+      statuses: read
+    uses: ejmlabs/.github/.github/workflows/draft-release.yml@af4ee77e9ee8da606c4ae3a0838bc3b46fd9d7f3
+    with:
+      commit: ${{ inputs.commit }}
+      version: ${{ inputs.version }}
+      standards-ref: "af4ee77e9ee8da606c4ae3a0838bc3b46fd9d7f3"

@@ -1,0 +1,17 @@
+name: Human-admitted PR checks
+on:
+  issue_comment:
+    types: [created, edited, deleted]
+permissions: {}
+jobs:
+  governance:
+    if: ${{ github.event.issue.pull_request }}
+    permissions:
+      contents: read
+      pull-requests: write
+      statuses: write
+      actions: write
+    uses: ejmlabs/.github/.github/workflows/governance.yml@af4ee77e9ee8da606c4ae3a0838bc3b46fd9d7f3
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      EJM_HARNESS_TOKEN: ${{ secrets.EJM_HARNESS_TOKEN }}
