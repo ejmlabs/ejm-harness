@@ -11,7 +11,7 @@ jobs:
       pull-requests: write
       statuses: write
       actions: write
-    uses: ejmlabs/.github/.github/workflows/governance.yml@8e888752e00a29363fb8ae125658159b5c2dee58
+    uses: ejmlabs/.github/.github/workflows/governance.yml@5fae851502c2e3c31d4df9a44f8d56c2cb49e098
     secrets:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       EJM_HARNESS_TOKEN: ${{ secrets.EJM_HARNESS_TOKEN }}
