@@ -2,8 +2,8 @@
   "repository": "ejmlabs/.github",
   "revisions": {
     "old": {
-      "commit": "aa4144fa978d711a5e009b384718b4cf27cf87bf",
-      "tree": "b51d243de9c73681cfa5fbc4c5393bf5ca8bf88e",
+      "commit": "c4f2873ef0eef5bc3c7d75cf71fa3489a911d134",
+      "tree": "dc440b03159b377979b6b76dde119eec98aa75cb",
       "files": [
         {
           "path": ".github/workflows/draft-release.yml",
@@ -15,9 +15,9 @@
         {
           "path": ".github/workflows/governance.yml",
           "mode": "100644",
-          "blob": "36cf29bf644e7a08702e78e64f77b4df8dc72aaa",
-          "size": 164208,
-          "sha256": "50e65c7c3f010c7fbbdc4acb1a2c9b66b4b37ad8ade570dbb37425efdefb779e"
+          "blob": "51834cf2fe188fcb46c0a3e9b1720e27742f49a5",
+          "size": 164726,
+          "sha256": "5a68b9406b56b543d7eaf7910d631836b2044f9ccf3c0dc649cbbbfa66d45677"
         },
         {
           "path": "review/prompt.md",
@@ -36,9 +36,9 @@
         {
           "path": "scripts/build_workflows.py",
           "mode": "100644",
-          "blob": "34647391d6135b48f9037e603c334a7da669cfdb",
-          "size": 15767,
-          "sha256": "76151c1e30892ed6b1211371657833202e33bfa360eb9ac81162dd132ab67ddc"
+          "blob": "ef556603367efb5351d9d937fecc680e64f7d3fb",
+          "size": 16220,
+          "sha256": "2ef4866a2833a0161dab49710dc1df3ddf30735a2666f3419d1eabb96f328816"
         },
         {
           "path": "scripts/governance.py",
@@ -120,22 +120,22 @@
       ]
     },
     "new": {
-      "commit": "c4f2873ef0eef5bc3c7d75cf71fa3489a911d134",
-      "tree": "dc440b03159b377979b6b76dde119eec98aa75cb",
+      "commit": "6717b433c462e01abaed86e2118e4843827598cb",
+      "tree": "c07344ae6f5d5f04408b5423857c5da3d41df896",
       "files": [
         {
           "path": ".github/workflows/draft-release.yml",
           "mode": "100644",
-          "blob": "35fea4d70d5015ef6c12d9fc789c51a12c6a6a90",
-          "size": 57269,
-          "sha256": "31dacec14d77bba653cf9bec32baaf1992066d9b1bf4696f7ddf025dfbedbb74"
+          "blob": "8baf9cdc6acf09df665ba37483dcbc39e3d5bf7c",
+          "size": 75177,
+          "sha256": "d60df49fc021a38cf552d90ab779706b29b1d9a29ba5e3260809fc4b6ca52b43"
         },
         {
           "path": ".github/workflows/governance.yml",
           "mode": "100644",
-          "blob": "51834cf2fe188fcb46c0a3e9b1720e27742f49a5",
-          "size": 164726,
-          "sha256": "5a68b9406b56b543d7eaf7910d631836b2044f9ccf3c0dc649cbbbfa66d45677"
+          "blob": "8b41aaa1615a2bb780670d2e658af61cb464b890",
+          "size": 218571,
+          "sha256": "98a947f8a6a273e9c06c0ffb11ab693ee27546fc14036e6db9d1b1921a531127"
         },
         {
           "path": "review/prompt.md",
@@ -154,30 +154,30 @@
         {
           "path": "scripts/build_workflows.py",
           "mode": "100644",
-          "blob": "ef556603367efb5351d9d937fecc680e64f7d3fb",
-          "size": 16220,
-          "sha256": "2ef4866a2833a0161dab49710dc1df3ddf30735a2666f3419d1eabb96f328816"
+          "blob": "6443e0c0f463cd4c8583bd77c13cc2b4b90894ca",
+          "size": 16805,
+          "sha256": "b09f30820195e38e2f3bc61f98f73d7d6daaf3ec40dd27a4a2aafdb1a1129bd9"
         },
         {
           "path": "scripts/governance.py",
           "mode": "100644",
-          "blob": "a5dc545e535136320c584e72838cb12bdd50f5ee",
-          "size": 12533,
-          "sha256": "682071c05228c2ca8724a38781a09b4929d4df7ba8a53df57a7f2e9e1429154b"
+          "blob": "6d98b8e87c6b88d2fddfbcabd275a19b8665dd6f",
+          "size": 12543,
+          "sha256": "2eac3623d4a777a0f0647d8e049e959557ac0af543fb2123cbfa3e97dfe060cb"
         },
         {
           "path": "scripts/prepare.py",
           "mode": "100644",
-          "blob": "ddeb838296f8c91825cbb889ab1c1c29305cb7e3",
-          "size": 4454,
-          "sha256": "1c9029a02f24b30f843591932e7e8ca7fb60487064d3feac2b97265fa3b5c2be"
+          "blob": "23ab5c7961b4758517d54976e8128db7ad24fbff",
+          "size": 13208,
+          "sha256": "d3b2b95d61dae902bbfb44952f4b164be90da009d05865f99b9a967799d24364"
         },
         {
           "path": "scripts/release.py",
           "mode": "100644",
-          "blob": "70d62ee78882a8ac1be8326ce36214918920d50e",
-          "size": 6463,
-          "sha256": "16b0af49a06c1f7a6fd621e14e55f67a50c06c95af947ce9aaa0b924f3292563"
+          "blob": "0bc79377d9ce8172fe493ae361aa7297109a6c1f",
+          "size": 6787,
+          "sha256": "dc9b2406daf26c198e0ec9dd3b3a6f48bc859f78fb1f48771dbe02fad4ebf2a8"
         },
         {
           "path": "scripts/review_result.py",
@@ -189,9 +189,9 @@
         {
           "path": "scripts/standards.py",
           "mode": "100644",
-          "blob": "08dc7c58255fa66cc8bd5bf4c827e923ed64f5e3",
-          "size": 18091,
-          "sha256": "689c42fe36c4696c839e0c1f651480e977c8a4e44417888b2170c659d08e965c"
+          "blob": "41113fd54e962a99eaa53b9afade15ca34576597",
+          "size": 22433,
+          "sha256": "9989df0ec790354dc4fac745d09f4656c27bcdfcff8cbc4b52034f4cf5e906d7"
         },
         {
           "path": "templates/community/CODE_OF_CONDUCT.md",

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Dependency-free documentation, workflow pin, and release version checks."""
+import hashlib
 import json
 import re
 import sys
@@ -9,13 +10,27 @@ from urllib.parse import unquote
 
 HEADINGS = ("Overview", "Status", "Requirements", "Quick start", "Usage", "Development", "Documentation", "Contributing", "Security", "Support", "License")
 DOCS = ("README.md", "CONTRIBUTING.md", "SECURITY.md", "SUPPORT.md", "CODE_OF_CONDUCT.md", "RELEASING.md", "THIRD_PARTY_NOTICES.md", "CHANGELOG.md", "LICENSE")
-COMMUNITY_GUIDES = {"ejm-cli": "docs/contributing.md", "ejm-harness": "docs/contributing.md", "ejm-ide": "docs/development.md", "ejmlabs": "site/README.md", ".github": "docs/operations.md"}
+COMMUNITY_GUIDES = {"ejm-cli": "docs/contributing.md", "ejm-harness": "docs/contributing.md", "ejm-ide": "docs/development.md", "ejmlabs": "site/README.md", ".github": "docs/operations.md", "ejm-ui": "README.md#development"}
+UI_PACKAGES = tuple("packages/" + name for name in ("core", "demos", "ink", "shots", "site", "ssg", "tokens", "ui"))
 VERSIONS = {
     "ejm-cli": (("Cargo.toml", "workspace.package.version"),),
     "ejm-harness": (("Cargo.toml", "workspace.package.version"), ("sdk/typescript/package.json", "version"), ("sdk/python/pyproject.toml", "project.version"), ("registry/Cargo.toml", "package.version")),
     "ejm-ide": (("package.json", "version"), ("package-lock.json", "version"), ("src-tauri/Cargo.toml", "package.version"), ("src-tauri/tauri.conf.json", "version")),
     "ejmlabs": (("site/package.json", "version"),),
     ".github": (),
+    "ejm-ui": (("package.json", "version"), ("package-lock.json", "version"), ("crates/ejm-tui/Cargo.toml", "package.version"),
+               *((path + "/package.json", "version") for path in UI_PACKAGES)),
+}
+UI_LICENSE_SCOPE = '''The ejmlabs name, logos, supplied brand artwork, design assets, templates, and
+visual identity retain their owners' rights. All rights in those materials are
+reserved except where a file or its accompanying notice gives a separate
+license. Public access does not grant a right to use the marks or redistribute
+the brand materials.'''
+UI_FONT_NOTICES = tuple("packages/" + path + "/" + name + "-OFL.txt"
+                        for path in ("tokens/assets/fonts", "ui/src/fonts") for name in ("Manrope", "IBMPlexMono"))
+UI_FONT_HASHES = {
+    "Manrope": "58172e0c0fac2cda8a37b348164bb55e44b0e69051e557e92b1d3f6910141f7b",
+    "IBMPlexMono": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
 }
 SEMVER = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$")
 MIT_TERMS = '''Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -42,12 +57,14 @@ def semver(value):
     return not match[4] or all(not item.isdigit() or item == "0" or not item.startswith("0") for item in match[4].split("."))
 
 
-def read(root, path):
+def read(root, path, preserve_newlines=False):
     file = root / path
     if file.is_symlink() or not file.resolve().is_relative_to(root.resolve()) or not file.is_file():
         raise ValueError(f"Missing or unsafe file: {path}")
     if file.stat().st_size > 8_000_000:
         raise ValueError(f"File exceeds validation limit: {path}")
+    if preserve_newlines:
+        return file.read_bytes().decode("utf-8")
     return file.read_text(encoding="utf-8")
 
 
@@ -69,6 +86,15 @@ def versions(root, profile):
         lock = json.loads(read(root, "package-lock.json"))
         if lock["packages"][""]["version"] != canonical:
             raise ValueError("package-lock.json root package differs from VERSION")
+    if profile == "ejm-ui":
+        lock = json.loads(read(root, "package-lock.json"))
+        for path in ("", *UI_PACKAGES):
+            if lock["packages"][path]["version"] != canonical:
+                raise ValueError("Owned UI npm lock package differs from VERSION: " + path)
+        lock = tomllib.loads(read(root, "crates/ejm-tui/Cargo.lock"))
+        owned = [package for package in lock["package"] if package["name"] == "ejm-tui"]
+        if len(owned) != 1 or owned[0]["version"] != canonical:
+            raise ValueError("Owned UI Cargo lock package differs from VERSION")
     if profile == "ejm-harness":
         for path in ("sdk/typescript/LICENSE", "sdk/python/LICENSE"):
             if read(root, path) != read(root, "LICENSE"):
@@ -97,6 +123,9 @@ def licenses(root, profile):
             raise ValueError("Studio metadata must preserve its specific rights notice")
         return
     text = read(root, "LICENSE")
+    if profile == "ejm-ui":
+        ui_licenses(root, text)
+        return
     if not text.startswith("MIT License") or not re.search(r"Copyright.*\d{4}.*\S", text) or " ".join(MIT_TERMS.split()) not in " ".join(text.split()):
         raise ValueError("Complete MIT license terms and copyright notice are required")
     manifests = []
@@ -121,6 +150,41 @@ def licenses(root, profile):
             value = value[part]
         if value != "MIT":
             raise ValueError("Owned manifest license differs from MIT: " + path)
+
+
+def ui_licenses(root, text):
+    """Keep the UI software grant, reserved assets, and packaged font notices."""
+    def scoped_license(value):
+        return (value.startswith("ejm-ui license scope\n") and UI_LICENSE_SCOPE in value
+                and "MIT License" in value and re.search(r"Copyright.*\d{4}.*\S", value)
+                and " ".join(MIT_TERMS.split()) in " ".join(value.split()))
+
+    if not scoped_license(text):
+        raise ValueError("UI license must preserve complete MIT terms and reserved brand rights")
+    manifests = {path.parent.relative_to(root).as_posix() for path in root.glob("packages/*/package.json")}
+    if manifests != set(UI_PACKAGES):
+        raise ValueError("UI owned package inventory changed; review its version and license policy")
+    for path in ("", *UI_PACKAGES):
+        prefix = path + "/" if path else ""
+        package = json.loads(read(root, prefix + "package.json"))
+        if package.get("license") != "SEE LICENSE IN LICENSE" or package.get("private") is not True:
+            raise ValueError("UI npm packages must remain private and preserve their scoped license: " + prefix)
+        if not path:
+            continue
+        if package.get("repository") != {"type": "git", "url": "git+https://github.com/ejmlabs/ejm-ui.git", "directory": path}:
+            raise ValueError("UI package repository metadata differs from its owner: " + path)
+        if not scoped_license(read(root, prefix + "LICENSE")) or not read(root, prefix + "THIRD_PARTY_NOTICES.md").strip():
+            raise ValueError("UI package needs complete scoped license and third-party notices: " + path)
+    crate = tomllib.loads(read(root, "crates/ejm-tui/Cargo.toml"))["package"]
+    if crate.get("license") != "MIT" or crate.get("publish") is not False:
+        raise ValueError("UI terminal crate must retain MIT terms and remain unpublished")
+    for name in ("Manrope", "IBMPlexMono"):
+        source = read(root, "packages/tokens/assets/fonts/" + name + "-OFL.txt", preserve_newlines=True)
+        if hashlib.sha256(source.encode("utf-8")).hexdigest() != UI_FONT_HASHES[name]:
+            raise ValueError("UI fonts need their original OFL and copyright notices")
+        copy = read(root, "packages/ui/src/fonts/" + name + "-OFL.txt")
+        if [line.rstrip() for line in copy.splitlines()] != [line.rstrip() for line in source.splitlines()]:
+            raise ValueError("UI package font notice differs from the token owner: " + name)
 
 
 def consumer_workflows(revision):
