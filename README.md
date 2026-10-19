@@ -1,39 +1,50 @@
 # ejm-harness
 
-A reusable Rust engine for coding agents. Run many sessions through one resource
+## Overview
+
+A reusable Rust engine for coding agents. Run sessions through one resource
 governor, keep a durable event journal, and extend the engine from Rust,
-TypeScript, or Python.
+TypeScript, or Python. [ejm-cli](https://github.com/ejmlabs/ejm-cli) and
+[ejm-ide](https://github.com/ejmlabs/ejm-ide) are separate hosts. No Gerry
+Workspace account or server is required.
 
-[ejm-cli](../ejm-cli/README.md) is the separate reference terminal app. Neither
-project requires a Gerry Workspace account or server.
+## Status
 
-## Build
+This is a source release at version 0.1.0. Package registry releases, prebuilt
+workers, and a live extension registry have not been published. Local fixtures
+use replay providers and make no paid model requests. See [the changelog](CHANGELOG.md)
+and [release policy](RELEASING.md) for release status and gates.
 
-Requires the pinned Rust toolchain. The repository contains source packages;
-registry releases and prebuilt worker binaries have not been published.
+## Requirements
+
+- Rust 1.99.1 with rustfmt and Clippy. `rust-toolchain.toml` pins this toolchain.
+- Node 24 or later for repository development and TypeScript extensions. The
+  TypeScript SDK itself supports Node 20 or later with a compatible Rust worker.
+- Python 3.11 or later for the Python SDK, and uv for its development tools.
+
+Rust hosts do not require Node or Python. The [contributor guide](docs/contributing.md)
+lists the tools needed for the full quality gate.
+
+## Quick start
+
+From a source checkout, build the worker and run a local TypeScript example:
 
 ```sh
-cargo build --release --workspace --locked
-cargo test --workspace --locked
+export CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=2
+cargo build --locked -p ejm-harness-worker
+npm ci --ignore-scripts
+npm run build --workspace ejm-harness
+export EJM_HARNESS_WORKER_PATH="$PWD/target/debug/ejm-harness-worker"
+node examples/sdk_typescript.mjs
 ```
 
-The main packages are:
+The default provider returns `Demo: ...` without credentials or model charges.
+The SDK does not download a worker during installation.
 
-| Package              | Responsibility                                                         |
-| -------------------- | ---------------------------------------------------------------------- |
-| `ejm-harness`        | Sessions, agent loop, providers, context, events, recovery             |
-| `ejm-harness-exec`   | Shared resource admission and command supervision                      |
-| `ejm-harness-auth`   | Sign-in, verified identity, credential storage, and serialized renewal |
-| `ejm-harness-coding` | Native read, list, search, write, patch, and optional shell tools      |
-| `ejm-harness-worker` | Persistent JSONL bridge for language SDKs                              |
-| `sdk/typescript`     | Typed async API and TypeScript tool callbacks                          |
-| `sdk/python`         | Sync and async Python API and tool callbacks                           |
-| `ejm-harness-bench`  | Deterministic concurrency and command workloads                        |
+## Usage
 
-## Embed in Rust
-
-During source development, depend on `crates/ejm-harness` from your own Cargo
-project. Add `ejm-harness-coding` when your host needs the standard coding tools.
+During source development, depend on `crates/ejm-harness` from a Rust project.
+Add `ejm-harness-coding` when the host needs the standard file tools.
 
 ```rust
 use std::sync::Arc;
@@ -41,72 +52,83 @@ use ejm_harness::{Harness, HarnessConfig, ReplayProvider, SessionOptions};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-let harness = Harness::new(
-    HarnessConfig::default(),
-    Arc::new(ReplayProvider::echo()),
-    vec![],
-)?;
-let session = harness.create_session(SessionOptions {
-    cwd: std::env::current_dir()?,
-    title: "First agent".into(),
-}).await?;
-let mut run = harness.start(&session.id, "Hello".into()).await?;
-println!("{}", run.wait().await?.text);
-harness.shutdown().await?;
+    let harness = Harness::new(
+        HarnessConfig::default(),
+        Arc::new(ReplayProvider::echo()),
+        vec![],
+    )?;
+    let session = harness.create_session(SessionOptions {
+        cwd: std::env::current_dir()?,
+        title: "First agent".into(),
+    }).await?;
+    let mut run = harness.start(&session.id, "Hello".into()).await?;
+    println!("{}", run.wait().await?.text);
+    harness.shutdown().await?;
     Ok(())
 }
 ```
 
-The replay provider replies with `Demo: Hello` and makes no network calls.
-`OpenAiProvider` supports Chat Completions compatible streaming APIs, including
-DeepSeek endpoints. `AnthropicProvider` supports the Messages streaming API.
-`ResponsesProvider` supports native OpenAI Responses through API keys or ChatGPT
-sign-in via `ejm-harness-auth`. Real provider credentials remain host configuration.
-See [host integration](docs/ide-integration.md) and [authentication](docs/auth.md).
-The [harness engineering decisions](docs/harness-engineering.md) record the
-source review, context and recovery contracts, and evaluation limits.
+The replay provider replies with `Demo: Hello`. Hosted providers support Chat
+Completions, Anthropic Messages, and OpenAI Responses. Credentials and tool grants
+remain host configuration. Use `Provider`, `Tool`, `ContextPolicy`, and `RunStrategy`
+to substitute behavior at the engine boundaries.
 
-Use `Provider`, `Tool`, `ContextPolicy`, and `RunStrategy` to substitute behavior
-at the engine boundaries. The engine retains control of grants, budgets,
-validation, and journaling. A repository cannot grant itself a tool.
-
-## TypeScript and Python
-
-Both SDKs share one persistent Rust worker across their sessions. Custom tools
-remain ordinary functions in the host language, with schema validation,
-progress, and cooperative cancellation. There is no Node or Python dependency
-for Rust hosts or ejm-cli.
-
-- [TypeScript quick start](sdk/typescript/README.md)
-- [Python quick start](sdk/python/README.md)
-- [SDK contracts, bounds, and recovery](docs/sdk.md)
-
-## Keep the host responsive
-
-One hundred managed agents is the target workload, using hosted models on four
-CPU cores and 8 GB RAM. Agents waiting on models do not need a shell or thread
-each. Model requests and local work have separate admission limits.
-
-Defaults allow eight model requests, four local jobs, and one heavy job. Local
-jobs share CPU, memory, process, output, queue, and duration reservations.
-Native file tools avoid spawning a shell for common repository operations.
-Normal Bash semantics are preserved when shell access is granted.
-
-Admission reservations are not kernel isolation. Native execution runs as the
-current user. The executor reports restrictions as enforced, monitored, or
-unsupported and rejects required unsupported protections before launch.
-See [execution guarantees](docs/executor.md) and
-[benchmark methods and evidence](docs/benchmarks.md). Results from a modern
-machine do not prove the old-laptop target or superiority over another agent.
+- [TypeScript SDK](sdk/typescript/README.md)
+- [Python SDK](sdk/python/README.md)
+- [Host integration](docs/ide-integration.md)
+- [Authentication](docs/auth.md)
+- [Extension packages and trust](docs/packages.md)
 
 ## Development
 
-Read [AGENTS.md](AGENTS.md) and [the contribution guide](docs/contributing.md).
-Project skills under `.agents/skills` route engine, execution, SDK, performance,
-and maintenance work. `./scripts/check` is the shared local, hook, and CI gate.
-It denies Rust warnings and Clippy all/pedantic, checks architecture, locks,
-dependencies, generated protocols, language types, formatting, and fixtures.
+Read [AGENTS.md](AGENTS.md) and [the technical contributor guide](docs/contributing.md).
+Feature and bugfix work uses the initialized OpenSpec workflow.
 
-- [Architecture and design decisions](docs/architecture.md)
-- [Public integration contract](docs/implementation-contract.md)
-- [MIT license](LICENSE)
+```sh
+./scripts/check
+./scripts/check-registry
+```
+
+The workspace gate checks Rust, dependency policy, generated protocols, and both
+SDKs. The separate registry gate covers the Cloudflare workers, schema, auth
+fixtures, and registry dependencies. Gates do not publish or deploy anything.
+Report failed or unavailable steps as unverified.
+
+## Documentation
+
+| Area                               | Guide                                                   |
+| ---------------------------------- | ------------------------------------------------------- |
+| Design and crate ownership         | [Architecture](docs/architecture.md)                    |
+| Public host APIs                   | [Integration contract](docs/implementation-contract.md) |
+| SDK protocol and recovery          | [SDK guide](docs/sdk.md)                                |
+| Shared admission and native limits | [Execution guarantees](docs/executor.md)                |
+| Context, recovery, and evaluation  | [Engineering decisions](docs/harness-engineering.md)    |
+| Capacity measurements and limits   | [Benchmark evidence](docs/benchmarks.md)                |
+| Undeployed registry service        | [Registry runbook](registry/README.md)                  |
+
+## Contributing
+
+Start with [the contribution policy](CONTRIBUTING.md), then follow
+[the technical setup and quality rules](docs/contributing.md). Changes need
+maintainer admission, current approval, and the required checks before merging.
+
+## Security
+
+Read [SECURITY.md](SECURITY.md) for supported versions and private vulnerability
+reporting. Coding tools reject protected repository metadata and harness state,
+including symlink aliases. A repository cannot grant itself a tool.
+
+Native shell commands and enabled extension code run as the current user. They
+are not sandboxed. Admission reservations and sampled process usage do not prove
+kernel isolation. See [execution guarantees](docs/executor.md) before granting
+native access.
+
+## Support
+
+Use [SUPPORT.md](SUPPORT.md) for questions, bug reports, and support scope. Keep
+credentials and private session data out of public issues.
+
+## License
+
+The code is licensed under [MIT](LICENSE). Bundled third-party assets retain
+their own license notices. Both SDK distributions include the MIT license text.

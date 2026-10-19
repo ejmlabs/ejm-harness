@@ -368,7 +368,7 @@ pub fn load_registry_token(root: &Path, origin: &str) -> Result<SecretString> {
         );
     }
     let bytes = super::manager::read_bounded(&path, 8192)
-        .context("sign in with ejm-cli packages login first")?;
+        .context("sign in with ejm-cli package login first")?;
     let value: Value = serde_json::from_slice(&bytes)?;
     ensure!(
         value["origin"] == origin,

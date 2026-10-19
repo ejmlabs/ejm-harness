@@ -7,7 +7,11 @@ resolver = "2"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-rust-version = "1.89"
+rust-version = "1.99.1"
+repository = "https://github.com/ejmlabs/ejm-harness"
+homepage = "https://github.com/ejmlabs/ejm-harness"
+documentation = "https://github.com/ejmlabs/ejm-harness/tree/main/docs"
+readme = "README.md"
 
 [workspace.dependencies]
 anyhow = "1"

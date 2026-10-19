@@ -123,7 +123,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
         !data ||
         typeof data !== "object" ||
         !("client_id" in data) ||
-        data.client_id !== "gerry-cli" ||
+        data.client_id !== "ejm-cli" ||
         ("scope" in data && data.scope !== "registry") ||
         Object.keys(data).some((key) => key !== "client_id" && key !== "scope")
       ) {

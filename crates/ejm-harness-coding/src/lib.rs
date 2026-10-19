@@ -196,7 +196,7 @@ fn hash(bytes: &[u8]) -> String {
 
 fn read_file(root: &Dir, arguments: &Value) -> Result<ToolOutput> {
     let path = relative_path(arguments, "path", None)?;
-    let bytes = load(root, &path)?;
+    let bytes = load(root, &resolve_read_path(root, &path)?)?;
     let text = std::str::from_utf8(&bytes).context("file is not UTF-8 text")?;
     let offset = usize::try_from(arguments["offset"].as_u64().unwrap_or(1).max(1))
         .context("line offset exceeds platform range")?;
@@ -232,7 +232,7 @@ fn read_file(root: &Dir, arguments: &Value) -> Result<ToolOutput> {
 
 fn list_files(root: &Dir, arguments: &Value) -> Result<ToolOutput> {
     let path = relative_path(arguments, "path", Some("."))?;
-    let directory = root.open_dir(&path)?;
+    let directory = root.open_dir(resolve_read_path(root, &path)?)?;
     let mut entries = vec![];
     let mut output_bytes = 0;
     let mut limit_reached = None;
@@ -243,7 +243,7 @@ fn list_files(root: &Dir, arguments: &Value) -> Result<ToolOutput> {
         }
         let entry = entry?;
         let name = entry.file_name().to_string_lossy().into_owned();
-        if name == ".git" || name == ".ejm-harness" {
+        if protected_path(Path::new(&name)) {
             continue;
         }
         let rendered = format!(
@@ -281,6 +281,7 @@ fn search(
     cancel: &tokio_util::sync::CancellationToken,
 ) -> Result<ToolOutput> {
     let path = relative_path(arguments, "path", Some("."))?;
+    let path = resolve_read_path(root, &path)?;
     let pattern = arguments["pattern"]
         .as_str()
         .context("pattern is required")?;
@@ -323,13 +324,14 @@ fn search(
             continue;
         }
         let relative = entry.path().strip_prefix(cwd)?;
-        if relative
-            .components()
-            .any(|c| c.as_os_str() == ".git" || c.as_os_str() == ".ejm-harness")
-        {
+        if protected_path(relative) {
             continue;
         }
-        let Ok(file) = root.open(relative) else {
+        let Ok(resolved) = resolve_read_path(root, relative) else {
+            skipped += 1;
+            continue;
+        };
+        let Ok(file) = root.open(resolved) else {
             skipped += 1;
             continue;
         };
@@ -406,6 +408,19 @@ fn protected_path(path: &Path) -> bool {
         let name = component.as_os_str().to_string_lossy();
         name.eq_ignore_ascii_case(".git") || name.eq_ignore_ascii_case(".ejm-harness")
     })
+}
+
+fn resolve_read_path(root: &Dir, path: &Path) -> Result<PathBuf> {
+    ensure!(
+        !protected_path(path),
+        "tool cannot read repository metadata or harness state"
+    );
+    let resolved = root.canonicalize(path)?;
+    ensure!(
+        !protected_path(&resolved),
+        "resolved path is protected metadata"
+    );
+    Ok(resolved)
 }
 
 fn validate_edit_path(root: &Dir, path: &Path) -> Result<()> {
@@ -984,6 +999,120 @@ mod tests {
             );
             assert!(!outside.path().join("new").exists());
         }
+        Ok(())
+    }
+
+    #[test]
+    fn reads_listings_and_search_reject_protected_names_and_case_variants() -> Result<()> {
+        for name in [".git", ".GIT", ".ejm-harness", ".EjM-HaRnEsS"] {
+            let temp = tempfile::tempdir()?;
+            std::fs::create_dir(temp.path().join(name))?;
+            std::fs::write(temp.path().join(name).join("state.txt"), "fixture needle\n")?;
+            std::fs::write(temp.path().join("visible.txt"), "ordinary needle\n")?;
+            let cwd = temp.path().canonicalize()?;
+            let root = Dir::open_ambient_dir(&cwd, ambient_authority())?;
+            let cancel = tokio_util::sync::CancellationToken::new();
+            let file = format!("{name}/state.txt");
+            assert!(
+                read_file(&root, &json!({"path":file})).is_err(),
+                "allowed {file}"
+            );
+            assert!(
+                list_files(&root, &json!({"path":name})).is_err(),
+                "listed {name}"
+            );
+            assert!(
+                search(
+                    &root,
+                    &cwd,
+                    &json!({"path":name,"pattern":"needle"}),
+                    &cancel
+                )
+                .is_err(),
+                "searched {name}"
+            );
+            let listing = list_files(&root, &json!({}))?;
+            assert_eq!(listing.content, "visible.txt");
+            assert!(
+                read_file(&root, &json!({"path":"visible.txt"}))?
+                    .content
+                    .contains("ordinary")
+            );
+            let output = search(&root, &cwd, &json!({"pattern":"needle"}), &cancel)?;
+            assert!(output.content.contains("ordinary needle"));
+            assert!(!output.content.contains("fixture needle"));
+        }
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn reads_listings_and_search_reject_protected_aliases_but_allow_workspace_aliases() -> Result<()>
+    {
+        let temp = tempfile::tempdir()?;
+        let cwd = temp.path().canonicalize()?;
+        for (directory, alias) in [(".git", "metadata"), (".ejm-harness", "state")] {
+            std::fs::create_dir(cwd.join(directory))?;
+            std::fs::write(cwd.join(directory).join("record.txt"), "private fixture\n")?;
+            std::os::unix::fs::symlink(directory, cwd.join(alias))?;
+            std::os::unix::fs::symlink(
+                format!("{directory}/record.txt"),
+                cwd.join(format!("{alias}-file")),
+            )?;
+        }
+        std::fs::create_dir(cwd.join("ordinary"))?;
+        std::fs::write(cwd.join("ordinary/visible.txt"), "ordinary needle\n")?;
+        std::os::unix::fs::symlink("ordinary", cwd.join("allowed"))?;
+        let root = Dir::open_ambient_dir(&cwd, ambient_authority())?;
+        let cancel = tokio_util::sync::CancellationToken::new();
+        for alias in ["metadata", "state"] {
+            for path in [format!("{alias}/record.txt"), format!("{alias}-file")] {
+                assert!(
+                    read_file(&root, &json!({"path":path})).is_err(),
+                    "read {path}"
+                );
+                assert!(
+                    search(
+                        &root,
+                        &cwd,
+                        &json!({"path":path,"pattern":"fixture"}),
+                        &cancel
+                    )
+                    .is_err(),
+                    "searched {path}"
+                );
+            }
+            assert!(
+                list_files(&root, &json!({"path":alias})).is_err(),
+                "listed {alias}"
+            );
+            assert!(
+                search(
+                    &root,
+                    &cwd,
+                    &json!({"path":alias,"pattern":"fixture"}),
+                    &cancel
+                )
+                .is_err(),
+                "searched {alias}"
+            );
+        }
+        assert!(
+            read_file(&root, &json!({"path":"allowed/visible.txt"}))?
+                .content
+                .contains("ordinary needle")
+        );
+        assert_eq!(
+            list_files(&root, &json!({"path":"allowed"}))?.content,
+            "visible.txt"
+        );
+        let output = search(
+            &root,
+            &cwd,
+            &json!({"path":"allowed","pattern":"needle"}),
+            &cancel,
+        )?;
+        assert!(output.content.contains("ordinary needle"));
         Ok(())
     }
 

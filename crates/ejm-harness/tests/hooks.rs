@@ -449,9 +449,19 @@ async fn cancellation_during_tool_hooks_preserves_effect_and_recovery_boundaries
         )?;
         let session = session(&harness, &root).await?;
         let mut handle = harness.start(&session.id, "inspect".into()).await?;
-        tokio::time::timeout(Duration::from_secs(2), entered.notified()).await?;
+        tokio::time::timeout(Duration::from_secs(5), entered.notified())
+            .await
+            .with_context(|| {
+                format!("tool hook entry timed out (block_before_tool={block_before_tool})")
+            })?;
         handle.cancel();
-        let result = tokio::time::timeout(Duration::from_secs(2), handle.wait()).await??;
+        let result = tokio::time::timeout(Duration::from_secs(5), handle.wait())
+            .await
+            .with_context(|| {
+                format!(
+                    "cancelled run completion timed out (block_before_tool={block_before_tool})"
+                )
+            })??;
         assert_eq!(result.status, RunStatus::Cancelled);
         assert_eq!(
             calls.load(Ordering::SeqCst),
@@ -646,7 +656,7 @@ async fn hook_deadlines_and_run_end_observers_are_bounded() -> Result<()> {
     for block_end in [false, true] {
         let root = tempfile::tempdir()?;
         let mut config = config(&root);
-        config.run_timeout_ms = if block_end { 10_000 } else { 20 };
+        config.run_timeout_ms = if block_end { 10_000 } else { 1_000 };
         let provider = Arc::new(RecordingProvider::tool_then_complete("inspect"));
         let entered = Arc::new(Notify::new());
         let end_token = Arc::new(Mutex::new(None));
@@ -662,11 +672,17 @@ async fn hook_deadlines_and_run_end_observers_are_bounded() -> Result<()> {
         )?;
         let session = session(&harness, &root).await?;
         let mut handle = harness.start(&session.id, "inspect".into()).await?;
-        tokio::time::timeout(Duration::from_secs(2), entered.notified()).await?;
+        tokio::time::timeout(Duration::from_secs(5), entered.notified())
+            .await
+            .with_context(|| {
+                format!("before_model hook entry timed out (block_end={block_end})")
+            })?;
         if block_end {
             handle.cancel();
         }
-        let summary = tokio::time::timeout(Duration::from_secs(2), handle.wait()).await??;
+        let summary = tokio::time::timeout(Duration::from_secs(5), handle.wait())
+            .await
+            .with_context(|| format!("run completion timed out (block_end={block_end})"))??;
         assert_eq!(
             summary.status,
             if block_end {

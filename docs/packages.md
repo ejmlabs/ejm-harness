@@ -103,7 +103,7 @@ ejm-cli package install pypi:distribution==1.2.3
 ejm-cli package install 'git:https://github.com/publisher/package.git#FULL_COMMIT_HASH'
 ejm-cli package list
 ejm-cli package enable @example/workflow --trust \
-  --tool word_count --hook run_start --provider offline --command hello --widget status
+  --tool word_count --hook run_start --grant-provider offline --command hello --grant-widget status
 ejm-cli --package-provider @example/workflow:offline \
   --theme @example/workflow:midnight --widget @example/workflow:status
 ```

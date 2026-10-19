@@ -1,5 +1,5 @@
-use futures_util::StreamExt;
 use ejm_harness_package_spec::{Manifest, archive_sha256, validate_archive};
+use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use worker::{

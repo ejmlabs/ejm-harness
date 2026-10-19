@@ -4,6 +4,15 @@
   "description": "TypeScript SDK for ejm-harness's Rust worker",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ejmlabs/ejm-harness.git",
+    "directory": "sdk/typescript"
+  },
+  "homepage": "https://github.com/ejmlabs/ejm-harness/tree/main/sdk/typescript#readme",
+  "bugs": {
+    "url": "https://github.com/ejmlabs/ejm-harness/issues"
+  },
   "engines": {
     "node": ">=20"
   },
@@ -15,7 +24,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",

@@ -20,6 +20,12 @@ hypotheses. They do not establish ejm-harness's task quality or speed.
 
 ## Context and recovery contract
 
+Native file reads, listings, and search reject `.git` and `.ejm-harness` path
+components case-insensitively. They also reject symlink aliases into those paths
+after resolution through the workspace capability. Ordinary workspace aliases
+remain readable. Edits retain their stricter rule rejecting symbolic links.
+These path controls do not sandbox shell commands or trusted extension code.
+
 The journal retains full bounded messages. Context preparation changes only the
 request copy. Loading history has separate byte and row limits. A page that ends
 inside an exchange drops that partial older exchange, fetches the original user

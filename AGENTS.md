@@ -20,7 +20,8 @@ SDKs. ejm-cli lives in its own sibling repository. No Gerry Workspace dependency
 - Keep Cargo jobs at most two on constrained machines.
 - Use replay or local HTTP fixtures. Tests must not call paid models.
 - Do not publish packages, upload artifacts, or deploy without explicit authorization.
-- If `openspec/` is added, follow the installed OpenSpec workflow for feature and bugfix work. Do not initialize it without a request.
+- Feature and bugfix work follows the initialized OpenSpec workflow: explore or clarify,
+  propose, apply, sync specs, then archive after required verification.
 
 ## Repository map
 
@@ -103,6 +104,19 @@ when the change crosses those boundaries.
 - [harness-hosts](.agents/skills/harness-hosts/SKILL.md): public API and rename coordination with ejm-cli and ejm-ide.
 - [harness-site](.agents/skills/harness-site/SKILL.md): the static harness.ejmlabs.com site, the ejmlabs design kit, headers, and deployment.
 - [harness-maintenance](.agents/skills/harness-maintenance/SKILL.md): architecture decisions, strict gates, and updating these rules from evidence.
+
+## OpenSpec skills
+
+These six generated workflow skills retain OpenSpec's upstream format. The policy
+gate checks their metadata, routing, and local references. Harness-owned skills
+also follow the repository's concise authoring rules.
+
+- [openspec-explore](.agents/skills/openspec-explore/SKILL.md): investigate and clarify a change.
+- [openspec-propose](.agents/skills/openspec-propose/SKILL.md): create its planning artifacts.
+- [openspec-update-change](.agents/skills/openspec-update-change/SKILL.md): revise an existing plan.
+- [openspec-apply-change](.agents/skills/openspec-apply-change/SKILL.md): implement and verify tracked tasks.
+- [openspec-sync-specs](.agents/skills/openspec-sync-specs/SKILL.md): update the main specifications.
+- [openspec-archive-change](.agents/skills/openspec-archive-change/SKILL.md): archive completed work.
 
 ## Done means
 

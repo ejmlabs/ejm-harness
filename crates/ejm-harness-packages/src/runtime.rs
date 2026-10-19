@@ -88,7 +88,7 @@ impl RuntimeConfig {
             "runtime outbound buffer must fit a frame and stay within 16 MiB"
         );
         ensure!(
-            !self.call_timeout.is_zero() && self.call_timeout <= Duration::from_secs(86_400),
+            !self.call_timeout.is_zero() && self.call_timeout <= Duration::from_hours(24),
             "runtime call timeout must be positive and at most one day"
         );
         ensure!(

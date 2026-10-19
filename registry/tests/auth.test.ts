@@ -76,18 +76,19 @@ describe("private Better Auth boundary", () => {
 
   it("enforces pending, polling, client, and expiration boundaries", async () => {
     const created = await call("/api/auth/device/code", "POST", {
-      client_id: "gerry-cli",
+      client_id: "ejm-cli",
       scope: "registry",
     });
     const grant = await created.json<{ device_code: string }>();
     const body = {
-      client_id: "gerry-cli",
+      client_id: "ejm-cli",
       device_code: grant.device_code,
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
     };
-    expect(
-      (await call("/api/auth/device/token", "POST", { ...body, client_id: "attacker" })).status,
-    ).toBe(400);
+    for (const clientId of ["attacker", "gerry-cli"])
+      expect(
+        (await call("/api/auth/device/token", "POST", { ...body, client_id: clientId })).status,
+      ).toBe(400);
     const pending = await call("/api/auth/device/token", "POST", body);
     expect(await pending.json()).toMatchObject({ error: "authorization_pending" });
     const tooFast = await call("/api/auth/device/token", "POST", body);
@@ -103,7 +104,7 @@ describe("private Better Auth boundary", () => {
     const { session: owner } = await session("owner");
     const { session: other } = await session("other");
     const created = await call("/api/auth/device/code", "POST", {
-      client_id: "gerry-cli",
+      client_id: "ejm-cli",
       scope: "registry",
     });
     const grant = await created.json<{ user_code: string; device_code: string }>();
@@ -139,7 +140,7 @@ describe("private Better Auth boundary", () => {
       ).status,
     ).toBe(200);
     const denied = await call("/api/auth/device/token", "POST", {
-      client_id: "gerry-cli",
+      client_id: "ejm-cli",
       device_code: grant.device_code,
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
     });
@@ -174,7 +175,7 @@ describe("private Better Auth boundary", () => {
     const { session: active } = await session();
     const authorization = `Bearer ${active.token}`;
     const created = await call("/api/auth/device/code", "POST", {
-      client_id: "gerry-cli",
+      client_id: "ejm-cli",
       scope: "registry",
     });
     const grant = await created.json<{ user_code: string }>();
@@ -202,12 +203,13 @@ describe("private Better Auth boundary", () => {
   it("allows only the first-party device client and known access label", async () => {
     for (const body of [
       { client_id: "attacker", scope: "registry" },
-      { client_id: "gerry-cli", scope: "admin" },
-      { client_id: "gerry-cli", scope: "registry", user_id: "victim" },
+      { client_id: "gerry-cli", scope: "registry" },
+      { client_id: "ejm-cli", scope: "admin" },
+      { client_id: "ejm-cli", scope: "registry", user_id: "victim" },
     ])
       expect((await call("/api/auth/device/code", "POST", body)).status).toBe(400);
     const response = await call("/api/auth/device/code", "POST", {
-      client_id: "gerry-cli",
+      client_id: "ejm-cli",
       scope: "registry",
     });
     expect(response.status).toBe(200);
@@ -262,7 +264,7 @@ describe("private Better Auth boundary", () => {
     const { session: active } = await session();
     const authorization = `Bearer ${active.token}`;
     const created = await call("/api/auth/device/code", "POST", {
-      client_id: "gerry-cli",
+      client_id: "ejm-cli",
       scope: "registry",
     });
     const grant = await created.json<{ user_code: string; device_code: string }>();
@@ -278,7 +280,7 @@ describe("private Better Auth boundary", () => {
     );
     expect(verified.status).toBe(200);
     expect(await verified.json()).toMatchObject({
-      client_id: "gerry-cli",
+      client_id: "ejm-cli",
       scope: "registry",
       status: "pending",
     });
@@ -295,7 +297,7 @@ describe("private Better Auth boundary", () => {
     const redemptions = await Promise.all(
       Array.from({ length: 2 }, () =>
         call("/api/auth/device/token", "POST", {
-          client_id: "gerry-cli",
+          client_id: "ejm-cli",
           device_code: grant.device_code,
           grant_type: "urn:ietf:params:oauth:grant-type:device_code",
         }),
@@ -313,7 +315,7 @@ describe("private Better Auth boundary", () => {
       ).status,
     ).toBe(200);
     const replay = await call("/api/auth/device/token", "POST", {
-      client_id: "gerry-cli",
+      client_id: "ejm-cli",
       device_code: grant.device_code,
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
     });

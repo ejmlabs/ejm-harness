@@ -25,6 +25,9 @@ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 cargo machete --with-metadata
 cargo deny --locked --all-features check
 python3 scripts/generate-protocol.py --check
+if [ ! -d registry/node_modules ]; then
+    npm --prefix registry ci --ignore-scripts
+fi
 npm run check
 uv run --project sdk/python --group dev --locked ruff check .
 uv run --project sdk/python --group dev --locked ruff format --check .
