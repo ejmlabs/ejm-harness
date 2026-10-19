@@ -229,6 +229,10 @@ status/sign-out deadline. Cancellation and dropped callers trigger child
 termination and reaping. Hosts must keep the Tokio runtime alive for cleanup.
 Captured commands use a separate Unix process group; interactive sign-in keeps
 the foreground group for terminal input. This is native execution, not a sandbox.
+Successful captured Unix cleanup retires its numeric group identity after
+termination and child reaping, before later output-drain waits. Cleanup errors
+and abandoned waits retain ownership; dropping a completed owner cannot signal
+a reused group identifier.
 
 Subscription mode removes ambient API-key, bearer-token and cloud-routing
 environment overrides listed by `CLAUDE_CODE_ENV_OVERRIDES`, and

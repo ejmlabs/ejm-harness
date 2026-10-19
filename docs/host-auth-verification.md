@@ -28,8 +28,37 @@ and checked standards task history stayed unchanged.
 
 Hosted run [39299507686](https://github.com/ejmlabs/ejm-harness/actions/runs/39299507686)
 then exposed the two registry issues below. The current correction preserves
-that committed source and caller while addressing those findings. It has not
-run its local gate or fresh hosted review. OpenSpec task 3.5 stays open.
+that committed source and caller while addressing those findings and the later
+auth cleanup finding below. This successor has not run its local gate or fresh
+hosted review. OpenSpec task 3.5 stays open.
+
+## Hosted auth process-group correction
+
+Hosted run [39302646399](https://github.com/ejmlabs/ejm-harness/actions/runs/39302646399)
+reviewed registry-corrected head
+`86677bbf89f34275614963eb26b91e05fcb7c80b` against protected base
+`99ba4575ad9070a7a0f3296a35e746858af904b0`. The admitted source context and
+both raw reports name that head. Both reviewers marked their static review
+complete and ran no project code or tests. Pass 1 reported one medium defect;
+pass 2 reported no findings. Their raw report SHA-256 values are
+`6f377df659b36de26aa9b7b01988adee43664b738851ab244816ad42b7021e52`
+and `000acabd4762928a1d0759be2a0e76ab58879af9b7d5885c4dc412665f39379d`.
+
+Successful Unix auth cleanup killed its process group and reaped the child but
+kept the numeric group identity. A later owner drop, after output-reader waits,
+could signal an unrelated group if the OS reused that identifier. The successor
+retires the identity synchronously after all termination and reaping checks
+succeed. Cleanup errors and pending awaits retain ownership; Windows Job
+behavior is unchanged. A bounded real-child regression checks retirement
+without forcing identifier reuse. No dependency, workflow, vault deadline or
+public API changes are part of this correction.
+
+At the retained exact-head snapshot, Linux, macOS, registry and standards jobs
+completed successfully; Windows was still running. AI pass 1 failed its
+required validation because of the finding. These historical results do not
+accept the successor. Its regression, full local gate and fresh exact-head
+hosted checks remain pending under task 3.5. Real native key-service acceptance,
+package release and docs publication remain separate and unproved here.
 
 ## Paused-clock deadline fixture follow-up
 

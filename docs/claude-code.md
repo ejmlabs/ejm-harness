@@ -115,6 +115,12 @@ and restore it only after the auth operation finishes. Keep the host's Tokio
 runtime alive through cleanup. See [native process support](native-process-support.md)
 for package selection, nested-Job errors, and native verification limits.
 
+The auth supervisor retires a captured Unix group's numeric identity only after
+group termination and child reaping succeed, before awaiting output-reader
+cleanup. Pending waits and cleanup errors keep ownership armed. This prevents a
+later completed-owner drop from signalling an unrelated group after identifier
+reuse; Windows Job ownership is unchanged.
+
 The provider rejects process failures, cancellation, timeouts, truncated output,
 unsuccessful result envelopes, missing structured output, invalid JSON and schema
 mismatches. Errors omit raw client output. Replies allow at most 64 KiB of UTF-8

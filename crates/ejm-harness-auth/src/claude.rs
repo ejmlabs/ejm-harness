@@ -275,7 +275,7 @@ impl ClaudeCodeClient {
                 .stdout(Stdio::inherit())
                 .stderr(Stdio::inherit());
         }
-        let (mut child, group) = ProcessGroup::spawn(command, captured).context(
+        let (mut child, mut group) = ProcessGroup::spawn(command, captured).context(
             "start official Claude Code client; install it or configure its executable path",
         )?;
         let mut readers = JoinSet::new();
@@ -461,7 +461,7 @@ impl ProcessGroup {
         Ok(())
     }
 
-    async fn reap(&self, child: &mut Child) -> Result<ExitStatus> {
+    async fn reap(&mut self, child: &mut Child) -> Result<ExitStatus> {
         let group = self.kill();
         let root = child.start_kill();
         #[cfg(windows)]
@@ -480,7 +480,13 @@ impl ProcessGroup {
         let status = child.wait().await;
         group.context("terminate Claude Code auth process group")?;
         root.context("terminate Claude Code auth child")?;
-        status.context("reap Claude Code auth")
+        let status = status.context("reap Claude Code auth")?;
+        #[cfg(unix)]
+        {
+            // Cleanup consumed this identity. Drop must not signal a reused group.
+            self.pid = None;
+        }
+        Ok(status)
     }
 }
 impl Drop for ProcessGroup {
@@ -541,6 +547,26 @@ mod tests {
         assert!(!ClaudeCodeStatus::from_client_output(Some(1), &output)?.logged_in);
         output.push(b' ');
         assert!(ClaudeCodeStatus::from_client_output(Some(1), &output).is_err());
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn successful_auth_reap_retires_the_unix_group_identity() -> anyhow::Result<()> {
+        let mut command = tokio::process::Command::new(std::env::current_exe()?);
+        command
+            .arg("--list")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        let (mut child, mut group) = super::ProcessGroup::spawn(command, true)?;
+        assert!(group.pid.is_some(), "captured child must own its group");
+        tokio::time::timeout(std::time::Duration::from_secs(3), group.reap(&mut child)).await??;
+        assert!(
+            child.id().is_none(),
+            "successful cleanup must reap its child"
+        );
+        assert!(group.pid.is_none(), "completed ownership must be retired");
         Ok(())
     }
 }

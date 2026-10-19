@@ -21,6 +21,21 @@ The harness SHALL delegate Claude subscription sign-in, status and sign-out to a
 - **WHEN** the official client reports API-key or third-party authentication
 - **THEN** subscription configuration fails with guidance instead of silently changing billing
 
+### Requirement: Auth cleanup retires completed Unix ownership
+
+The auth supervisor SHALL retain its Unix process-group identity through pending cleanup and errors. After group termination and child reaping succeed, it SHALL retire that numeric identity before later asynchronous work so dropping the completed owner cannot signal a reused group identifier. Windows Job cleanup ownership SHALL remain unchanged.
+
+#### Scenario: Auth cleanup succeeds
+
+- **WHEN** the auth supervisor successfully terminates its captured Unix group and reaps its child
+- **THEN** it retires the stored group identity before awaiting output-reader cleanup
+- **AND** dropping the completed owner does not signal that retired identity
+
+#### Scenario: Cleanup is interrupted
+
+- **WHEN** termination fails or cleanup is abandoned while awaiting child reaping
+- **THEN** the Unix group identity remains armed for the existing cleanup path
+
 ### Requirement: Harness retains tools and conversation state
 
 The Claude provider SHALL return canonical model responses and proposed tool calls to the harness. It SHALL disable the client's built-in tools, MCP tools, session persistence and ordinary customizations. Managed provider policy SHALL remain effective and its native execution limits SHALL be documented.
