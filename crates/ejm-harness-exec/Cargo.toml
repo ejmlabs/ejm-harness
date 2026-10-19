@@ -24,6 +24,9 @@ uuid.workspace = true
 [target.'cfg(unix)'.dependencies]
 rustix = { workspace = true, features = ["process", "param"] }
 
+[target.'cfg(windows)'.dependencies]
+processkit = { version = "=3.3.4", default-features = false, features = ["process-control"] }
+
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs-core.workspace = true
 

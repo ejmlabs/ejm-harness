@@ -184,6 +184,31 @@ through this worker, so no second engine is involved.
 
 ## Security and resource boundaries
 
+### Registry credentials
+
+Registry account sessions use the shared encrypted credential vault in
+`<package-root>/credentials`. The exact registry origin identifies a scoped
+`ejm-harness-packages` / `registry-session` record. `save_registry_token`,
+`load_registry_token`, and `delete_registry_token` are synchronous host
+boundaries; call them on a blocking worker when the host has a UI or async loop.
+They require the current user's OS key service. They never create a plaintext
+`registry-session.json` or fall back to one when vault access fails.
+
+For an existing private legacy session, stop older clients and run
+`ejm-cli package migrate-credentials --old-clients-stopped` for the same registry
+origin. Rust hosts use `migrate_registry_token(root, origin, true)` after the
+same confirmation. An unconfirmed handoff refuses before key access or source
+changes. Migration validates the source's privacy and origin, commits its
+encrypted record and permanent marker, reopens the authenticated state, then
+retires the source. Interrupted cleanup can be retried. A marker survives
+logout and replacement, preventing any stale reimport from a leftover source.
+An existing vault with a missing key requires recovery of the original OS
+record. Read [credential storage](auth.md#storage-and-renewal) for key setup,
+limits, headless Linux behavior, and the storage trust boundary. Native OS
+acceptance remains required before support claims.
+
+### Native package code
+
 **Native packages run arbitrary code as the current user.** Export grants
 control harness registration. They do not restrict filesystem or network access,
 secret access, subprocesses, or language allocations. Use an external sandbox

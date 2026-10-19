@@ -22,6 +22,11 @@ and [release policy](RELEASING.md) for release status and gates.
   TypeScript SDK itself supports Node 20 or later with a compatible Rust worker.
 - Python 3.11 or later for the Python SDK, and uv for its development tools.
 
+Persistent credentials use macOS Keychain, Windows Credential Manager, or an
+unlocked Linux Secret Service. Linux development builds also need `pkg-config`
+and D-Bus development headers. The official Claude Code provider requires its
+separately installed unmodified client.
+
 Rust hosts do not require Node or Python. The [contributor guide](docs/contributing.md)
 lists the tools needed for the full quality gate.
 
@@ -69,7 +74,8 @@ async fn main() -> anyhow::Result<()> {
 ```
 
 The replay provider replies with `Demo: Hello`. Hosted providers support Chat
-Completions, Anthropic Messages, and OpenAI Responses. Credentials and tool grants
+Completions, Anthropic Messages, OpenAI Responses, and an official Claude Code
+subscription adapter. Credentials and tool grants
 remain host configuration. Use `Provider`, `Tool`, `ContextPolicy`, and `RunStrategy`
 to substitute behavior at the engine boundaries.
 
@@ -77,6 +83,10 @@ to substitute behavior at the engine boundaries.
 - [Python SDK](sdk/python/README.md)
 - [Host integration](docs/ide-integration.md)
 - [Authentication](docs/auth.md)
+- [Shared credential vault](docs/credential-vault.md)
+- [Official Claude Code provider](docs/claude-code.md)
+- [Host authentication guide](site/public/docs/host-auth/index.html)
+- [Host authentication verification](docs/host-auth-verification.md)
 - [Extension packages and trust](docs/packages.md)
 
 ## Development

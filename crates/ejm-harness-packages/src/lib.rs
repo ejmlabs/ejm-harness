@@ -13,8 +13,8 @@ mod transport;
 pub use ejm_harness_package_spec::{HookEvent, RuntimeKind};
 pub use manager::{PackageManager, PackageRecord, pack_directory, read_bounded};
 pub use registry::{
-    DEFAULT_REGISTRY, DeviceCode, RegistryClient, VersionRecord, load_registry_token,
-    save_registry_token,
+    DEFAULT_REGISTRY, DeviceCode, RegistryClient, VersionRecord, delete_registry_token,
+    load_registry_token, migrate_registry_token, save_registry_token,
 };
 pub use runtime::{
     InstalledPackage, PackageContext, PackageGrants, RuntimeConfig, RuntimeEvent, RuntimePool,

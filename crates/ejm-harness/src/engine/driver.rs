@@ -258,10 +258,15 @@ impl Harness {
         self.emit(&session.id, Some(run), EventKind::ModelStarted { step })
             .await?;
         let (deltas, mut receiver) = mpsc::channel(16);
-        let provider = self
+        let selected = self
             .inner
             .provider
-            .stream(request, cancel.child_token(), deltas);
+            .lock()
+            .await
+            .provider
+            .clone()
+            .context("model provider is not configured")?;
+        let provider = selected.stream(request, cancel.child_token(), deltas);
         tokio::pin!(provider);
         let mut streamed = String::new();
         let mut response = loop {

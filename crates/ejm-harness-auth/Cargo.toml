@@ -29,11 +29,29 @@ zeroize = "1.9"
 base64 = "0.22"
 oauth2 = { version = "5.0", default-features = false }
 subtle = "2.6"
+aws-lc-rs = "=1.18.2"
+keyring-core = "=1.0.1"
+which = "=8.0.6"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store = { version = "=1.0.2", default-features = false, features = ["keychain"] }
+
+[target.'cfg(any(windows, target_os = "macos"))'.dependencies]
+rightkit-fs = { version = "=0.4.4", default-features = false, features = ["fs"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-native-keyring-store = "=1.1.0"
+processkit = { version = "=3.3.4", default-features = false, features = ["process-control"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+dbus-secret-service-keyring-store = { version = "=1.0.1", default-features = false, features = ["crypto-rust"] }
 
 [target.'cfg(unix)'.dependencies]
-rustix = { workspace = true, features = ["process"] }
+rustix = { workspace = true, features = ["process", "fs"] }
 
 [dev-dependencies]
 wiremock.workspace = true
 sha2 = "0.10"
+tokio = { workspace = true, features = ["test-util"] }
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 

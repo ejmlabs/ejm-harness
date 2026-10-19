@@ -448,6 +448,33 @@ pub(crate) fn read_bounded_checked(
     Ok(bytes)
 }
 
+#[cfg(windows)]
+pub(crate) fn private_directory(path: &Path) -> Result<()> {
+    let directory = rightkit_fs::StateDir::create(&std::path::absolute(path)?)
+        .context("open protected package directory")?;
+    rightkit_fs::private::verify_owner_only(directory.path())
+        .context("package directory must have an owner-only Windows ACL")?;
+    rightkit_fs::private::restrict_owner_only(directory.path())?;
+    ensure!(
+        rightkit_fs::private::is_owner_only_strict(directory.path())?,
+        "package directory requires an inheritable owner-only Windows ACL"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn private_directory(path: &Path) -> Result<()> {
+    match fs::symlink_metadata(path) {
+        Ok(_) => rightkit_fs::private::verify_owner_only(path)?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error).context("inspect private package directory"),
+    }
+    rightkit_fs::private::ensure_private_dir(path)?;
+    rightkit_fs::private::verify_owner_only(path)
+        .context("package store must have an owner-only ACL")
+}
+
+#[cfg(not(any(windows, target_os = "macos")))]
 pub(crate) fn private_directory(path: &Path) -> Result<()> {
     let mut builder = fs::DirBuilder::new();
     builder.recursive(true);

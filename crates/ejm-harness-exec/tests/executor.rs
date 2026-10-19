@@ -5,7 +5,7 @@
 )]
 
 use std::{
-    io::Write,
+    io::{Read, Write},
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
@@ -15,7 +15,6 @@ use ejm_harness_exec::{
     CommandRequest, Executor, Governor, GovernorSnapshot, RequiredCapabilities, Reservation,
     ResourceLimits, RestrictionState,
 };
-#[cfg(unix)]
 use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System};
 use tempfile::TempDir;
 use tokio::time::timeout;
@@ -26,6 +25,87 @@ fn executor(limits: ResourceLimits) -> (TempDir, Arc<Governor>, Executor) {
     let governor = Arc::new(Governor::new(limits).unwrap());
     let executor = Executor::new(governor.clone(), directory.path().join("artifacts")).unwrap();
     (directory, governor, executor)
+}
+
+#[tokio::test]
+async fn private_input_closes_at_eof_while_both_output_pipes_drain() {
+    let (directory, governor, executor) = executor(ResourceLimits::default());
+    let input = b"fixture-private-input".repeat(32 * 1024);
+    let expected = input.len();
+    let output = timeout(
+        Duration::from_secs(5),
+        executor.run_with_input(
+            fixture_request("private-input", directory.path()),
+            input,
+            vec!["PATH".into()],
+            CancellationToken::new(),
+        ),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(output.exit_code, Some(0));
+    assert!(output.stdout.contains(&format!("INPUT_LEN={expected}")));
+    assert!(output.stdout.contains("PATH_REMOVED=true"));
+    assert!(output.stderr.contains("STDERR_END"));
+    let artifact = std::fs::read(output.artifact.unwrap()).unwrap();
+    assert!(
+        !artifact
+            .windows(21)
+            .any(|bytes| bytes == b"fixture-private-input")
+    );
+    assert_eq!(governor.snapshot(), GovernorSnapshot::default());
+}
+
+#[tokio::test]
+async fn oversized_private_input_is_rejected_before_launch() {
+    let (directory, governor, executor) = executor(ResourceLimits::default());
+    let path = directory.path().join("started");
+    let mut request = fixture_request("ready", directory.path());
+    request.env.insert(
+        "EJM_HARNESS_EXEC_PID_FILE".into(),
+        path.to_string_lossy().into_owned(),
+    );
+    assert!(
+        executor
+            .run_with_input(
+                request,
+                vec![0; 8 * 1024 * 1024 + 1],
+                Vec::new(),
+                CancellationToken::new()
+            )
+            .await
+            .is_err()
+    );
+    assert!(!path.exists());
+    assert_eq!(governor.snapshot(), GovernorSnapshot::default());
+}
+
+#[tokio::test]
+async fn cancellation_reaps_a_command_that_never_reads_private_input() {
+    let (directory, governor, executor) = executor(ResourceLimits::default());
+    let path = directory.path().join("pids");
+    let mut request = fixture_request("blocked-input", directory.path());
+    request.env.insert(
+        "EJM_HARNESS_EXEC_PID_FILE".into(),
+        path.to_string_lossy().into_owned(),
+    );
+    let cancel = CancellationToken::new();
+    let child_cancel = cancel.clone();
+    let task = tokio::spawn(async move {
+        executor
+            .run_with_input(request, vec![0; 8 * 1024 * 1024], Vec::new(), child_cancel)
+            .await
+    });
+    let pids = parse_pids(&wait_for_file(&path).await);
+    cancel.cancel();
+    let output = timeout(Duration::from_secs(5), task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert!(output.cancelled);
+    wait_for_cleanup(&governor, &pids).await;
 }
 
 fn fixture_request(mode: &str, directory: &Path) -> CommandRequest {
@@ -50,7 +130,6 @@ fn fixture_request(mode: &str, directory: &Path) -> CommandRequest {
     request
 }
 
-#[cfg(unix)]
 fn live(pid: u32) -> bool {
     let mut system = System::new();
     let ids = [Pid::from_u32(pid)];
@@ -64,7 +143,6 @@ fn live(pid: u32) -> bool {
         .is_some_and(|process| process.status() != ProcessStatus::Zombie)
 }
 
-#[cfg(unix)]
 async fn wait_for_file(path: &Path) -> String {
     timeout(Duration::from_secs(5), async {
         loop {
@@ -80,7 +158,6 @@ async fn wait_for_file(path: &Path) -> String {
     .expect("fixture became ready")
 }
 
-#[cfg(unix)]
 async fn wait_for_cleanup(governor: &Governor, pids: &[u32]) {
     timeout(Duration::from_secs(5), async {
         loop {
@@ -300,7 +377,6 @@ async fn queued_commands_obey_the_same_wall_deadline() {
     assert_eq!(governor.snapshot(), GovernorSnapshot::default());
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn cancellation_reaps_command_and_ordinary_descendants() {
     let (directory, governor, executor) = executor(ResourceLimits::default());
@@ -326,13 +402,11 @@ async fn cancellation_reaps_command_and_ordinary_descendants() {
     wait_for_cleanup(&governor, &pids).await;
 }
 
-#[cfg(unix)]
 struct CleanupProbe {
     pids: Arc<std::sync::Mutex<Vec<u32>>>,
     dropped: Option<tokio::sync::oneshot::Sender<bool>>,
 }
 
-#[cfg(unix)]
 impl Drop for CleanupProbe {
     fn drop(&mut self) {
         let cleaned = self.pids.lock().unwrap().iter().all(|pid| !live(*pid));
@@ -342,7 +416,6 @@ impl Drop for CleanupProbe {
     }
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn dropping_the_run_future_retains_host_ownership_until_child_cleanup() {
     let (directory, governor, executor) = executor(ResourceLimits::default());
@@ -380,7 +453,6 @@ async fn dropping_the_run_future_retains_host_ownership_until_child_cleanup() {
     wait_for_cleanup(&governor, &pids).await;
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn normal_parent_exit_cleans_children_that_keep_pipes_open() {
     let (directory, governor, executor) = executor(ResourceLimits::default());
@@ -403,7 +475,6 @@ async fn normal_parent_exit_cleans_children_that_keep_pipes_open() {
     wait_for_cleanup(&governor, &pids).await;
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn deadline_terminates_a_command_tree() {
     let (directory, governor, executor) = executor(ResourceLimits::default());
@@ -423,7 +494,6 @@ async fn deadline_terminates_a_command_tree() {
     wait_for_cleanup(&governor, &pids).await;
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn observed_process_budget_abuse_is_stopped_and_released() {
     let (directory, governor, executor) = executor(ResourceLimits::default());
@@ -444,7 +514,6 @@ async fn observed_process_budget_abuse_is_stopped_and_released() {
     wait_for_cleanup(&governor, &pids).await;
 }
 
-#[cfg(unix)]
 fn parse_pids(text: &str) -> Vec<u32> {
     text.split_whitespace()
         .map(|part| part.parse().unwrap())
@@ -458,6 +527,32 @@ fn fixture() {
     let mode = std::env::var("EJM_HARNESS_EXEC_FIXTURE").expect("fixture mode");
     let pid_file = std::env::var_os("EJM_HARNESS_EXEC_PID_FILE").map(PathBuf::from);
     match mode.as_str() {
+        "private-input" => {
+            let err = std::thread::spawn(|| {
+                let mut stderr = std::io::stderr().lock();
+                stderr.write_all(&vec![b'e'; 1024 * 1024]).unwrap();
+                stderr.write_all(b"\nSTDERR_END\n").unwrap();
+            });
+            std::io::stdout()
+                .write_all(&vec![b'o'; 1024 * 1024])
+                .unwrap();
+            let mut input = Vec::new();
+            std::io::stdin().read_to_end(&mut input).unwrap();
+            err.join().unwrap();
+            println!(
+                "INPUT_LEN={} PATH_REMOVED={}",
+                input.len(),
+                std::env::var_os("PATH").is_none()
+            );
+        }
+        "blocked-input" => {
+            if let Some(path) = pid_file {
+                std::fs::write(path, std::process::id().to_string()).unwrap();
+            }
+            loop {
+                std::thread::sleep(Duration::from_secs(1));
+            }
+        }
         "noisy" => {
             let err = std::thread::spawn(|| {
                 let mut stderr = std::io::stderr().lock();

@@ -42,3 +42,9 @@ current masking, recovery, completion, and evaluation contracts.
 
 If the change alters a durable or public contract, use
 [harness-maintenance](../harness-maintenance/SKILL.md) to update its decision and checks.
+
+## Provider configuration
+
+Use `with_optional_provider` and `configure_provider` for interactive hosts. Reject turns before journaling when no provider is configured. Replace providers only while all managed work is idle. Keep durable nonsecret binding and continuation removal atomic under admission ownership, retaining readable history and tool evidence.
+
+Claude subscription checks and inference use the shared executor as separate sequential jobs. Keep native tools and ordinary customizations disabled, return proposals to the normal tool loop and retain managed provider policy. Read the [official-client contract](../../../docs/claude-code.md).

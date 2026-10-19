@@ -35,3 +35,9 @@ in maintained libraries. Cover invalid state, nonce,
 signature, audience, identity changes, rotation races, interrupted persistence,
 and redacted errors for the contract being changed. Never run a paid inference
 or real browser sign-in as an automated check. Run `./scripts/check` when ready.
+
+## Shared vault and official client
+
+Use the [credential vault](../../../docs/credential-vault.md) for provider state and scoped host secrets. The OS key service holds only its key. Keep the stable legacy lock, rejecting provider barrier and permanent host migration markers. Never reset missing keys or fall back to plaintext. Memory-only storage must be explicitly selected.
+
+Use `ClaudeCodeClient` for official Claude account controls and require the subscription source before every inference. Use `resolve_claude_code_program` for explicit override, native install and maintained PATH discovery. Keep API-key routes separate. See the [official-client contract](../../../docs/claude-code.md).

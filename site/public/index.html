@@ -36,6 +36,7 @@
         <details class="ejm-menu">
           <summary><span class="ejm-menu__label">Menu</span></summary>
           <nav class="ejm-nav" aria-label="Main">
+            <a href="/docs/host-auth/">Host authentication</a>
             <a href="https://ejmlabs.com/" rel="external">ejmlabs.com</a>
             <a href="https://cli.ejmlabs.com/" rel="external">ejm-cli</a>
             <a href="https://ide.ejmlabs.com/" rel="external">ejm-ide</a>
@@ -309,7 +310,7 @@ async fn main() -&gt; anyhow::Result&lt;()&gt; {
               <p class="ejm-eyebrow">get it</p>
               <h2 class="ejm-h2" id="get-title">Build ejm-harness from source.</h2>
             </div>
-            <p class="ejm-head__text">The repository contains source packages. Registry releases and prebuilt worker binaries have not been published. It needs only the pinned Rust toolchain, and it is MIT licensed.</p>
+            <p class="ejm-head__text">The repository contains source packages. Registry releases and prebuilt worker binaries have not been published. It uses the pinned Rust toolchain and is MIT licensed. Persistent credentials require an OS key service; Linux builds also need D-Bus development headers. Read the <a href="/docs/host-auth/">host authentication guide</a>.</p>
           </div>
           <div class="ejm-showcase">
             <div class="ejm-showcase__text">
@@ -351,7 +352,7 @@ cargo test --workspace --locked</code></pre>
             <details class="ejm-faq__item">
               <summary>Which model providers work?</summary>
               <div class="ejm-faq__answer">
-                <p>Chat Completions compatible streaming APIs, including DeepSeek endpoints, the Anthropic Messages API, and native OpenAI Responses with an API key or ChatGPT sign-in.</p>
+                <p>Chat Completions compatible streaming APIs, including DeepSeek endpoints, the Anthropic Messages API, native OpenAI Responses with an API key or ChatGPT sign-in, and the official Claude Code subscription adapter. The <a href="/docs/host-auth/#claude">Claude route</a> requires a separately installed official client and retains its managed provider policy.</p>
               </div>
             </details>
             <details class="ejm-faq__item">

@@ -56,7 +56,8 @@ impl Store {
             CREATE INDEX IF NOT EXISTS messages_by_role ON messages(session_id,json_extract(payload,'$.role'),sequence);
             CREATE TABLE IF NOT EXISTS tool_views(sequence INTEGER PRIMARY KEY REFERENCES messages(sequence),original_output TEXT NOT NULL,payload TEXT,bytes INTEGER);
             CREATE TABLE IF NOT EXISTS events(sequence INTEGER PRIMARY KEY,session_id TEXT NOT NULL REFERENCES sessions(id),run_id TEXT,created INTEGER NOT NULL,payload TEXT NOT NULL);
-            CREATE INDEX IF NOT EXISTS events_by_session ON events(session_id,sequence);")?;
+            CREATE INDEX IF NOT EXISTS events_by_session ON events(session_id,sequence);
+            CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT NOT NULL);")?;
         let page_size: i64 = connection.query_row("PRAGMA page_size", [], |r| r.get(0))?;
         connection.pragma_update(
             None,
@@ -131,6 +132,40 @@ impl Store {
             let rows = query.query_map([], row_session)?;
             rows.collect::<rusqlite::Result<Vec<_>>>()
                 .map_err(Into::into)
+        })
+        .await
+    }
+
+    pub async fn configure_provider_binding(&self, binding: Option<String>) -> Result<()> {
+        self.call(move |db| {
+            let tx = db.transaction()?;
+            let current: Option<String> = tx
+                .query_row(
+                    "SELECT value FROM settings WHERE key='provider_binding'",
+                    [],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if current != binding {
+                tx.execute(
+                    "UPDATE messages SET payload=json_remove(payload,'$.continuation'),bytes=length(CAST(json_remove(payload,'$.continuation') AS BLOB)) WHERE json_type(payload,'$.continuation') IS NOT NULL",
+                    [],
+                )?;
+                tx.execute(
+                    "UPDATE tool_views SET payload=json_remove(payload,'$.continuation'),bytes=length(CAST(json_remove(payload,'$.continuation') AS BLOB)) WHERE payload IS NOT NULL AND json_type(payload,'$.continuation') IS NOT NULL",
+                    [],
+                )?;
+                if let Some(binding) = binding {
+                    tx.execute(
+                        "INSERT INTO settings(key,value) VALUES('provider_binding',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                        [binding],
+                    )?;
+                } else {
+                    tx.execute("DELETE FROM settings WHERE key='provider_binding'", [])?;
+                }
+            }
+            tx.commit()?;
+            Ok(())
         })
         .await
     }

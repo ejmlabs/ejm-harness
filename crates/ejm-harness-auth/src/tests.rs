@@ -10,17 +10,38 @@ use wiremock::{
 };
 
 use super::*;
-use crate::{FileStore, StoredAuth};
+use crate::{FileStore, StoredAuth, VaultKeyStore};
 
 const CLIENT: &str = "oaiapp_test_client";
 const CALLBACK: &str = "http://127.0.0.1:54823/auth/callback";
 const KEY: &[u8] = include_bytes!("../tests/fixtures/signing-key.der");
+
+#[derive(Default)]
+struct FixtureKeys(std::sync::Mutex<Option<SecretString>>);
+
+impl VaultKeyStore for FixtureKeys {
+    fn get(&self, _: &str) -> Result<Option<SecretString>> {
+        Ok(self
+            .0
+            .lock()
+            .map_err(|_| anyhow::anyhow!("fixture key lock"))?
+            .clone())
+    }
+    fn set(&self, _: &str, key: &SecretString) -> Result<()> {
+        *self
+            .0
+            .lock()
+            .map_err(|_| anyhow::anyhow!("fixture key lock"))? = Some(key.clone());
+        Ok(())
+    }
+}
 
 struct Fixture {
     server: MockServer,
     engine: AuthEngine,
     store: Arc<FileStore>,
     directory: tempfile::TempDir,
+    keys: Arc<FixtureKeys>,
 }
 
 impl Fixture {
@@ -47,13 +68,18 @@ impl Fixture {
             .mount(&server)
             .await;
         let directory = tempfile::tempdir()?;
-        let store = Arc::new(FileStore::open(directory.path().join("auth"))?);
+        let keys = Arc::new(FixtureKeys::default());
+        let store = Arc::new(FileStore::open_with_key_store(
+            directory.path().join("auth"),
+            keys.clone(),
+        )?);
         let engine = test_engine(&server, store.clone())?;
         Ok(Self {
             server,
             engine,
             store,
             directory,
+            keys,
         })
     }
 
@@ -548,7 +574,10 @@ async fn separate_engines_serialize_rotating_refresh_and_persist_replacement() -
     fixture.expire().await?;
     let independent = test_engine(
         &fixture.server,
-        Arc::new(FileStore::open(fixture.directory.path().join("auth"))?),
+        Arc::new(FileStore::open_with_key_store(
+            fixture.directory.path().join("auth"),
+            fixture.keys.clone(),
+        )?),
     )?;
     let body = json!({"access_token": "access-next", "refresh_token": "refresh-next", "token_type": "Bearer", "expires_in": 3600, "id_token": signed(&claims("account-a", None))?});
     let _token = fixture.token(200, body).await;
@@ -616,7 +645,10 @@ async fn malformed_renewal_keeps_durable_uncertainty_marker() -> Result<()> {
     );
     let reopened = test_engine(
         &fixture.server,
-        Arc::new(FileStore::open(fixture.directory.path().join("auth"))?),
+        Arc::new(FileStore::open_with_key_store(
+            fixture.directory.path().join("auth"),
+            fixture.keys.clone(),
+        )?),
     )?;
     assert!(
         reopened
@@ -712,7 +744,10 @@ async fn logout_invalidates_pending_sign_in_and_retry_across_engines() -> Result
     let status = fixture.login("account-a", SCOPES).await?;
     let independent = test_engine(
         &fixture.server,
-        Arc::new(FileStore::open(fixture.directory.path().join("auth"))?),
+        Arc::new(FileStore::open_with_key_store(
+            fixture.directory.path().join("auth"),
+            fixture.keys.clone(),
+        )?),
     )?;
     let pending = independent
         .start(CALLBACK, Some(&status.id), CancellationToken::new())
