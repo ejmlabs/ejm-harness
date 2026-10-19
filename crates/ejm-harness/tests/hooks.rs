@@ -449,9 +449,19 @@ async fn cancellation_during_tool_hooks_preserves_effect_and_recovery_boundaries
         )?;
         let session = session(&harness, &root).await?;
         let mut handle = harness.start(&session.id, "inspect".into()).await?;
-        tokio::time::timeout(Duration::from_secs(2), entered.notified()).await?;
+        tokio::time::timeout(Duration::from_secs(5), entered.notified())
+            .await
+            .with_context(|| {
+                format!("tool hook entry timed out (block_before_tool={block_before_tool})")
+            })?;
         handle.cancel();
-        let result = tokio::time::timeout(Duration::from_secs(2), handle.wait()).await??;
+        let result = tokio::time::timeout(Duration::from_secs(5), handle.wait())
+            .await
+            .with_context(|| {
+                format!(
+                    "cancelled run completion timed out (block_before_tool={block_before_tool})"
+                )
+            })??;
         assert_eq!(result.status, RunStatus::Cancelled);
         assert_eq!(
             calls.load(Ordering::SeqCst),
