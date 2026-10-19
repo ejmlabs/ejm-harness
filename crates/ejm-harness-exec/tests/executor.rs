@@ -15,6 +15,7 @@ use ejm_harness_exec::{
     CommandRequest, Executor, Governor, GovernorSnapshot, RequiredCapabilities, Reservation,
     ResourceLimits, RestrictionState,
 };
+#[cfg(unix)]
 use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System};
 use tempfile::TempDir;
 use tokio::time::timeout;
@@ -49,6 +50,7 @@ fn fixture_request(mode: &str, directory: &Path) -> CommandRequest {
     request
 }
 
+#[cfg(unix)]
 fn live(pid: u32) -> bool {
     let mut system = System::new();
     let ids = [Pid::from_u32(pid)];
@@ -62,6 +64,7 @@ fn live(pid: u32) -> bool {
         .is_some_and(|process| process.status() != ProcessStatus::Zombie)
 }
 
+#[cfg(unix)]
 async fn wait_for_file(path: &Path) -> String {
     timeout(Duration::from_secs(5), async {
         loop {
@@ -77,6 +80,7 @@ async fn wait_for_file(path: &Path) -> String {
     .expect("fixture became ready")
 }
 
+#[cfg(unix)]
 async fn wait_for_cleanup(governor: &Governor, pids: &[u32]) {
     timeout(Duration::from_secs(5), async {
         loop {

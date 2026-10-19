@@ -8,8 +8,14 @@ version = "0.1.0"
 description = "Python SDK for ejm-harness's Rust worker"
 requires-python = ">=3.11"
 license = "MIT"
+license-files = ["LICENSE"]
 readme = "README.md"
 dependencies = []
+
+[project.urls]
+Repository = "https://github.com/ejmlabs/ejm-harness"
+Documentation = "https://github.com/ejmlabs/ejm-harness/blob/main/docs/sdk.md"
+Issues = "https://github.com/ejmlabs/ejm-harness/issues"
 
 [project.optional-dependencies]
 dev = ["mypy==1.18.2", "ruff==0.13.2", "build==1.3.0", "datamodel-code-generator==0.86.0"]

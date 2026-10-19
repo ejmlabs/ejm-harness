@@ -79,7 +79,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    prettier = str(ROOT / "node_modules/.bin/prettier")
+    prettier = ["node", str(ROOT / "node_modules/prettier/bin/prettier.cjs")]
     with tempfile.TemporaryDirectory(prefix="ejm-harness-schema-") as folder:
         schema_path = Path(folder) / "protocol.schema.json"
         subprocess.run(
@@ -104,10 +104,10 @@ def main() -> None:
         )
         outputs = {
             ROOT / "sdk/protocol.schema.json": output(
-                [prettier, "--parser", "json"], schema_path.read_text(encoding="utf-8")
+                [*prettier, "--parser", "json"], schema_path.read_text(encoding="utf-8")
             ),
             ROOT / "sdk/typescript/src/protocol.ts": output(
-                [prettier, "--parser", "typescript"], typescript
+                [*prettier, "--parser", "typescript"], typescript
             ),
             ROOT / "sdk/python/ejm_harness/protocol.py": python_source(
                 schema_path, Path(folder) / "protocol.py"

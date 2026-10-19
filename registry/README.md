@@ -123,7 +123,7 @@ is disabled, so normalized identity requests check D1 revocation. The Rust Worke
 returns only the subject, display name, and operator boolean from the private
 auth service. It never accepts public operator headers.
 
-The first-party client ID is `gerry-cli`. Its optional access label is exactly
+The first-party client ID is `ejm-cli`. Its optional access label is exactly
 `registry`. Device grants expire after ten minutes and require at least five
 seconds between polls. The CLI starts `/api/auth/device/code` and polls
 `/api/auth/device/token` with the maintained device grant type. Browser approval

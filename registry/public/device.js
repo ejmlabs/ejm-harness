@@ -30,15 +30,17 @@ async function verify() {
         const result = await api(`/api/auth/device?${new URLSearchParams({ user_code: code })}`);
         if (generation !== verificationGeneration) return;
         if (
-            result.client_id !== "gerry-cli" ||
+            result.client_id !== "ejm-cli" ||
             typeof result.user_code !== "string" ||
             result.status !== "pending" ||
             (result.scope !== undefined && result.scope !== null && result.scope !== "registry")
         ) {
-            throw new Error("This request could not be verified. Start gerry pkg login again.");
+            throw new Error(
+                "This request could not be verified. Start ejm-cli package login again.",
+            );
         }
         verified = Object.freeze({ user_code: result.user_code });
-        document.getElementById("client").textContent = "Gerry CLI (gerry-cli)";
+        document.getElementById("client").textContent = "ejm-cli";
         document.getElementById("code").textContent = result.user_code;
         document.getElementById("scope").textContent = result.scope || "Registry session";
         request.hidden = false;

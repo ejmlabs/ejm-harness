@@ -6,7 +6,7 @@ Build the worker and SDK from the repository root:
 
 ```sh
 cargo build --release -p ejm-harness-worker
-npm ci
+npm ci --ignore-scripts
 npm run build --workspace ejm-harness
 export EJM_HARNESS_WORKER_PATH="$PWD/target/release/ejm-harness-worker"
 node examples/sdk_typescript.mjs
@@ -56,4 +56,8 @@ One hundred runs can wait concurrently without caller batching. The SDK admits a
 
 Callback cancellation is cooperative. A callback holds its capacity and effect guard until its handler settles, including cleanup. If it does not settle within five seconds after cancellation, the transport closes and rejects further work. Deadlines and cancellation require a responsive Node event loop. JavaScript cannot forcibly stop a host handler, and uncertain effects are never retried automatically.
 
-Requires Node 20 or newer and a compatible worker binary, supplied through `workerPath`, `EJM_HARNESS_WORKER_PATH`, or `PATH`. This source release includes no prebuilt workers and performs no installation-time downloads. See [the SDK guide](../../docs/sdk.md) for bounds, recovery, effect grants, and cooperative cancellation.
+Requires Node 20 or newer and a compatible worker binary, supplied through `workerPath`, `EJM_HARNESS_WORKER_PATH`, or `PATH`. This source release includes no prebuilt workers and performs no installation-time downloads. See [the SDK guide](https://github.com/ejmlabs/ejm-harness/blob/main/docs/sdk.md) for bounds, recovery, effect grants, and cooperative cancellation.
+
+## License
+
+Licensed under [MIT](LICENSE). The package includes the full license text.

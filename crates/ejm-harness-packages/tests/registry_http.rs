@@ -1,10 +1,49 @@
 use anyhow::Result;
 use ejm_harness_packages::{RegistryClient, pack_directory};
 use serde_json::json;
+use tokio_util::sync::CancellationToken;
 use wiremock::{
     Mock, MockServer, ResponseTemplate,
-    matchers::{method, path},
+    matchers::{body_json, method, path},
 };
+
+#[tokio::test]
+async fn device_code_and_polling_use_the_registered_cli_identity() -> Result<()> {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/auth/device/code"))
+        .and(body_json(json!({"client_id":"ejm-cli","scope":"registry"})))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "device_code":"local-device-code",
+            "user_code":"TEST-CODE",
+            "verification_uri":format!("{}/device", server.uri()),
+            "expires_in":600,
+            "interval":5
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/api/auth/device/token"))
+        .and(body_json(json!({
+            "client_id":"ejm-cli",
+            "device_code":"local-device-code",
+            "grant_type":"urn:ietf:params:oauth:grant-type:device_code"
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "access_token":"local-fixture-token"
+        })))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let client = RegistryClient::new(&server.uri())?;
+    let code = client.device_code().await?;
+    let token = client
+        .wait_for_login(&code, CancellationToken::new())
+        .await?;
+    assert_eq!(token.expose_secret(), "local-fixture-token");
+    Ok(())
+}
 
 #[tokio::test]
 async fn pinned_download_checks_identity_hash_and_does_not_follow_redirects() -> Result<()> {

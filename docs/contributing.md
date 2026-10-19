@@ -8,8 +8,8 @@ to their language.
 ## Set up
 
 Use Rust 1.99.1 with rustfmt and Clippy, Node 24 or later, Python 3.11 or later,
-and uv. `rust-toolchain.toml` pins the Rust quality toolchain. `rust-version` in
-the workspace remains the source compatibility floor. Cargo, npm, and Python
+and uv. `rust-toolchain.toml` and workspace `rust-version` agree on Rust 1.99.1.
+An older compiler is not a supported configuration. Cargo, npm, and Python
 development locks belong in version control.
 
 Install the quality tools once:
@@ -35,10 +35,22 @@ generated wire types, ESLint, Prettier, TypeScript, Ruff, mypy, and SDK fixtures
 It does not publish packages or call hosted models. Rust process and compiler
 jobs are capped at two by the repository configuration.
 
+`./scripts/check-registry` is the separate required gate for the registry. It
+checks both workers, auth fixtures, schema, dependencies, and deployment dry runs.
+Run it when changing the registry; CI runs both gates after human admission.
+
 Use focused tests while editing. Run the required gate once the patch is ready.
 A missing tool or stale lock is a failed gate, not a skipped check. The advisory
 check needs access to the RustSec database. Report network or platform limits
 as unverified evidence instead of describing a partial run as green.
+
+## Plan changes
+
+Read [the repository contribution policy](../CONTRIBUTING.md). Feature and bugfix
+work starts with OpenSpec exploration or clarification, then a proposed change.
+Implement tracked tasks through the apply workflow. Sync the specifications and
+archive only after the required work and checks pass. Existing changes live in
+`openspec/changes`.
 
 ## Design and ownership
 

@@ -58,7 +58,7 @@ export function authOptions(
         expiresIn: "10m",
         interval: "5s",
         verificationUri: `${env.REGISTRY_ORIGIN}/device`,
-        validateClient: (clientId: string) => clientId === "gerry-cli",
+        validateClient: (clientId: string) => clientId === "ejm-cli",
       }),
       atomicDeviceConsent,
     ],

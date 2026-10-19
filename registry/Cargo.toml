@@ -3,7 +3,8 @@ name = "gerry-registry"
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-rust-version = "1.91"
+rust-version = "1.99.1"
+repository = "https://github.com/ejmlabs/ejm-harness"
 publish = false
 
 [lib]

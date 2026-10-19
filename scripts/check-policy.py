@@ -15,6 +15,17 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 Object = dict[str, Any]
+OPENSPEC_SKILLS = frozenset(
+    f"openspec-{action}"
+    for action in (
+        "apply-change",
+        "archive-change",
+        "explore",
+        "propose",
+        "sync-specs",
+        "update-change",
+    )
+)
 
 
 def dependency_errors(package: Object, policies: Object) -> list[str]:
@@ -72,14 +83,17 @@ def skill_errors(root: Path) -> list[str]:
             errors.append(f"{relative}: skill name must match its directory")
         if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", metadata.get("name", "")):
             errors.append(f"{relative}: skill name must use lowercase words with hyphens")
+        generated = path.parent.name in OPENSPEC_SKILLS
         description = metadata.get("description", "")
-        if not description or len(description) > 300 or "<" in description or ">" in description:
+        if not description or (
+            not generated and (len(description) > 300 or "<" in description or ">" in description)
+        ):
             errors.append(f"{relative}: use a concise single-line discovery description")
         if relative not in routing:
             errors.append(f"{relative}: add the skill to AGENTS.md routing")
-        if len(body.splitlines()) > 100:
+        if not generated and len(body.splitlines()) > 100:
             errors.append(f"{relative}: move conditional detail into linked references")
-        if "[TODO:" in body or "\u2014" in text:
+        if "[TODO:" in body or (not generated and "\u2014" in text):
             errors.append(f"{relative}: remove unfinished instructions or em dashes")
         for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", body):
             if "://" in target or target.startswith("#"):
@@ -157,6 +171,36 @@ class PolicyTests(unittest.TestCase):
             self.assertTrue(skill_errors(root))
             (source.parent / "missing.md").write_text("A maintained reference.\n")
             self.assertFalse(skill_errors(root))
+
+    def test_only_known_openspec_skills_use_generated_style(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            source = root / ".agents/skills/openspec-explore/SKILL.md"
+            source.parent.mkdir(parents=True)
+            routing = root / "AGENTS.md"
+            routing.write_text(source.relative_to(root).as_posix())
+            text = (
+                "---\nname: openspec-explore\ndescription: "
+                + "Generated workflow. " * 20
+                + "\n---\n"
+                + "Generated guidance.\n" * 101
+            )
+            source.write_text(text)
+            self.assertFalse(skill_errors(root))
+            source.write_text(text + "Read [the contract](missing.md).\n")
+            self.assertTrue(skill_errors(root))
+            source.write_text(text)
+            routing.write_text("")
+            self.assertTrue(skill_errors(root))
+            routing.write_text(source.relative_to(root).as_posix())
+            source.write_text(text.replace("name: openspec-explore", "name: wrong"))
+            self.assertTrue(skill_errors(root))
+            target = source.parent.with_name("openspec-custom")
+            source.parent.rename(target)
+            source = target / "SKILL.md"
+            source.write_text(text.replace("openspec-explore", "openspec-custom"))
+            routing.write_text(source.relative_to(root).as_posix())
+            self.assertTrue(skill_errors(root))
 
 
 def main() -> None:
