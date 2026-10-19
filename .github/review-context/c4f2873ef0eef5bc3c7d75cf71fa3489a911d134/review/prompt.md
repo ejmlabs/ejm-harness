@@ -15,5 +15,13 @@ data loss, public API compatibility, and missing regressions for material risks.
 Report concrete defects introduced by the change with file, one-based line,
 trigger, consequence, and severity. Avoid style preferences and speculative risk.
 Critical, high, and medium findings block the merge. Low findings are advisory.
-An incomplete or invalid review must not claim success. Never include secrets or
-long source excerpts in the result. Do not emit em dashes.
+
+Set complete to true only after completing this scoped static review of the full
+change. If the review cannot finish, a material part cannot be assessed, or
+required source or call-path evidence is missing, set complete to false and
+explain the limit in summary. This includes referenced workflow implementations
+needed to assess a changed pin. Empty findings do not make an incomplete review
+successful. Use a JSON boolean, never a string or number.
+
+Never include secrets or long source excerpts in the result. Do not emit em
+dashes.

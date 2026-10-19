@@ -51,6 +51,86 @@ A missing tool or stale lock is a failed gate, not a skipped check. The advisory
 check needs access to the RustSec database. Report network or platform limits
 as unverified evidence instead of describing a partial run as green.
 
+## Shared CI caller prerequisite
+
+Protected harness main `09b779ee0452dda07b7f52503be22e65fe238373` already
+adopts shared revision `aa4144fa978d711a5e009b384718b4cf27cf87bf` at both
+canonical workflow `uses` sites and the release `standards-ref`. That revision
+requires complete actual AI reviews and owns the bounded static source
+exporter. Preserve those controls and the checked standards-plan history.
+
+The next caller-only prerequisite selects retained combined implementation
+`c4f2873ef0eef5bc3c7d75cf71fa3489a911d134` at all three sites together.
+Its 16 canonical workflow, script, review and template blobs match protected
+shared main `d00d8bbc7231485eb918008c562d835f394e82ea`. The exact
+`refs/heads/workflow-pins/c4f2873ef0eef5bc3c7d75cf71fa3489a911d134`
+ref has active update/deletion protection under rule `25369476`, with no bypass
+actors. This revision combines the existing completion guard with the
+previously reviewed setup from `ae903129564926a14287f75d2012610c59cccb65`;
+selecting the older setup revision alone would remove the newer guard.
+
+The combined quality workflow installs `pkg-config` and `libdbus-1-dev` with
+the runner's package manager only for the admitted `ejm-harness` profile on
+Linux, before Rust tools and the existing gate. This fixed step comes from the
+trusted shared workflow. It executes no harness-local action and gives product
+code no installation authority. The CLI local setup hook remains restricted to
+its CLI profile. Product runtime, manifests, locks, tools and gate commands
+stay at the protected harness base.
+
+The separate host-auth API candidate needs these D-Bus development files for
+its native Secret Service adapter: Linux job `118036420366` failed to find
+`dbus-1.pc`. This caller prerequisite contains no auth API, credential
+migration, native key-service change or dependency resolution. Passing local
+macOS or caller-only checks does not verify that later Linux build or the
+native key service.
+
+Adopt the prerequisites in this order:
+
+1. Verify the combined source and exact protected retention at all three pin
+   sites. Preserve the current caller ancestry through a normal merge of
+   protected `09b779`; do not replace newer controls with `ae903`.
+2. Run the normal hook and admit the new exact caller head through the existing
+   human and protected gates. Require Linux, macOS and Windows quality,
+   registry, standards, two complete actual AI reviews and separate explicit
+   approval. Prior-head decisions and checks do not approve this head.
+3. After protected caller adoption, reconcile and readmit the separate API and
+   vault source on the actual protected parent. Run fresh locked platform
+   gates. Caller adoption does not establish API or native certification.
+
+Private CLI dependency checkout still requires reviewed harness source and a
+dedicated, expiring Contents: read credential limited to `ejmlabs/ejm-harness`.
+The user authorized private API publication and provided `EJM_HARNESS_TOKEN`;
+successful CLI source preparation does not verify that credential's scope or
+expiry. Validate those separately through protected secret handling. IDE access
+and adoption require its owner's separate authorization. Keep workstation
+credentials local and preserve all existing admission, approval and secret
+boundaries.
+
+Both admitted AI reports for the earlier PR #13 head
+`28401e93b79824d13bda697b805ceca05ea65d04` explicitly called review
+incomplete because the old and new shared workflow sources were absent.
+Successful wrappers and zero findings did not complete review. Head
+`8b29b6c0aa944ff51611a377a067180b8fd6c940` supplied exact source context;
+both actual reports in [run 39274768967](https://github.com/ejmlabs/ejm-harness/actions/runs/39274768967)
+bind that head and report `complete: true` with no findings. Those reports cover
+that old head, not this reconciliation.
+
+The [canonical source manifest](../.github/review-context/manifest.json) binds
+the actual `aa414` to `c4f2873` transition to full Git commit, tree and blob
+IDs, original file modes, sizes and SHA-256 digests. Generate the 32 source
+files and manifest only with the reviewed shared exporter and enforce its
+combined 750,000-byte cap. Shared snapshots retain
+`Copyright (c) 2026 ejmlabs contributors`; their permission and warranty text
+is identical to the [repository's MIT license](../LICENSE). Snapshots are
+nonexecutable offline review data; never import or execute them. The existing narrow Ruff and Prettier exclusions
+apply only to `.github/review-context`. The superseded source pair and duplicate
+`docs/ci/shared-workflow-review` evidence remain available in Git history.
+
+This contributor CI guidance changes no product API or public product-page
+workflow, so the public site needs no content change. Source preparation does
+not establish a new full gate, hosted acceptance, native key-service acceptance
+or public site publication.
+
 ## Plan changes
 
 Read [the repository contribution policy](../CONTRIBUTING.md). Feature and bugfix

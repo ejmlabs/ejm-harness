@@ -24,7 +24,7 @@ At the start of this audit, the projects were private and main had no branch pro
 
 - Shared workflow changes affect several products. Immutable caller pins and reviewed update PRs bound rollout.
 - Human readiness costs a small metadata action and can delay outside contributions. The expensive checks remain unavailable until deliberate admission.
-- The owner initially chose to keep CLI and IDE quality checks blocked until the harness is public rather than provision a private cross-repository token. This harness change does not authorize private dependency access. IDE retains that public-harness requirement; any later CLI access decision belongs to its owning task. Each host still needs a reviewed harness pin and its own required gate evidence.
+- Private CLI dependency checkout requires reviewed harness source and a dedicated, expiring Contents: read credential for this repository. The user authorized private API publication and provided `EJM_HARNESS_TOKEN`; successful CLI source preparation does not prove its scope or expiry. Validate those separately. IDE access and adoption require its owner's separate authorization. New API consumers still need their own trusted pin and exact-source gates.
 - API review needs a scoped OPENAI_API_KEY and provider budget settings. Setup does not prove a successful paid review.
 - Local disk space is constrained. Coordinate Cargo checks, use focused existing caches, and report missing full platform evidence honestly.
 - Source and history scans reduce known risk; partial scan coverage and platform-specific tests remain explicit.
@@ -67,7 +67,9 @@ Its trusted default caller came from
 summaries reported incomplete reviews because the archive lacked the old and
 new shared workflow implementations. The old validator accepted those outputs,
 so their success statuses do not establish complete AI acceptance. The PR was
-converted to draft and remains unmerged. Existing human comments are preserved.
+converted to draft at that stage. Existing human comments were preserved. The
+later repair merged as protected harness main
+`09b779ee0452dda07b7f52503be22e65fe238373`.
 
 That admitted run finished with all three OS Quality jobs, registry, and
 repository standards passing. Both AI jobs technically succeeded with the
@@ -75,7 +77,7 @@ incomplete outputs above. At 11:58:04 UTC, the final gate refused the draft PR
 with `PR head changed, PR is a draft, or PR no longer targets main`. The deliberate
 draft hold therefore blocked acceptance; it is not a product Quality failure.
 
-Both normal callers in this unmerged repair select retained shared revision
+Both normal callers adopted by protected main `09b779` select retained shared revision
 `aa4144fa978d711a5e009b384718b4cf27cf87bf`. The shared schema requires
 a boolean `complete`; it permits `false` so a reviewer can report a limit. The
 trusted validator accepts only `complete: true` and rejects a missing, false, or
@@ -120,7 +122,59 @@ all 33 snapshot files, keeps the sampled product docs, manifests, and callers in
 scope, and passes the changed callers and planning docs. The system Ruff 0.17.0
 format check found an unrelated unchanged SDK README snippet; it is outside the
 pinned check evidence and was not changed. No native or full product gate was
-repeated. The replacement guard has not executed through this product's default
-caller, and no new CI or model run was started. The changed head still needs
-fresh human readiness and approval and complete hosted reviews under task 3.2.
+repeated. At that preparation stage, the replacement guard had not executed
+through this product's default caller, and no new CI or model run had started.
+That preparation did not establish hosted acceptance. Keep fresh human decisions,
+complete hosted reviews, and the remaining acceptance cases under task 3.2.
 Do not sync, archive, or declare public readiness yet.
+
+## Combined caller reconciliation
+
+PR #13 originally prepared Linux harness prerequisites from protected parent
+`ee1d2e3df5d77027be226d20830f6c5ea84d0d1d` by selecting reviewed shared
+implementation `ae903129564926a14287f75d2012610c59cccb65`. Protected shared
+merge `8c304c8cdfc8b6fe50f3e442507215e615944f2b` preserves that reviewed
+tree. Its fixed Linux `ejm-harness` quality step installs `pkg-config` and
+`libdbus-1-dev` before Rust setup. The separate host-auth API candidate needs
+these files: Linux job `118036420366` failed to find `dbus-1.pc`. Caller-only
+results do not verify that API source or the native key service.
+
+Both actual reviews of the earlier PR #13 head
+`28401e93b79824d13bda697b805ceca05ea65d04` reported incomplete assessment
+because the old and new shared workflow sources were absent. Successful
+wrappers and zero findings did not complete review. Head
+`8b29b6c0aa944ff51611a377a067180b8fd6c940` supplied those sources; both
+actual reports in [run 39274768967](https://github.com/ejmlabs/ejm-harness/actions/runs/39274768967)
+bind that head, report `complete: true`, and have no findings. Those reports
+cover that old head, not this reconciliation. Fresh complete checks and
+separate exact-head approval remain required.
+
+Protected harness main advanced to `09b779` and adopted the newer completion
+guard and canonical exporter at `aa4144fa978d711a5e009b384718b4cf27cf87bf`.
+That revision lacks the earlier Linux setup step. Selecting `ae903` unchanged
+would remove the newer completion guard. Preserve both through retained
+combined implementation `c4f2873ef0eef5bc3c7d75cf71fa3489a911d134`, tree
+`dc440b03159b377979b6b76dde119eec98aa75cb`. Its 16 canonical workflow,
+script, review and template blobs match protected shared main
+`d00d8bbc7231485eb918008c562d835f394e82ea`, tree
+`41309fdb41562cfdae1a226ef1d52023f9cbfffe`. The builder equals `ae903`;
+the prompt, schema, review validator and exporter equal `aa414`. The exact
+workflow-pins ref is protected against update and deletion by active rule
+`25369476`, with no bypass actors.
+
+Preserve PR #13 ancestry with a normal merge of protected `09b779` before
+changing the three caller pin sites together. Keep completed tasks 2.8 and 2.9
+and their evidence. Add open task 2.10 for this adoption. Rotate only the
+canonical `.github/review-context` pair from `5fae851`/`aa414` to the actual
+`aa414`/`c4f2873` transition using the shared exporter. Remove the duplicate
+`docs/ci/shared-workflow-review` files added only by the old unmerged caller;
+Git history preserves that earlier review context. Keep the existing narrow
+Prettier and Ruff exclusions and never execute or import snapshots.
+
+Preserve all runtime, manifest, lock, tool, gate, permission, admission,
+release and secret boundaries from protected harness main. No API source
+belongs in this prerequisite. Reconcile and readmit the separate API and
+vault patch only after caller adoption, with fresh locked platform checks.
+This CI guidance has no public product-page impact and claims no site or
+package publication. Preparation does not establish a full gate, hosted
+acceptance or native certification for the new head.
