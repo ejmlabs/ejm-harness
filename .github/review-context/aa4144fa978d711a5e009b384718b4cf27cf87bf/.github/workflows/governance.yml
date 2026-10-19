@@ -179,13 +179,6 @@
         "with":
           "version": "0.9.26"
       -
-        "name": "Install Linux harness keyring build prerequisites"
-        "shell": "bash"
-        "run": |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends pkg-config libdbus-1-dev
-        "if": "${{ needs.admission.outputs.profile == 'ejm-harness' && runner.os == 'Linux' }}"
-      -
         "name": "Install pinned Rust tools"
         "shell": "bash"
         "run": |
@@ -195,10 +188,6 @@
             cargo install cargo-deny --version 0.20.2 --locked
             cargo install cargo-machete --version 0.9.2 --locked
           fi
-      -
-        "name": "Prepare ejm-cli remote test prerequisites"
-        "if": "${{ needs.admission.outputs.profile == 'ejm-cli' }}"
-        "uses": "./product/.github/actions/setup-ci"
       -
         "name": "Run the project's required gate without secrets or write tokens"
         "shell": "bash"
@@ -379,10 +368,11 @@
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["head", "pass", "summary", "findings"],
+              "required": ["head", "pass", "complete", "summary", "findings"],
               "properties": {
                 "head": {"type": "string"},
                 "pass": {"type": "integer", "enum": [1, 2]},
+                "complete": {"type": "boolean"},
                 "summary": {"type": "string"},
                 "findings": {
                   "type": "array",
@@ -419,15 +409,23 @@
             Report concrete defects introduced by the change with file, one-based line,
             trigger, consequence, and severity. Avoid style preferences and speculative risk.
             Critical, high, and medium findings block the merge. Low findings are advisory.
-            An incomplete or invalid review must not claim success. Never include secrets or
-            long source excerpts in the result. Do not emit em dashes.
+
+            Set complete to true only after completing this scoped static review of the full
+            change. If the review cannot finish, a material part cannot be assessed, or
+            required source or call-path evidence is missing, set complete to false and
+            explain the limit in summary. This includes referenced workflow implementations
+            needed to assess a changed pin. Empty findings do not make an incomplete review
+            successful. Use a JSON boolean, never a string or number.
+
+            Never include secrets or long source excerpts in the result. Do not emit em
+            dashes.
       -
         "name": "Validate the exact head, pass, and bounded review output"
         "shell": "bash"
         "run": |
           python3 - review-result.json "$PR_HEAD" "$REVIEW_PASS" <<'TRUSTED_PYTHON'
           import base64
-          exec(compile(base64.b64decode('IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwoiIiJWYWxpZGF0ZSBib3VuZGVkIEFJIG91dHB1dCBiZWZvcmUgaXQgaXMgdXNlZCBpbiBhIHJlcXVpcmVkIHN0YXR1cy4iIiIKaW1wb3J0IGpzb24KaW1wb3J0IHN5cwpmcm9tIHBhdGhsaWIgaW1wb3J0IFBhdGgKCgpkZWYgdmFsaWRhdGUoZmlsZSwgaGVhZCwgbnVtYmVyKToKICAgIGlmIGZpbGUuaXNfc3ltbGluaygpIG9yIG5vdCBmaWxlLmlzX2ZpbGUoKSBvciBmaWxlLnN0YXQoKS5zdF9zaXplID4gNjRfMDAwOgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIk1pc3NpbmcsIHVuc2FmZSwgb3Igb3ZlcnNpemVkIHJldmlldyBvdXRwdXQiKQogICAgcmVzdWx0ID0ganNvbi5sb2FkcyhmaWxlLnJlYWRfdGV4dCgpKQogICAgaWYgc2V0KHJlc3VsdCkgIT0geyJoZWFkIiwgInBhc3MiLCAic3VtbWFyeSIsICJmaW5kaW5ncyJ9OgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIkludmFsaWQgcmV2aWV3IGZpZWxkcyIpCiAgICBpZiByZXN1bHRbImhlYWQiXSAhPSBoZWFkIG9yIHR5cGUocmVzdWx0WyJwYXNzIl0pIGlzIG5vdCBpbnQgb3IgcmVzdWx0WyJwYXNzIl0gIT0gbnVtYmVyOgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIlJldmlldyBpcyBmb3IgYW5vdGhlciBoZWFkIG9yIHBhc3MiKQogICAgaWYgbm90IGlzaW5zdGFuY2UocmVzdWx0WyJzdW1tYXJ5Il0sIHN0cikgb3Igbm90IDEgPD0gbGVuKHJlc3VsdFsic3VtbWFyeSJdKSA8PSA0MDAwOgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIk1pc3Npbmcgb3Igb3ZlcnNpemVkIHJldmlldyBzdW1tYXJ5IikKICAgIGZpbmRpbmdzID0gcmVzdWx0WyJmaW5kaW5ncyJdCiAgICBpZiBub3QgaXNpbnN0YW5jZShmaW5kaW5ncywgbGlzdCkgb3IgbGVuKGZpbmRpbmdzKSA+IDUwOgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIkludmFsaWQgZmluZGluZ3MiKQogICAgZm9yIGl0ZW0gaW4gZmluZGluZ3M6CiAgICAgICAgaWYgbm90IGlzaW5zdGFuY2UoaXRlbSwgZGljdCkgb3Igc2V0KGl0ZW0pICE9IHsic2V2ZXJpdHkiLCAiZmlsZSIsICJsaW5lIiwgInRpdGxlIiwgInJlYXNvbiJ9OgogICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCJJbnZhbGlkIGZpbmRpbmcgZmllbGRzIikKICAgICAgICBpZiBpdGVtWyJzZXZlcml0eSJdIG5vdCBpbiB7ImNyaXRpY2FsIiwgImhpZ2giLCAibWVkaXVtIiwgImxvdyJ9OgogICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCJJbnZhbGlkIHNldmVyaXR5IikKICAgICAgICBwYXRoID0gUGF0aChpdGVtWyJmaWxlIl0pCiAgICAgICAgaWYgcGF0aC5pc19hYnNvbHV0ZSgpIG9yICIuLiIgaW4gcGF0aC5wYXJ0cyBvciBub3QgaXRlbVsiZmlsZSJdOgogICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCJJbnZhbGlkIGZpbmRpbmcgcGF0aCIpCiAgICAgICAgaWYgdHlwZShpdGVtWyJsaW5lIl0pIGlzIG5vdCBpbnQgb3IgaXRlbVsibGluZSJdIDwgMToKICAgICAgICAgICAgcmFpc2UgVmFsdWVFcnJvcigiSW52YWxpZCBmaW5kaW5nIGxpbmUiKQogICAgICAgIGlmIGFueShub3QgaXNpbnN0YW5jZShpdGVtW2tleV0sIHN0cikgb3Igbm90IDEgPD0gbGVuKGl0ZW1ba2V5XSkgPD0gNDAwMCBmb3Iga2V5IGluICgiZmlsZSIsICJ0aXRsZSIsICJyZWFzb24iKSk6CiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIkludmFsaWQgZmluZGluZyB0ZXh0IikKICAgIHJldHVybiByZXN1bHQsIGFueShpdGVtWyJzZXZlcml0eSJdICE9ICJsb3ciIGZvciBpdGVtIGluIGZpbmRpbmdzKQoKCmlmIF9fbmFtZV9fID09ICJfX21haW5fXyI6CiAgICB0cnk6CiAgICAgICAgcmVzdWx0LCBibG9ja2VkID0gdmFsaWRhdGUoUGF0aChzeXMuYXJndlsxXSksIHN5cy5hcmd2WzJdLCBpbnQoc3lzLmFyZ3ZbM10pKQogICAgICAgIHByaW50KGYiUmV2aWV3IHBhc3Mge3Jlc3VsdFsncGFzcyddfToge2xlbihyZXN1bHRbJ2ZpbmRpbmdzJ10pfSBmaW5kaW5nKHMpOyAiICsgKCJibG9ja2VkIiBpZiBibG9ja2VkIGVsc2UgInBhc3NlZCIpKQogICAgICAgICMgRnVsbCBib3VuZGVkIEpTT04gcmVtYWlucyBhbiBhcnRpZmFjdC4gTmV2ZXIgZXhlY3V0ZSBvciBpbnRlcnBvbGF0ZSBtb2RlbCB0ZXh0LgogICAgICAgIHN5cy5leGl0KDEgaWYgYmxvY2tlZCBlbHNlIDApCiAgICBleGNlcHQgKFZhbHVlRXJyb3IsIEtleUVycm9yLCBPU0Vycm9yLCBUeXBlRXJyb3IpIGFzIGVycm9yOgogICAgICAgIHByaW50KGYiSW52YWxpZCByZXZpZXcgb3V0cHV0OiB7ZXJyb3J9IiwgZmlsZT1zeXMuc3RkZXJyKQogICAgICAgIHN5cy5leGl0KDEpCg=='), 'trusted-workflow.py', 'exec'))
+          exec(compile(base64.b64decode('IyEvdXNyL2Jpbi9lbnYgcHl0aG9uMwoiIiJWYWxpZGF0ZSBib3VuZGVkIEFJIG91dHB1dCBiZWZvcmUgaXQgaXMgdXNlZCBpbiBhIHJlcXVpcmVkIHN0YXR1cy4iIiIKaW1wb3J0IGpzb24KaW1wb3J0IHN5cwpmcm9tIHBhdGhsaWIgaW1wb3J0IFBhdGgKCgpkZWYgdmFsaWRhdGUoZmlsZSwgaGVhZCwgbnVtYmVyKToKICAgIGlmIGZpbGUuaXNfc3ltbGluaygpIG9yIG5vdCBmaWxlLmlzX2ZpbGUoKSBvciBmaWxlLnN0YXQoKS5zdF9zaXplID4gNjRfMDAwOgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIk1pc3NpbmcsIHVuc2FmZSwgb3Igb3ZlcnNpemVkIHJldmlldyBvdXRwdXQiKQogICAgcmVzdWx0ID0ganNvbi5sb2FkcyhmaWxlLnJlYWRfdGV4dCgpKQogICAgaWYgc2V0KHJlc3VsdCkgIT0geyJoZWFkIiwgInBhc3MiLCAiY29tcGxldGUiLCAic3VtbWFyeSIsICJmaW5kaW5ncyJ9OgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIkludmFsaWQgcmV2aWV3IGZpZWxkcyIpCiAgICBpZiByZXN1bHRbImhlYWQiXSAhPSBoZWFkIG9yIHR5cGUocmVzdWx0WyJwYXNzIl0pIGlzIG5vdCBpbnQgb3IgcmVzdWx0WyJwYXNzIl0gIT0gbnVtYmVyOgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIlJldmlldyBpcyBmb3IgYW5vdGhlciBoZWFkIG9yIHBhc3MiKQogICAgaWYgbm90IGlzaW5zdGFuY2UocmVzdWx0WyJzdW1tYXJ5Il0sIHN0cikgb3Igbm90IDEgPD0gbGVuKHJlc3VsdFsic3VtbWFyeSJdKSA8PSA0MDAwOgogICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIk1pc3Npbmcgb3Igb3ZlcnNpemVkIHJldmlldyBzdW1tYXJ5IikKICAgIGlmIHR5cGUocmVzdWx0WyJjb21wbGV0ZSJdKSBpcyBub3QgYm9vbDoKICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCJSZXZpZXcgY29tcGxldGVuZXNzIG11c3QgYmUgYSBib29sZWFuIikKICAgIGlmIG5vdCByZXN1bHRbImNvbXBsZXRlIl06CiAgICAgICAgcmFpc2UgVmFsdWVFcnJvcigiUmV2aWV3IGlzIGluY29tcGxldGUiKQogICAgZmluZGluZ3MgPSByZXN1bHRbImZpbmRpbmdzIl0KICAgIGlmIG5vdCBpc2luc3RhbmNlKGZpbmRpbmdzLCBsaXN0KSBvciBsZW4oZmluZGluZ3MpID4gNTA6CiAgICAgICAgcmFpc2UgVmFsdWVFcnJvcigiSW52YWxpZCBmaW5kaW5ncyIpCiAgICBmb3IgaXRlbSBpbiBmaW5kaW5nczoKICAgICAgICBpZiBub3QgaXNpbnN0YW5jZShpdGVtLCBkaWN0KSBvciBzZXQoaXRlbSkgIT0geyJzZXZlcml0eSIsICJmaWxlIiwgImxpbmUiLCAidGl0bGUiLCAicmVhc29uIn06CiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIkludmFsaWQgZmluZGluZyBmaWVsZHMiKQogICAgICAgIGlmIGl0ZW1bInNldmVyaXR5Il0gbm90IGluIHsiY3JpdGljYWwiLCAiaGlnaCIsICJtZWRpdW0iLCAibG93In06CiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIkludmFsaWQgc2V2ZXJpdHkiKQogICAgICAgIHBhdGggPSBQYXRoKGl0ZW1bImZpbGUiXSkKICAgICAgICBpZiBwYXRoLmlzX2Fic29sdXRlKCkgb3IgIi4uIiBpbiBwYXRoLnBhcnRzIG9yIG5vdCBpdGVtWyJmaWxlIl06CiAgICAgICAgICAgIHJhaXNlIFZhbHVlRXJyb3IoIkludmFsaWQgZmluZGluZyBwYXRoIikKICAgICAgICBpZiB0eXBlKGl0ZW1bImxpbmUiXSkgaXMgbm90IGludCBvciBpdGVtWyJsaW5lIl0gPCAxOgogICAgICAgICAgICByYWlzZSBWYWx1ZUVycm9yKCJJbnZhbGlkIGZpbmRpbmcgbGluZSIpCiAgICAgICAgaWYgYW55KG5vdCBpc2luc3RhbmNlKGl0ZW1ba2V5XSwgc3RyKSBvciBub3QgMSA8PSBsZW4oaXRlbVtrZXldKSA8PSA0MDAwIGZvciBrZXkgaW4gKCJmaWxlIiwgInRpdGxlIiwgInJlYXNvbiIpKToKICAgICAgICAgICAgcmFpc2UgVmFsdWVFcnJvcigiSW52YWxpZCBmaW5kaW5nIHRleHQiKQogICAgcmV0dXJuIHJlc3VsdCwgYW55KGl0ZW1bInNldmVyaXR5Il0gIT0gImxvdyIgZm9yIGl0ZW0gaW4gZmluZGluZ3MpCgoKaWYgX19uYW1lX18gPT0gIl9fbWFpbl9fIjoKICAgIHRyeToKICAgICAgICByZXN1bHQsIGJsb2NrZWQgPSB2YWxpZGF0ZShQYXRoKHN5cy5hcmd2WzFdKSwgc3lzLmFyZ3ZbMl0sIGludChzeXMuYXJndlszXSkpCiAgICAgICAgcHJpbnQoZiJSZXZpZXcgcGFzcyB7cmVzdWx0WydwYXNzJ119OiB7bGVuKHJlc3VsdFsnZmluZGluZ3MnXSl9IGZpbmRpbmcocyk7ICIgKyAoImJsb2NrZWQiIGlmIGJsb2NrZWQgZWxzZSAicGFzc2VkIikpCiAgICAgICAgIyBGdWxsIGJvdW5kZWQgSlNPTiByZW1haW5zIGFuIGFydGlmYWN0LiBOZXZlciBleGVjdXRlIG9yIGludGVycG9sYXRlIG1vZGVsIHRleHQuCiAgICAgICAgc3lzLmV4aXQoMSBpZiBibG9ja2VkIGVsc2UgMCkKICAgIGV4Y2VwdCAoVmFsdWVFcnJvciwgS2V5RXJyb3IsIE9TRXJyb3IsIFR5cGVFcnJvcikgYXMgZXJyb3I6CiAgICAgICAgcHJpbnQoZiJJbnZhbGlkIHJldmlldyBvdXRwdXQ6IHtlcnJvcn0iLCBmaWxlPXN5cy5zdGRlcnIpCiAgICAgICAgc3lzLmV4aXQoMSkK'), 'trusted-workflow.py', 'exec'))
           TRUSTED_PYTHON
         "env":
           "PR_HEAD": "${{ needs.admission.outputs.head }}"

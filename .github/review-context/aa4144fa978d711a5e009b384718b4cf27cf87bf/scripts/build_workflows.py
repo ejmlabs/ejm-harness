@@ -166,7 +166,7 @@ Path(os.environ['RUNNER_TEMP'], 'review-home').mkdir()
 if os.environ['HAS_MODEL_KEY'] != 'true': raise ValueError('OPENAI_API_KEY is required; review fails closed')
 PY
 """, env={"REVIEW_PASS": "${{ matrix.pass }}", "HAS_MODEL_KEY": "${{ secrets.OPENAI_API_KEY != '' }}"}),
-                  {"name": "Independent Codex review", "uses": CODEX, "timeout-minutes": 9, "with": {
+                  {"name": "Independent Codex review", "uses": CODEX, "timeout-minutes": 9, "env": {"GH_TOKEN": "", "GITHUB_TOKEN": ""}, "with": {
                       "openai-api-key": "${{ secrets.OPENAI_API_KEY }}", "model": "gpt-6.1-sol", "effort": "medium", "codex-version": "0.163.0",
                       "working-directory": "reviewer", "codex-home": "${{ runner.temp }}/review-home", "permission-profile": ":read-only", "safety-strategy": "drop-sudo",
                       "output-file": "${{ github.workspace }}/review-result.json", "output-schema": schema, "prompt": prompt}},
@@ -197,9 +197,11 @@ from pathlib import Path
 manifest = json.loads(Path('release-assets/provenance.json').read_text())
 tag = 'v' + manifest['version']
 repo = os.environ['GITHUB_REPOSITORY']
+# VERSION is already validated; hyphens in build metadata do not mark prereleases.
+prerelease_flags = ['--prerelease', '--latest=false'] if '-' in manifest['version'].split('+', 1)[0] else []
 # No --force, --clobber, or implicit existing-tag acceptance.
 subprocess.run(['gh', 'api', '--method', 'POST', 'repos/' + repo + '/git/refs', '-f', 'ref=refs/tags/' + tag, '-f', 'sha=' + manifest['commit']], check=True)
-subprocess.run(['gh', 'release', 'create', tag, '--repo', repo, '--verify-tag', '--draft', '--title', tag, '--notes-file', 'release-notes.md', *[str(p) for p in sorted(Path('release-assets').iterdir())]], check=True)
+subprocess.run(['gh', 'release', 'create', tag, '--repo', repo, '--verify-tag', '--draft', '--title', tag, '--notes-file', 'release-notes.md', *prerelease_flags, *[str(p) for p in sorted(Path('release-assets').iterdir())]], check=True)
 PY
 """)]}}}
 

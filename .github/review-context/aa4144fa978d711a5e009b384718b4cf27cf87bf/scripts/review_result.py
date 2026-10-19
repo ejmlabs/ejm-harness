@@ -9,12 +9,16 @@ def validate(file, head, number):
     if file.is_symlink() or not file.is_file() or file.stat().st_size > 64_000:
         raise ValueError("Missing, unsafe, or oversized review output")
     result = json.loads(file.read_text())
-    if set(result) != {"head", "pass", "summary", "findings"}:
+    if set(result) != {"head", "pass", "complete", "summary", "findings"}:
         raise ValueError("Invalid review fields")
     if result["head"] != head or type(result["pass"]) is not int or result["pass"] != number:
         raise ValueError("Review is for another head or pass")
     if not isinstance(result["summary"], str) or not 1 <= len(result["summary"]) <= 4000:
         raise ValueError("Missing or oversized review summary")
+    if type(result["complete"]) is not bool:
+        raise ValueError("Review completeness must be a boolean")
+    if not result["complete"]:
+        raise ValueError("Review is incomplete")
     findings = result["findings"]
     if not isinstance(findings, list) or len(findings) > 50:
         raise ValueError("Invalid findings")

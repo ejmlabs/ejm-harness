@@ -1,10 +1,11 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["head", "pass", "summary", "findings"],
+  "required": ["head", "pass", "complete", "summary", "findings"],
   "properties": {
     "head": {"type": "string"},
     "pass": {"type": "integer", "enum": [1, 2]},
+    "complete": {"type": "boolean"},
     "summary": {"type": "string"},
     "findings": {
       "type": "array",
