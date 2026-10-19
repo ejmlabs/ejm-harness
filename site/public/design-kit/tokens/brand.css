@@ -1,0 +1,61 @@
+/* ejmlabs 1.0.0. Color and type come from the October 2026 guide. */
+@font-face {
+  font-family: "Manrope";
+  src: url("../fonts/Manrope-Variable.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../fonts/IBMPlexMono-Medium.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+:root {
+  --ejm-sage: #8A9A7B;
+  --ejm-forest: #29443B;
+  --ejm-ink: #202721;
+  --ejm-paper: #F6F5EF;
+  --ejm-mist: #E8EDE3;
+  --ejm-white: #FFFFFF;
+  --ejm-font-sans: "Manrope", system-ui, sans-serif;
+  --ejm-font-mono: "IBM Plex Mono", monospace;
+  --ejm-display-size: 48px;
+  --ejm-display-leading: 54px;
+  --ejm-heading-size: 32px;
+  --ejm-heading-leading: 40px;
+  --ejm-body-size: 16px;
+  --ejm-body-leading: 26px;
+  --ejm-caption-size: 14px;
+  --ejm-caption-leading: 20px;
+  --ejm-technical-size: 12px;
+  --ejm-technical-leading: 18px;
+  --ejm-weight-body: 400;
+  --ejm-weight-heading: 600;
+  --ejm-weight-technical: 500;
+  /* The following web settings extend the PDF. */
+  --ejm-space-1: 4px;
+  --ejm-space-2: 8px;
+  --ejm-space-3: 12px;
+  --ejm-space-4: 16px;
+  --ejm-space-6: 24px;
+  --ejm-space-8: 32px;
+  --ejm-space-12: 48px;
+  --ejm-space-16: 64px;
+  --ejm-space-24: 96px;
+  --ejm-space-32: 128px;
+  --ejm-radius-small: 4px;
+  --ejm-radius-medium: 12px;
+  --ejm-radius-large: 24px;
+  --ejm-radius-pill: 999px;
+  --ejm-duration-ambient: 32000ms;
+  --ejm-duration-interface: 180ms;
+  --ejm-ease-ambient: linear;
+  --ejm-ease-interface: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ejm-content-width: 1200px;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --ejm-duration-interface: 0ms; }
+}
