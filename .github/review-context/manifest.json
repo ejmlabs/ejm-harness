@@ -1,0 +1,241 @@
+{
+  "repository": "ejmlabs/.github",
+  "revisions": {
+    "old": {
+      "commit": "5fae851502c2e3c31d4df9a44f8d56c2cb49e098",
+      "tree": "213210b68a5493121d0b396f15da8fee39d293cd",
+      "files": [
+        {
+          "path": ".github/workflows/draft-release.yml",
+          "mode": "100644",
+          "blob": "cf8830457f180fd1bfa4f915a27cd0f1ff9a2fea",
+          "size": 53682,
+          "sha256": "26db55b0fd3c9747b20bdf7bcc6c5ecfe2c3c1b878b275860e95e521c77a7151"
+        },
+        {
+          "path": ".github/workflows/governance.yml",
+          "mode": "100644",
+          "blob": "dce2cf5146ea5857b749c784a0d4694d43828e4f",
+          "size": 159981,
+          "sha256": "8b7e0a3163b420f8ad90677c3ec73ed08616cfdf79279ac39acee56f925cddc0"
+        },
+        {
+          "path": "review/prompt.md",
+          "mode": "100644",
+          "blob": "6bd159b52ccc0f5064857c74bb0a04f040bb79cb",
+          "size": 1360,
+          "sha256": "e00b5bcc3fd21fc9b036be31b9e08d79f9b4de00df83c984e3be275f0ee3c426"
+        },
+        {
+          "path": "review/schema.json",
+          "mode": "100644",
+          "blob": "33e58eaeda2d2163168bf9a08368ef1c939f9a41",
+          "size": 734,
+          "sha256": "ad587e879602cbf62d49053934a07920eef3683e5ca0dbb7a508d9a040cc5fb6"
+        },
+        {
+          "path": "scripts/build_workflows.py",
+          "mode": "100644",
+          "blob": "8f71a4790bd806c224bf8345b1832f5c681e1506",
+          "size": 15511,
+          "sha256": "3f4b545d378296142c5f731d264c3a644a38a9683cac4e9ba911818a03975d12"
+        },
+        {
+          "path": "scripts/governance.py",
+          "mode": "100644",
+          "blob": "a5dc545e535136320c584e72838cb12bdd50f5ee",
+          "size": 12533,
+          "sha256": "682071c05228c2ca8724a38781a09b4929d4df7ba8a53df57a7f2e9e1429154b"
+        },
+        {
+          "path": "scripts/prepare.py",
+          "mode": "100644",
+          "blob": "ddeb838296f8c91825cbb889ab1c1c29305cb7e3",
+          "size": 4454,
+          "sha256": "1c9029a02f24b30f843591932e7e8ca7fb60487064d3feac2b97265fa3b5c2be"
+        },
+        {
+          "path": "scripts/release.py",
+          "mode": "100644",
+          "blob": "70d62ee78882a8ac1be8326ce36214918920d50e",
+          "size": 6463,
+          "sha256": "16b0af49a06c1f7a6fd621e14e55f67a50c06c95af947ce9aaa0b924f3292563"
+        },
+        {
+          "path": "scripts/review_result.py",
+          "mode": "100644",
+          "blob": "a991a8d51501c969218ae956a93b6410bed9f4b3",
+          "size": 2293,
+          "sha256": "2d3afc2557f298095f9c6ffed772753c2cc2aa2db9fdac45656c36ed54856f70"
+        },
+        {
+          "path": "scripts/standards.py",
+          "mode": "100644",
+          "blob": "b40ad937c41510c7385b9730f09562dc6cf625a6",
+          "size": 15572,
+          "sha256": "9d1a0e5ff4e9b87406f71195247bd50a3a8bc76bdde3ff607511b379acf2997c"
+        },
+        {
+          "path": "templates/community/CODE_OF_CONDUCT.md",
+          "mode": "100644",
+          "blob": "b35bd0bbf2daab636744f009d9f600d6a247acf2",
+          "size": 820,
+          "sha256": "d49a959861c1b24fb0b711466701001626a52b9cf9b344010ff13350f6b913e3"
+        },
+        {
+          "path": "templates/community/CONTRIBUTING.md",
+          "mode": "100644",
+          "blob": "18e25e8c6695114323710db094d55dec7132fe07",
+          "size": 2276,
+          "sha256": "750c33e33c7c7af428bc9056ac81038a509c600c69649ab789641f2c44fed70d"
+        },
+        {
+          "path": "templates/community/RELEASING.md",
+          "mode": "100644",
+          "blob": "ebca44ecc26781a5debe7e74fa32d42d927216ae",
+          "size": 2125,
+          "sha256": "c6c99c93a2d88dd15d859e353835e1ed0bf38661939dafdd312700512c8a045f"
+        },
+        {
+          "path": "templates/community/SECURITY.md",
+          "mode": "100644",
+          "blob": "2f68316b0ec77a50cacc1a06267b216343906e46",
+          "size": 1847,
+          "sha256": "c7a6845f7bf0120fef673f8cfce120d518a4f2f6f546f9f91c7d69fcef321834"
+        },
+        {
+          "path": "templates/community/SUPPORT.md",
+          "mode": "100644",
+          "blob": "403caa9ec7f6ffa217d0b526bd87675b32dcdf54",
+          "size": 611,
+          "sha256": "012081f5061250207b56e66afa1b12ab0b3498237703768efa7ea032dd5dcc2b"
+        },
+        {
+          "path": "templates/community/THIRD_PARTY_NOTICES.md",
+          "mode": "100644",
+          "blob": "368a214f12f4819661f85632d0217c92bc450beb",
+          "size": 725,
+          "sha256": "4a37737dd1b3abfd1c2059cbd7d89c3e705c61470cdfbb772ff25c0237871367"
+        }
+      ]
+    },
+    "new": {
+      "commit": "aa4144fa978d711a5e009b384718b4cf27cf87bf",
+      "tree": "b51d243de9c73681cfa5fbc4c5393bf5ca8bf88e",
+      "files": [
+        {
+          "path": ".github/workflows/draft-release.yml",
+          "mode": "100644",
+          "blob": "35fea4d70d5015ef6c12d9fc789c51a12c6a6a90",
+          "size": 57269,
+          "sha256": "31dacec14d77bba653cf9bec32baaf1992066d9b1bf4696f7ddf025dfbedbb74"
+        },
+        {
+          "path": ".github/workflows/governance.yml",
+          "mode": "100644",
+          "blob": "36cf29bf644e7a08702e78e64f77b4df8dc72aaa",
+          "size": 164208,
+          "sha256": "50e65c7c3f010c7fbbdc4acb1a2c9b66b4b37ad8ade570dbb37425efdefb779e"
+        },
+        {
+          "path": "review/prompt.md",
+          "mode": "100644",
+          "blob": "610d2a0af34772578a2896d7aa313719ba4e31ed",
+          "size": 1757,
+          "sha256": "1ff68477555ba40ede22b5cb565fdaa4cacdeb18b44fcee3e53d16754911dca9"
+        },
+        {
+          "path": "review/schema.json",
+          "mode": "100644",
+          "blob": "6d692c26812bc9ba0aaf6842eb981bc9a9fa40ed",
+          "size": 783,
+          "sha256": "53148b7876fc2c485f2eb49fd96d9a60ddb566d71a3c70c7d7491cbc536c8ad5"
+        },
+        {
+          "path": "scripts/build_workflows.py",
+          "mode": "100644",
+          "blob": "34647391d6135b48f9037e603c334a7da669cfdb",
+          "size": 15767,
+          "sha256": "76151c1e30892ed6b1211371657833202e33bfa360eb9ac81162dd132ab67ddc"
+        },
+        {
+          "path": "scripts/governance.py",
+          "mode": "100644",
+          "blob": "a5dc545e535136320c584e72838cb12bdd50f5ee",
+          "size": 12533,
+          "sha256": "682071c05228c2ca8724a38781a09b4929d4df7ba8a53df57a7f2e9e1429154b"
+        },
+        {
+          "path": "scripts/prepare.py",
+          "mode": "100644",
+          "blob": "ddeb838296f8c91825cbb889ab1c1c29305cb7e3",
+          "size": 4454,
+          "sha256": "1c9029a02f24b30f843591932e7e8ca7fb60487064d3feac2b97265fa3b5c2be"
+        },
+        {
+          "path": "scripts/release.py",
+          "mode": "100644",
+          "blob": "70d62ee78882a8ac1be8326ce36214918920d50e",
+          "size": 6463,
+          "sha256": "16b0af49a06c1f7a6fd621e14e55f67a50c06c95af947ce9aaa0b924f3292563"
+        },
+        {
+          "path": "scripts/review_result.py",
+          "mode": "100644",
+          "blob": "37a4167f1e66ad87fc0333c36e5764b978268c68",
+          "size": 2496,
+          "sha256": "167dc0ed8a9a6791cb61c736564887b366e6aa1f50d07c982f13fbe073ef545b"
+        },
+        {
+          "path": "scripts/standards.py",
+          "mode": "100644",
+          "blob": "08dc7c58255fa66cc8bd5bf4c827e923ed64f5e3",
+          "size": 18091,
+          "sha256": "689c42fe36c4696c839e0c1f651480e977c8a4e44417888b2170c659d08e965c"
+        },
+        {
+          "path": "templates/community/CODE_OF_CONDUCT.md",
+          "mode": "100644",
+          "blob": "b35bd0bbf2daab636744f009d9f600d6a247acf2",
+          "size": 820,
+          "sha256": "d49a959861c1b24fb0b711466701001626a52b9cf9b344010ff13350f6b913e3"
+        },
+        {
+          "path": "templates/community/CONTRIBUTING.md",
+          "mode": "100644",
+          "blob": "18e25e8c6695114323710db094d55dec7132fe07",
+          "size": 2276,
+          "sha256": "750c33e33c7c7af428bc9056ac81038a509c600c69649ab789641f2c44fed70d"
+        },
+        {
+          "path": "templates/community/RELEASING.md",
+          "mode": "100644",
+          "blob": "ebca44ecc26781a5debe7e74fa32d42d927216ae",
+          "size": 2125,
+          "sha256": "c6c99c93a2d88dd15d859e353835e1ed0bf38661939dafdd312700512c8a045f"
+        },
+        {
+          "path": "templates/community/SECURITY.md",
+          "mode": "100644",
+          "blob": "2f68316b0ec77a50cacc1a06267b216343906e46",
+          "size": 1847,
+          "sha256": "c7a6845f7bf0120fef673f8cfce120d518a4f2f6f546f9f91c7d69fcef321834"
+        },
+        {
+          "path": "templates/community/SUPPORT.md",
+          "mode": "100644",
+          "blob": "403caa9ec7f6ffa217d0b526bd87675b32dcdf54",
+          "size": 611,
+          "sha256": "012081f5061250207b56e66afa1b12ab0b3498237703768efa7ea032dd5dcc2b"
+        },
+        {
+          "path": "templates/community/THIRD_PARTY_NOTICES.md",
+          "mode": "100644",
+          "blob": "368a214f12f4819661f85632d0217c92bc450beb",
+          "size": 725,
+          "sha256": "4a37737dd1b3abfd1c2059cbd7d89c3e705c61470cdfbb772ff25c0237871367"
+        }
+      ]
+    }
+  }
+}

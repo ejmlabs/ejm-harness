@@ -24,7 +24,7 @@ At the start of this audit, the projects were private and main had no branch pro
 
 - Shared workflow changes affect several products. Immutable caller pins and reviewed update PRs bound rollout.
 - Human readiness costs a small metadata action and can delay outside contributions. The expensive checks remain unavailable until deliberate admission.
-- CLI and IDE quality checks remain blocked until the harness is public. The owner chose not to provision a private cross-repository token. After the harness fixes merge, update both hosts to that reviewed commit and rerun their required gates.
+- The owner initially chose to keep CLI and IDE quality checks blocked until the harness is public rather than provision a private cross-repository token. This harness change does not authorize private dependency access. IDE retains that public-harness requirement; any later CLI access decision belongs to its owning task. Each host still needs a reviewed harness pin and its own required gate evidence.
 - API review needs a scoped OPENAI_API_KEY and provider budget settings. Setup does not prove a successful paid review.
 - Local disk space is constrained. Coordinate Cargo checks, use focused existing caches, and report missing full platform evidence honestly.
 - Source and history scans reduce known risk; partial scan coverage and platform-specific tests remain explicit.
@@ -37,12 +37,90 @@ Create and test the shared repository first. Add pinned consumers and version me
 
 Use ejm-cli consistently in device code, polling, consent UI, and real auth fixtures. Add request-body and unregistered-client regressions. Run the registry gate in an isolated CI job alongside the workspace gate. Apply protected path checks to reads and listings before returning data, including canonical symlink aliases. Include MIT text and repository metadata in language SDK distributions.
 
-The root lint gate checks registry TypeScript, but the registry is outside the root npm workspace. Install both locked npm trees during setup. Before root npm checks, `scripts/check` fills an absent `registry/node_modules` with `npm --prefix registry ci --ignore-scripts` and stops if installation fails. Existing dependency trees are reused; rerun the locked install after dependency changes. This keeps the previous trusted caller's root-only setup compatible while preserving all lint coverage. Hosted acceptance remains pending.
+The root lint gate checks registry TypeScript, but the registry is outside the root npm workspace. Install both locked npm trees during setup. Before root npm checks, `scripts/check` fills an absent `registry/node_modules` with `npm --prefix registry ci --ignore-scripts` and stops if installation fails. Existing dependency trees are reused; rerun the locked install after dependency changes. This keeps the previous trusted caller's root-only setup compatible while preserving all lint coverage. Hosted non-AI acceptance is recorded below.
 
-The package-install deadline regression waits for `Governor::wait_idle()` within a five-second timeout before checking the empty package store and zero running or queued admissions. A deadline can return before the blocking install task drops its lease. This test uses the existing cleanup barrier rather than requiring an immediate lease release. Production ownership and public behavior stay unchanged, so this test-only correction has no public product documentation impact. Hosted acceptance remains pending.
+The package-install deadline regression waits for `Governor::wait_idle()` within a five-second timeout before checking the empty package store and zero running or queued admissions. A deadline can return before the blocking install task drops its lease. This test uses the existing cleanup barrier rather than requiring an immediate lease release. Production ownership and public behavior stay unchanged, so this test-only correction has no public product documentation impact. Hosted non-AI acceptance is recorded below.
 
-The RSS and PTY benchmark runner already rejects non-POSIX systems in `main`. Guard `first_paint` with `sys.platform == "win32"` before its Unix-only imports so strict Windows type checking respects that boundary. Preserve Linux and macOS measurement behavior and keep all strict checks enabled. Clarify the existing Linux/macOS requirement in `docs/benchmarks.md`; this does not add platform support or new measurements. Verify strict script typing for Windows, Linux, and macOS plus a focused Windows-guard smoke test. Hosted acceptance remains pending.
+The RSS and PTY benchmark runner already rejects non-POSIX systems in `main`. Guard `first_paint` with `sys.platform == "win32"` before its Unix-only imports so strict Windows type checking respects that boundary. Preserve Linux and macOS measurement behavior and keep all strict checks enabled. Clarify the existing Linux/macOS requirement in `docs/benchmarks.md`; this does not add platform support or new measurements. Verify strict script typing for Windows, Linux, and macOS plus a focused Windows-guard smoke test. Hosted non-AI acceptance is recorded below.
 
-The hook deadline fixture allows one second for the deadline case to reach its pending `before_model` hook after durable journal preparation. Five-second outer waits bound hook entry and completion, and name the phase and `block_end` mode if they expire. Keep the pending hook and observer, run-status, empty-provider, durable-completion, and observer-token cancellation assertions. Reproduce the old 20 ms failure with a temporary 100 ms SQLite write-transaction hold, verify the repaired fixture with the same hold, then remove the probe. This changes test timing only, with no product behavior or public site impact. Hosted Windows acceptance remains pending.
+The hook deadline fixture allows one second for the deadline case to reach its pending `before_model` hook after durable journal preparation. Five-second outer waits bound hook entry and completion, and name the phase and `block_end` mode if they expire. Keep the pending hook and observer, run-status, empty-provider, durable-completion, and observer-token cancellation assertions. Reproduce the old 20 ms failure with a temporary 100 ms SQLite write-transaction hold, verify the repaired fixture with the same hold, then remove the probe. This changes test timing only, with no product behavior or public site impact. Hosted Windows acceptance is recorded below.
 
-The tool-hook cancellation fixture also includes journal preparation before hook entry and durable reconciliation before `RunHandle::wait` completes. Its two unlabelled two-second waits cannot distinguish those phases on a slow host. Audit all hook-suite waits and use five-second entry/completion waits with hook-mode diagnostics, matching the other pending-hook fixture. A temporary probe with two separate 1,200 ms SQLite write-transaction holds reproduces the old entry timeout without exceeding either operation's two-second busy timeout; both cancellation modes pass with the repaired phase bounds. Remove the probe after verification. Preserve the entry notification, pending hooks, exact tool-effect counts, cancellation status, resumed provider history, confirmed result and artifact, and no-replay assertions. Production cancellation, journal durability, run deadlines, and observer deadlines stay unchanged. This test-only correction has no public product or site impact; fresh hosted Windows acceptance remains required.
+The tool-hook cancellation fixture also includes journal preparation before hook entry and durable reconciliation before `RunHandle::wait` completes. Its two unlabelled two-second waits cannot distinguish those phases on a slow host. Audit all hook-suite waits and use five-second entry/completion waits with hook-mode diagnostics, matching the other pending-hook fixture. A temporary probe with two separate 1,200 ms SQLite write-transaction holds reproduces the old entry timeout without exceeding either operation's two-second busy timeout; both cancellation modes pass with the repaired phase bounds. Remove the probe after verification. Preserve the entry notification, pending hooks, exact tool-effect counts, cancellation status, resumed provider history, confirmed result and artifact, and no-replay assertions. Production cancellation, journal durability, run deadlines, and observer deadlines stay unchanged. This test-only correction has no public product or site impact. Hosted Windows acceptance is recorded below.
+
+## Hosted recovery and caller acceptance
+
+Harness PR #1 at `6da46394f29b3d0d1f068175b1715e8c6b048d23` passed Quality on Linux, macOS, and Windows, plus registry and repository standards, in [run 39239206945](https://github.com/ejmlabs/ejm-harness/actions/runs/39239206945). All six Windows hook tests passed, including both repaired fixtures. Both AI jobs stopped at the old caller's duplicate `--skip-git-repo-check` argument before model execution. The owner approved an AI-only recovery for that exact head. It merged as `ee1d2e3df5d77027be226d20830f6c5ea84d0d1d`, with the reviewed tree preserved and full main protection restored and verified equal to its prior snapshot. This recovery did not provide two AI reviews of the patch.
+
+The initial local refresh generated both normal consumer callers at retained shared implementation `965cd684713ae91a7804745eddd452cc392af11d`. It clears inherited `GH_TOKEN` and `GITHUB_TOKEN` in the model steps while retaining the trusted verification steps' scoped tokens. Its alternate missing-key route is restricted to the shared repository; the harness keeps the exact normal caller. No harness public API, runtime, package metadata, dependency, or lockfile changes. The existing contribution and release guides already describe this workflow; the public site's product guidance is unaffected, and no site publication is claimed.
+
+A fresh admitted harness PR must complete both actual `gpt-6.1-sol` medium passes with all main protections enforced. Shared PR #12 separately verified missing-key failure and revocation during active Quality work without model calls; it does not replace the harness's positive acceptance. Genuine outsider and bot cases and live release tag refusal still need evidence. Keep task 3.2 open and do not archive or declare public readiness yet.
+
+## Completion guard and review source context
+
+The admitted review of [harness PR #12](https://github.com/ejmlabs/ejm-harness/pull/12)
+at `7a409665b4259135c85ca55c83bc5815cba237aa` ran through
+[run 39244757531](https://github.com/ejmlabs/ejm-harness/actions/runs/39244757531).
+Its trusted default caller came from
+`ee1d2e3df5d77027be226d20830f6c5ea84d0d1d` and executed shared revision
+`5fae851502c2e3c31d4df9a44f8d56c2cb49e098`. The proposed
+`965cd684713ae91a7804745eddd452cc392af11d` caller did not run. Both model
+summaries reported incomplete reviews because the archive lacked the old and
+new shared workflow implementations. The old validator accepted those outputs,
+so their success statuses do not establish complete AI acceptance. The PR was
+converted to draft and remains unmerged. Existing human comments are preserved.
+
+That admitted run finished with all three OS Quality jobs, registry, and
+repository standards passing. Both AI jobs technically succeeded with the
+incomplete outputs above. At 11:58:04 UTC, the final gate refused the draft PR
+with `PR head changed, PR is a draft, or PR no longer targets main`. The deliberate
+draft hold therefore blocked acceptance; it is not a product Quality failure.
+
+Both normal callers in this unmerged repair select retained shared revision
+`aa4144fa978d711a5e009b384718b4cf27cf87bf`. The shared schema requires
+a boolean `complete`; it permits `false` so a reviewer can report a limit. The
+trusted validator accepts only `complete: true` and rejects a missing, false, or
+nonboolean value. Keep exact admitted-head and pass validation, two serial
+`gpt-6.1-sol` medium passes, and all merge protections. Do not add a product
+alternate route or treat the incomplete reviews as acceptance.
+
+`ejmlabs/.github` owns `scripts/export_review_context.py`, the shared generator
+for this source context. Export exact canonical Git blobs for the old and new
+shared revisions into `.github/review-context/<oldsha>/` and
+`.github/review-context/<newsha>/`, with the exporter manifest. Use its fixed
+allowlist and enforce the combined 750,000-byte cap before writing. Verify the
+manifest's commit, tree, file mode, blob hash, and size against the canonical
+local Git objects. The exporter needs no network or private token. These
+nonexecutable snapshots are data for offline static review only; never import
+or execute them. Generate them only through the shared exporter, and remove the
+obsolete pair during a later reviewed pin rotation.
+
+The harness runs Ruff and Prettier over the repository root. Their discovery
+includes the snapshot Python, JSON, Markdown, and YAML files, so exclude only
+`.github/review-context` in `ruff.toml` and `/.github/review-context/` in
+`.prettierignore`. Preserve checks for first-party scripts, SDKs, docs, and real
+workflow callers. Verify file discovery before and after the exclusions and run
+the affected static checks without formatting the snapshots. Other inspected
+checks use named first-party paths and do not import or execute review data.
+
+The shared repository owns the guard, exporter, and consumer templates. The
+harness owns its normal pinned callers and review data; no runtime dependency
+points from the shared repository back into a product. This repair changes no
+product runtime, dependency, lockfile, site, or public API. It enforces the
+existing governance requirement that incomplete reviews block merging. Product
+guidance needs no public site change, and no publication is claimed. Verify exact
+snapshots, pinned
+standards and templates, actionlint, strict OpenSpec validation, and whitespace.
+Local preparation exported 32 exact source blobs and a 9,067-byte manifest,
+totaling 582,279 bytes. Canonical blob and manifest equality, inert file modes,
+normal template and community standards, alternate-route rejection, actionlint,
+strict OpenSpec, whitespace, and projected admission bounds passed. Ruff 0.13.2
+discovery excludes all 12 snapshot Python files while retaining its 13 existing
+first-party/config paths; its lint passed. Prettier 3.9.10 on Node 24.19.0 ignores
+all 33 snapshot files, keeps the sampled product docs, manifests, and callers in
+scope, and passes the changed callers and planning docs. The system Ruff 0.17.0
+format check found an unrelated unchanged SDK README snippet; it is outside the
+pinned check evidence and was not changed. No native or full product gate was
+repeated. The replacement guard has not executed through this product's default
+caller, and no new CI or model run was started. The changed head still needs
+fresh human readiness and approval and complete hosted reviews under task 3.2.
+Do not sync, archive, or declare public readiness yet.
