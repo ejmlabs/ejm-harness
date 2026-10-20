@@ -10,7 +10,7 @@ Workspace account or server is required.
 
 ## Status
 
-This is a source release at version 0.1.0. Package registry releases, prebuilt
+This is development source at version 0.1.0. Package registry releases, prebuilt
 workers, and a live extension registry have not been published. Local fixtures
 use replay providers and make no paid model requests. See [the changelog](CHANGELOG.md)
 and [release policy](RELEASING.md) for release status and gates.

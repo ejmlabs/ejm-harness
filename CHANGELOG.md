@@ -4,23 +4,47 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-19
+
+Prepared development source for the first `0.1.0` release. These notes do not
+announce a GitHub draft, package registry release, prebuilt worker or deployed
+service. Follow [Releases](RELEASING.md) before creating or publishing artifacts.
+
 ### Added
 
-- Add exact current-run completion subscriptions and clonable run handles for native hosts, including internally queued successors. Detailed completion also preserves the atomic local-successor decision; summary-only wait stays compatible. Waiting includes bounded run-end observers; the source revision still requires its local gate, hosted review and protected publication.
-
-- Add the encrypted credential vault and controlled registry-session migration APIs.
-- Add official Claude Code authentication and supervised structured inference.
-- Add optional provider readiness and idle provider replacement with durable continuation binding.
-- The resumed-clock deadline fixture and normal local hook passed at `90aa7350e30eaad908d14e8b3260610d5f15f2fe`. Hosted review then found a registry test that required a real OS key service and a legacy FIFO open that could block before validation. Registry-corrected head `86677bbf89f34275614963eb26b91e05fcb7c80b` passed hosted Linux, macOS, registry and standards jobs at the retained snapshot, while Windows was still running; its first complete AI review found the auth cleanup defect below. Native acceptance and release publication remain pending.
-
-- Shared repository standards, explicit human admission, protected merge gates, two-pass Codex review, and a draft source release pipeline.
+- Shared Rust agent engine, bounded tool execution, coding tools, package runtime,
+  worker protocol, and TypeScript and Python SDK source.
+- Exact current-run completion subscriptions and clonable run handles, including
+  internally queued successors and the atomic local-successor decision. Summary
+  waits remain compatible, and detailed waits include bounded run-end observers.
+- An encrypted credential vault, controlled registry-session migration, official
+  Claude Code authentication and supervised structured inference, optional
+  provider readiness, and idle provider replacement with durable continuation
+  binding.
+- Uniform repository guidance, explicit human admission, protected merge gates,
+  two complete Codex reviews, and independent SemVer source-draft preparation.
 
 ### Fixed
 
-- Update both shared callers and release standards to preserve original document and license bytes, including CRLF line endings, during source archive validation. The harness runtime, dependencies and package versions are unchanged; fresh hosted caller acceptance remains required.
+- Align registry device login with the registered `ejm-cli` client. Deny protected
+  repository and harness-state reads through file-tool paths and symlink aliases.
+- Include the MIT license in both SDK distributions and keep owned Rust, registry
+  and SDK versions aligned.
+- Retire a Unix auth process-group identity after successful termination and
+  reaping, so a later drop cannot signal a reused identifier. Cleanup errors and
+  Windows Job ownership keep their existing behavior.
+- Preserve original document and license bytes, including CRLF line endings,
+  when validating source archives.
 
-- Retire the Unix auth process-group identity after successful termination and reaping so a later owner drop cannot signal a reused group identifier. Pending cleanup, errors and Windows Job ownership retain their existing behavior. The bounded regression and fresh local and hosted acceptance remain pending.
+### Verification and limits
 
-## [0.1.0] - 2026-10-18
-
-- Initial development baseline. This entry documents source version metadata; it does not assert a published release or production readiness.
+- The installed shared caller passed Linux, macOS, Windows, registry and standards
+  checks in [PR #16](https://github.com/ejmlabs/ejm-harness/pull/16), with two
+  complete Codex Sol 6.1 medium reviews. This establishes the checked source and
+  caller path; it does not certify native key services, live sign-in or inference.
+- Host-auth API and process cleanup verification still has open work in the
+  [verification record](docs/host-auth-verification.md). Native platform and host
+  acceptance remain separate from fixture and hosted caller results.
+- The SDKs require a separately built compatible `ejm-harness-worker`; they do not
+  bundle or fetch prebuilt executables. Package registry publication, worker
+  distribution and registry deployment each need their own release gates.
