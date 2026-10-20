@@ -212,10 +212,20 @@ command is `ejm-cli package discard-retired-session`. An unsafe or unreadable
 `registry-session.json` makes sign-in name that file's path and the same command.
 `force_discard_legacy_registry_session` unlinks that directory entry without
 following it or sending anything on the network, and it leaves a private
-well-formed file in place. A plain HTTP loopback client does not use `HTTP_PROXY`
-or `ALL_PROXY`. Hosts sign in again on the new origin.
+well-formed file in place. Hosts sign in again on the new origin.
 `retired_registry_session_notice` returns that instruction when a leftover retired
 session is present.
+
+`RegistryClient::new` owns registry transport. For an accepted plain HTTP
+loopback origin it disables all proxies, including uppercase and lowercase
+`HTTP_PROXY`, `HTTPS_PROXY`, and `ALL_PROXY`. Account bearer requests go directly
+to that origin. HTTPS retains proxy support. Hosts consume this public contract
+through `ejm-harness-packages`; they do not need a second HTTP client. A host
+pinned to an older harness must refuse HTTP loopback access with proxy variables
+set until it adopts and verifies the direct-route contract. The local Wiremock
+regression fixture uses a synthetic account bearer and checks both the direct
+registry request and the absence of proxy requests. These source docs do not
+confirm a host pin update, a published release, or a deployed registry.
 
 An existing vault with a missing key requires recovery of the original OS
 record. Read [credential storage](auth.md#storage-and-renewal) for key setup,

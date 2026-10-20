@@ -59,3 +59,9 @@ None. `openspec/specs/` has no main specs. Related registry capabilities exist o
 3. **Saved sessions for the retired origin.** Resolved. Never send them and never re-key them. The host discards them locally. Design decision 4 and the requirement "Saved sessions for the retired origin are never sent" settle this.
 4. **Was the old registry ever live?** Resolved for this change. The source still has placeholder D1 ids and this change does not deploy. Either history uses the same rule: old sessions are not sent, not copied, and not redirected. Design decision 3 and the requirement "Saved sessions for the retired origin are never sent" settle this.
 5. **Loopback set** for development origins. Resolved. HTTP loopback is only `localhost`, `127.0.0.1`, and `[::1]`. `http://127.0.0.2` is rejected. Design decision 5 and the requirement "Registry origins are plain HTTPS origins" settle this.
+
+## Proxy transport review follow-up
+
+`ejm-harness-packages` owns the public `RegistryClient::new` transport contract. Accepted HTTP loopback origins must bypass every proxy before an account bearer request is sent. The existing reqwest `no_proxy()` setting supplies that behavior without a new dependency or a host transport copy. Strengthen the existing local route fixture to send a synthetic account bearer and prove the registry receives it while the proxy receives nothing.
+
+The CLI consumes this contract through public path packages. Its current immutable harness pin predates the fix, so its separate change adds a fail-closed configuration adapter. Verify the harness contract first, merge through the existing human gates, then adopt a reviewed full harness commit in the CLI and remove that adapter after its route fixtures pass. No pin, release, CI approval, or deployment changes are part of this follow-up.

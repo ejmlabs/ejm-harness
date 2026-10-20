@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail, ensure};
+use ejm_harness_auth::SecretString;
 use ejm_harness_packages::{
     DEFAULT_REGISTRY, DISCARD_RETIRED_REGISTRY_COMMAND, RegistryClient, pack_directory,
     registry_origin_is_default,
@@ -9,7 +10,7 @@ use serde_json::json;
 use tokio_util::sync::CancellationToken;
 use wiremock::{
     Mock, MockServer, ResponseTemplate,
-    matchers::{body_json, method, path},
+    matchers::{body_json, header, method, path},
 };
 
 #[tokio::test]
@@ -152,17 +153,19 @@ fn registry_origin_rejects_plain_http_credentials_paths_and_the_retired_host() -
 
 #[tokio::test]
 async fn loopback_http_registry_ignores_http_proxy() -> Result<()> {
+    let token = "loopback-registry-synthetic-bearer";
     if std::env::var_os("EJM_REGISTRY_PROXY_CHILD").is_some() {
         let origin = std::env::var("EJM_REGISTRY_PROXY_ORIGIN")?;
         RegistryClient::new(&origin)?
-            .search("proxy-check", None)
+            .me(&SecretString::new(token))
             .await?;
         return Ok(());
     }
     let registry = MockServer::start().await;
     Mock::given(method("GET"))
-        .and(path("/v1/packages"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"packages":[]})))
+        .and(path("/v1/me"))
+        .and(header("authorization", format!("Bearer {token}")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"id":"proxy-fixture"})))
         .expect(1)
         .mount(&registry)
         .await;
@@ -170,6 +173,7 @@ async fn loopback_http_registry_ignores_http_proxy() -> Result<()> {
     let output = tokio::time::timeout(
         Duration::from_secs(20),
         tokio::process::Command::new(std::env::current_exe()?)
+            .kill_on_drop(true)
             .env("EJM_REGISTRY_PROXY_CHILD", "1")
             .env("EJM_REGISTRY_PROXY_ORIGIN", registry.uri())
             .env("HTTP_PROXY", proxy.uri())
@@ -187,6 +191,11 @@ async fn loopback_http_registry_ignores_http_proxy() -> Result<()> {
     )
     .await
     .context("loopback proxy child timed out")??;
+    ensure!(
+        !String::from_utf8_lossy(&output.stdout).contains(token)
+            && !String::from_utf8_lossy(&output.stderr).contains(token),
+        "synthetic registry bearer appeared in child output"
+    );
     ensure!(
         output.status.success(),
         "loopback proxy child failed: {}",

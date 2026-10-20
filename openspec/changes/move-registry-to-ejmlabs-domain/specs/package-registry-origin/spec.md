@@ -119,3 +119,12 @@ For registry installs, the harness MUST keep verifying the exact archive size, S
 
 - **WHEN** a package installed before the move is enabled and loaded
 - **THEN** it loads from its local snapshot without any registry request
+
+### Requirement: Loopback account requests remain on the direct route
+
+For every accepted HTTP loopback registry origin, `RegistryClient` MUST disable proxies for credential-bearing requests. HTTPS proxy support MUST remain available.
+
+#### Scenario: Account bearer with proxy environment
+
+- **WHEN** a host calls `me` with a synthetic account bearer on an HTTP loopback registry while HTTP and all-protocol proxy variables point at another local fixture
+- **THEN** only the direct registry receives the authenticated request, the proxy receives no request, and the bearer does not appear in process output

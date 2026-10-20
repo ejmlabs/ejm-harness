@@ -38,6 +38,11 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
 
 ### Fixed
 
+- Check authenticated HTTP loopback registry requests against the direct-route
+  proxy fixture, with a synthetic bearer and bounded child cleanup. The
+  harness-owned client disables proxies for these origins; HTTPS keeps proxy
+  support. Older host pins need a temporary configuration guard until they
+  adopt and verify this transport contract.
 - Align registry device login with the registered `ejm-cli` client. Deny protected
   repository and harness-state reads through file-tool paths and symlink aliases.
 - Include the MIT license in both SDK distributions and keep owned Rust, registry

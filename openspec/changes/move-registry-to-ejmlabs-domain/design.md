@@ -116,3 +116,9 @@ Add the note to `## [0.1.0]`, not `## [Unreleased]` and not a `0.2.0` section. W
 
 1. Whether `harness.meetgerry.ai` ever issued real sessions. The source shows placeholder D1 ids. Either answer uses the same rejection and local discard. Tokens are not copied.
 2. Whether `require-https-provider-endpoints` changes the loopback set before a later edit. Until it does, the current three hosts stay.
+
+## Proxy contract verification and host order
+
+The harness already uses reqwest `ClientBuilder::no_proxy()` for validated HTTP loopback origins. HTTPS keeps proxy support. No public signature, credential format, dependency, process, or background work is added. The regression fixture must exercise `RegistryClient::me` with a synthetic bearer in a subprocess with isolated proxy variables. Use the existing Wiremock servers for the registry and proxy, bound the child lifetime, assert one authenticated direct request and zero proxy requests, and keep the token out of output.
+
+The harness owns this transport behavior; `ejm-cli` owns its temporary configuration refusal on the older pin. Verify this harness revision first. The CLI may adopt only a compatible reviewed full commit after it reaches protected main and passes the required human gates. Remove its compatibility guard only after the pinned transport and credential contracts and local route fixtures pass. Dependency direction remains CLI to public harness packages. This follow-up does not change pins or adopt the newer vault from a dirty sibling checkout.

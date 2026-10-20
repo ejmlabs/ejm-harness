@@ -40,3 +40,10 @@ Everett confirmed `https://registry.ejmlabs.com` on 2026-10-20. The `AGENTS.md` 
 - After the tasks above pass and the change is reviewed, sync the delta spec and archive through the OpenSpec workflow.
 - DNS, the custom domain, the GitHub OAuth app, real D1 ids, and registry deployment stay unauthorized until Everett asks.
 - The `ejm-cli` change of the same name updates its docs after this harness revision is the one that checkout builds.
+
+## 7. Proxy route regression follow-up
+
+- [x] 7.1 Preserve the harness-owned reqwest direct route for accepted HTTP loopback origins and strengthen the existing subprocess Wiremock fixture to call `me` with a synthetic bearer, verify direct authentication and zero proxy requests, and bound child cleanup without changing HTTPS behavior or public signatures.
+- [x] 7.2 Run the focused registry route fixture with Cargo jobs at most two and the approved existing cache. Record platform, exact command, result, and all unrun full gates. Do not install tools or run a full rebuild on the constrained disk. See `proxy-verification.md` for the successful authenticated fixture and sandbox limit.
+- [x] 7.3 Review public registry docs and record the two owners, public transport contract, dependency direction, CLI compatibility adapter, integration order, and unchanged human gates. Keep source checks distinct from publication.
+- [ ] 7.4 Run the normal full gate for the final revision and complete human review before syncing specs and archiving this change. These checks remain deferred on the constrained disk; focused fixture success does not close them.
