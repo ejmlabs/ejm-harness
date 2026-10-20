@@ -216,3 +216,25 @@ native/full product gate, model call, CI dispatch, tag, draft, package upload or
 deployment is part of local preparation. Fresh exact-head human decisions and
 all hosted merge gates remain required. Sync and archive only after the wider
 change's remaining verification is complete.
+
+## Prepare source version 0.1.0 notes
+
+Consolidate the current `Unreleased` entries into dated `0.1.0` source notes,
+with concise product changes and the remaining verification limits. The
+harness owns these notes and consumes the shared release workflow; no product
+or SDK interface, dependency direction, workflow pin, package version or
+license bytes change. The SDKs still require a separately built compatible
+worker. Registry packages, worker binaries and the live registry remain
+separate publication and deployment work.
+
+Reconcile installed-caller task 2.12 with PR #16 and its retained original
+run. Keep the historical task 2.10 and host-auth API/native acceptance open
+unless their own evidence satisfies them. Review source and contributor
+guidance, pinned standards, local links, strict OpenSpec, whitespace and
+unchanged non-document blobs. Full runtime suites need no local repetition for
+these docs alone; fresh normal PR gates remain required. No public product
+page or generated site output changes, and no live docs publication is claimed.
+
+After normal review and merge, freeze the resulting main commit before asking
+for an exact source-draft plan. Preparing dated notes creates no tag, draft,
+binary, package or deployment. Do not sync or archive incomplete work.

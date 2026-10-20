@@ -101,8 +101,14 @@ Its [admitted run](https://github.com/ejmlabs/ejm-harness/actions/runs/393442881
 passed all three OS quality jobs, registry, standards and two complete actual
 Codex Sol 6.1 medium reviews with no findings. It merged with all protections
 enforced. That run used the previous `c4f2873` shared caller. A fresh admitted
-PR must still verify the installed `6717b433` caller; local checks and the
-adoption run do not establish its hosted acceptance.
+follow-up, [PR #16](https://github.com/ejmlabs/ejm-harness/pull/16), verified the
+installed `6717b433` caller in
+[run 39347428993](https://github.com/ejmlabs/ejm-harness/actions/runs/39347428993).
+Its first attempt passed Linux, macOS, Windows, registry, standards and two
+complete actual Codex Sol 6.1 medium reviews with no findings. The exact reviewed
+tree merged normally as `039139129be2e957535478968c416e8c1d057fe8`, with
+protections unchanged. This closes installed-caller acceptance, not the
+remaining native key-service, host or release gates.
 
 ### Draft release validation
 
@@ -117,7 +123,12 @@ verified exact source archives, checksums and provenance. A separate
 [duplicate dispatch](https://github.com/ejmlabs/.github/actions/runs/39341034364)
 refused its existing version before writes. The pilot created a source-only draft.
 Those shared results do not establish a harness draft, binary, package or
-installed-caller acceptance.
+deployment. Harness PR #16 supplies the separate installed-caller evidence.
+
+The dated `0.1.0` [source notes](../CHANGELOG.md) are prepared for review.
+No harness draft is announced. After their normal protected merge, freeze the
+resulting main commit before requesting a source-only draft. Review both source
+archives, original notice bytes, checksums and provenance before any publication.
 
 A release dispatch permits only its first attempt. If it fails after reserving
 a version, inspect the protected tag and draft before deciding on a new version.
