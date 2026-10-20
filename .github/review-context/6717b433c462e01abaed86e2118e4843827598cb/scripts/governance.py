@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-REPOS = {"ejmlabs/" + name for name in (".github", "ejmlabs", "ejm-cli", "ejm-harness", "ejm-ide")}
+REPOS = {"ejmlabs/" + name for name in (".github", "ejmlabs", "ejm-cli", "ejm-harness", "ejm-ide", "ejm-ui")}
 CONTEXTS = ("Human readiness", "Maintainer approval", "Quality", "Repository standards", "AI review")
 COMMAND = re.compile(r"^/(ready|approve|revoke) ([0-9a-f]{40})$")
 

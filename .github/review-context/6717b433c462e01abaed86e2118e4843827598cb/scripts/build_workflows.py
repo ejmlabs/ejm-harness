@@ -82,20 +82,11 @@ def governance():
         "runs-on": "ubuntu-24.04", "timeout-minutes": 5, "permissions": {"contents": "read", "pull-requests": "read", "statuses": "read"}, "env": ENV,
         "outputs": {"artifact": "${{ steps.sources.outputs.artifact-id }}"},
         "steps": [VERIFY, checkout("product", "${{ needs.admission.outputs.head }}"), checkout("base", "${{ needs.admission.outputs.base }}"),
-                  run("Read harness dependency from trusted main", """python3 - <<'PY'
-import os, re
-from pathlib import Path
-profile = os.environ['PROFILE']
-value = ''
-if profile in ('ejm-cli', 'ejm-ide'):
-    file = Path('base/.github/harness-revision')
-    if file.is_symlink(): raise ValueError('Unsafe harness pin')
-    value = file.read_text().strip()
-    if not re.fullmatch('[0-9a-f]{40}', value): raise ValueError('Unpinned harness dependency')
-with open(os.environ['GITHUB_OUTPUT'], 'a') as out: out.write('revision=' + value + '\\n')
-PY
-""", id="harness", env={"PROFILE": "${{ needs.admission.outputs.profile }}"}),
+                  run("Select the admitted harness dependency against trusted source authority", python(source("prepare.py"), "select-harness"),
+                      id="harness", env={"PROFILE": "${{ needs.admission.outputs.profile }}", "HARNESS_READ_TOKEN": "${{ secrets.EJM_HARNESS_TOKEN || github.token }}"}),
                   {"uses": CHECKOUT, "if": "${{ steps.harness.outputs.revision != '' }}", "with": {"repository": "ejmlabs/ejm-harness", "ref": "${{ steps.harness.outputs.revision }}", "path": "harness", "persist-credentials": False, "token": "${{ secrets.EJM_HARNESS_TOKEN || github.token }}"}},
+                  run("Read optional public UI dependency from trusted main", python(source("prepare.py"), "ui-pin"), id="ui"),
+                  {"uses": CHECKOUT, "if": "${{ steps.ui.outputs.revision != '' }}", "with": {"repository": "ejmlabs/ejm-ui", "ref": "${{ steps.ui.outputs.revision }}", "path": "ejm-ui", "persist-credentials": False, "fetch-depth": 1, "submodules": False}},
                   run("Archive source and bounded diff", python(source("prepare.py"))), VERIFY,
                   {"uses": UPLOAD, "id": "sources", "with": {"name": "admitted-sources", "path": "prepared/", "retention-days": 3, "if-no-files-found": "error"}}],
     }
@@ -104,19 +95,39 @@ PY
         "strategy": {"fail-fast": False, "max-parallel": 2, "matrix": {"os": "${{ fromJSON(needs.admission.outputs.profile == 'ejm-harness' && '[\"ubuntu-24.04\",\"macos-15\",\"windows-2025\"]' || needs.admission.outputs.profile == 'ejm-cli' && '[\"ubuntu-24.04\",\"macos-15\"]' || needs.admission.outputs.profile == 'ejm-ide' && '[\"macos-15\"]' || '[\"ubuntu-24.04\"]') }}"}},
         "env": {"CARGO_BUILD_JOBS": "2", "CARGO_INCREMENTAL": "0", "PROFILE": "${{ needs.admission.outputs.profile }}", "CI": "true"},
         "steps": [ARTIFACT, EXTRACT, {"uses": NODE, "with": {"node-version": "24"}}, {"uses": UV, "with": {"version": "0.9.26"}},
+                  run("Install Linux harness keyring build prerequisites", """sudo apt-get update
+sudo apt-get install --yes --no-install-recommends pkg-config libdbus-1-dev
+""", **{"if": "${{ needs.admission.outputs.profile == 'ejm-harness' && runner.os == 'Linux' }}"}),
                   run("Install pinned Rust tools", """if [[ "$PROFILE" == ejm-* ]]; then
   rustup toolchain install 1.99.1 --profile minimal --component clippy,rustfmt
   rustup default 1.99.1
-  cargo install cargo-deny --version 0.20.2 --locked
-  cargo install cargo-machete --version 0.9.2 --locked
+  if [[ "$PROFILE" != ejm-ui ]]; then
+    cargo install cargo-deny --version 0.20.2 --locked
+    cargo install cargo-machete --version 0.9.2 --locked
+  fi
 fi
 """),
+                  {"name": "Prepare ejm-cli remote test prerequisites", "if": "${{ needs.admission.outputs.profile == 'ejm-cli' }}", "uses": "./product/.github/actions/setup-ci"},
                   run("Run the project's required gate without secrets or write tokens", """cd product
+if [[ -d ../ejm-ui ]]; then
+  npm --prefix ../ejm-ui ci --ignore-scripts
+fi
 case "$PROFILE" in
   ejm-cli) ./scripts/check ;;
   ejm-harness) npm ci --ignore-scripts; npm --prefix registry ci --ignore-scripts; ./scripts/check ;;
   ejm-ide) npm ci --ignore-scripts; npm run verify; npm run site:check; npm run site:build ;;
-  ejmlabs) node design-kit/scripts/check-kit.mjs; npm --prefix site test; npm --prefix site run build ;;
+  ejm-ui)
+    export npm_config_ignore_scripts=true
+    npm ci --ignore-scripts
+    npm rebuild node-pty --ignore-scripts=false
+    npm run check
+    npm run build
+    node scripts/size.mjs
+    npm run size -w @ejm/demos
+    npm run check:rust
+    node scripts/pack-proof.mjs
+    ;;
+  ejmlabs) node scripts/check.mjs; npm --prefix site test; npm --prefix site run build ;;
   .github) python3 -m unittest discover -s tests -v; python3 scripts/build_workflows.py --check ;;
   *) exit 1 ;;
 esac
@@ -133,6 +144,9 @@ esac
   cargo install cargo-machete --version 0.9.2 --locked
   cargo install worker-build --version 0.8.7 --locked --jobs 2
   cd product
+  if [[ -d ../ejm-ui ]]; then
+    npm --prefix ../ejm-ui ci --ignore-scripts
+  fi
   npm ci --ignore-scripts
   npm --prefix registry ci --ignore-scripts
   ./scripts/check-registry
@@ -156,7 +170,8 @@ import json, os, tarfile
 from pathlib import Path
 root = Path('reviewer/review-data')
 root.mkdir(parents=True)
-with tarfile.open('prepared/product.tar') as archive: archive.extractall(root, filter='data')
+for file in sorted(Path('prepared').glob('*.tar')):
+    with tarfile.open(file) as archive: archive.extractall(root, filter='data')
 for name in ('context.json', 'change.patch'):
     (root / name).write_bytes((Path('prepared') / name).read_bytes())
 context = json.loads((root / 'context.json').read_text())

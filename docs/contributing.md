@@ -55,85 +55,72 @@ A missing tool or stale lock is a failed gate, not a skipped check. The advisory
 check needs access to the RustSec database. Report network or platform limits
 as unverified evidence instead of describing a partial run as green.
 
-## Shared CI caller prerequisite
+## Shared workflows and source releases
 
-Protected harness main `09b779ee0452dda07b7f52503be22e65fe238373` already
-adopts shared revision `aa4144fa978d711a5e009b384718b4cf27cf87bf` at both
-canonical workflow `uses` sites and the release `standards-ref`. That revision
-requires complete actual AI reviews and owns the bounded static source
-exporter. Preserve those controls and the checked standards-plan history.
+Both canonical workflow callers and the release `standards-ref` pin reviewed
+shared revision `6717b433c462e01abaed86e2118e4843827598cb`. Update all
+three sites together through a protected PR. The shared repository owns the
+workflow implementation, standards and release validator; this repository
+owns its product gates and release metadata. Product repositories consume the
+harness public APIs. No product runtime becomes a harness dependency.
 
-The next caller-only prerequisite selects retained combined implementation
-`c4f2873ef0eef5bc3c7d75cf71fa3489a911d134` at all three sites together.
-Its 16 canonical workflow, script, review and template blobs match protected
-shared main `d00d8bbc7231485eb918008c562d835f394e82ea`. The exact
-`refs/heads/workflow-pins/c4f2873ef0eef5bc3c7d75cf71fa3489a911d134`
-ref has active update/deletion protection under rule `25369476`, with no bypass
-actors. This revision combines the existing completion guard with the
-previously reviewed setup from `ae903129564926a14287f75d2012610c59cccb65`;
-selecting the older setup revision alone would remove the newer guard.
+This update replaces `c4f2873ef0eef5bc3c7d75cf71fa3489a911d134`. It retains
+the complete two-pass Codex review guard, fixed Linux D-Bus setup, three-OS
+quality matrix and separate registry gate. Linux quality installs `pkg-config`
+and `libdbus-1-dev` before the existing gate, using a fixed trusted workflow
+step. Existing product gate commands, permissions, secret names and human
+admission rules are unchanged. Runtime sources, manifests, locks and public
+SDK contracts do not change.
 
-The combined quality workflow installs `pkg-config` and `libdbus-1-dev` with
-the runner's package manager only for the admitted `ejm-harness` profile on
-Linux, before Rust tools and the existing gate. This fixed step comes from the
-trusted shared workflow. It executes no harness-local action and gives product
-code no installation authority. The CLI local setup hook remains restricted to
-its CLI profile. Product runtime, manifests, locks, tools and gate commands
-stay at the protected harness base.
+The target also supports CLI harness selection and an optional UI source pin.
+This harness profile selects no sibling harness. It has no
+`.github/ui-source.json`, so the optional UI checkout, source archive and
+locked npm install stay inactive. Adding such a pin later needs its own
+review; this update adds no UI dependency or package installation.
 
-The separate host-auth API candidate needs these D-Bus development files for
-its native Secret Service adapter: Linux job `118036420366` failed to find
-`dbus-1.pc`. This caller prerequisite contains no auth API, credential
-migration, native key-service change or dependency resolution. Passing local
-macOS or caller-only checks does not verify that later Linux build or the
-native key service.
-
-Adopt the prerequisites in this order:
-
-1. Verify the combined source and exact protected retention at all three pin
-   sites. Preserve the current caller ancestry through a normal merge of
-   protected `09b779`; do not replace newer controls with `ae903`.
-2. Run the normal hook and admit the new exact caller head through the existing
-   human and protected gates. Require Linux, macOS and Windows quality,
-   registry, standards, two complete actual AI reviews and separate explicit
-   approval. Prior-head decisions and checks do not approve this head.
-3. After protected caller adoption, reconcile and readmit the separate API and
-   vault source on the actual protected parent. Run fresh locked platform
-   gates. Caller adoption does not establish API or native certification.
-
-Private CLI dependency checkout still requires reviewed harness source and a
-dedicated, expiring Contents: read credential limited to `ejmlabs/ejm-harness`.
-The user authorized private API publication and provided `EJM_HARNESS_TOKEN`;
-successful CLI source preparation does not verify that credential's scope or
-expiry. Validate those separately through protected secret handling. IDE access
-and adoption require its owner's separate authorization. Keep workstation
-credentials local and preserve all existing admission, approval and secret
-boundaries.
-
-Both admitted AI reports for the earlier PR #13 head
-`28401e93b79824d13bda697b805ceca05ea65d04` explicitly called review
-incomplete because the old and new shared workflow sources were absent.
-Successful wrappers and zero findings did not complete review. Head
-`8b29b6c0aa944ff51611a377a067180b8fd6c940` supplied exact source context;
-both actual reports in [run 39274768967](https://github.com/ejmlabs/ejm-harness/actions/runs/39274768967)
-bind that head and report `complete: true` with no findings. Those reports cover
-that old head, not this reconciliation.
+### Review source context
 
 The [canonical source manifest](../.github/review-context/manifest.json) binds
-the actual `aa414` to `c4f2873` transition to full Git commit, tree and blob
-IDs, original file modes, sizes and SHA-256 digests. Generate the 32 source
-files and manifest only with the reviewed shared exporter and enforce its
-combined 750,000-byte cap. Shared snapshots retain
-`Copyright (c) 2026 ejmlabs contributors`; their permission and warranty text
-is identical to the [repository's MIT license](../LICENSE). Snapshots are
-nonexecutable offline review data; never import or execute them. The existing narrow Ruff and Prettier exclusions
-apply only to `.github/review-context`. The superseded source pair and duplicate
-`docs/ci/shared-workflow-review` evidence remain available in Git history.
+the actual `c4f2873` to `6717` transition to full Git commit, tree and blob IDs,
+original modes, sizes and SHA-256 digests. Generate both revisions only with
+the shared `scripts/export_review_context.py`. Its 32 source files and one
+manifest fit the combined 750,000-byte cap. They are nonexecutable offline
+review data. Never import or execute them. Existing narrow Ruff and Prettier
+exclusions apply only to `.github/review-context`; prior snapshots remain in
+Git history. Shared snapshots retain `Copyright (c) 2026 ejmlabs contributors`
+and the same permission and warranty terms as the [MIT license](../LICENSE).
 
-This contributor CI guidance changes no product API or public product-page
-workflow, so the public site needs no content change. Source preparation does
-not establish a new full gate, hosted acceptance, native key-service acceptance
-or public site publication.
+Fresh exact-head human readiness and separate approval remain required before
+costly work and merging. A changed caller must pass the existing Linux, macOS
+and Windows quality jobs, registry and standards checks, two complete actual
+Codex Sol 6.1 medium reviews, and the protected approval gates. After adoption,
+use a fresh admitted PR to verify the installed caller. Local source checks
+and prior-head results do not establish either hosted acceptance.
+
+### Draft release validation
+
+Follow the uniform [release policy](../RELEASING.md) for independent SemVer,
+version metadata, dated notes and explicit publication. The repaired validator
+compares original document and license bytes with both source archives,
+preserving line endings. The earlier validator normalized expected text and
+could reject an unchanged original CRLF notice.
+
+The shared [draft pilot](https://github.com/ejmlabs/.github/actions/runs/39340565293)
+verified exact source archives, checksums and provenance. A separate
+[duplicate dispatch](https://github.com/ejmlabs/.github/actions/runs/39341034364)
+refused its existing version before writes. The pilot created a source-only draft.
+Those shared results do not establish a harness draft, binary, package or
+installed-caller acceptance.
+
+A release dispatch permits only its first attempt. If it fails after reserving
+a version, inspect the protected tag and draft before deciding on a new version.
+Do not rerun the failed attempt, move a tag or replace assets. Installing these
+callers creates no tag, draft, installer, package or deployment. Product release
+writes and publication require separate authorization.
+
+This contributor and release guidance changes no product API, public product
+page or generated site output, so the public site needs no content or build
+change. No public site publication or native platform certification is claimed.
 
 ## Plan changes
 

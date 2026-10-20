@@ -11,7 +11,7 @@ The harness has no branch protection or common release process, and its registry
 - Require a PR, current maintainer approval, resolved conversations, and passing quality, standards, and two Codex review passes before merging.
 - Allow a maintainer to approve their own current commit explicitly, without bypassing checks.
 - Standardize contributor, security, support, license, documentation, and dependency maintenance guidance.
-- Add independent semantic versions, release notes, version consistency checks, immutable tags, checksums, and a manual draft release pipeline.
+- Add independent semantic versions, release notes, version consistency checks, immutable tags, checksums, and a manual draft release pipeline that preserves original source and notice bytes.
 - Preserve existing work and keep publication, package uploads, deployment, and paid security enrollment separate from setup.
 - Align the registry device client and consent UI with ejm-cli and cover both device flow requests in tests.
 - Include the registry gate in CI, preserve license text in SDK archives, align package metadata, and deny protected state reads through file tools.

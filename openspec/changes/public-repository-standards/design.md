@@ -178,3 +178,41 @@ vault patch only after caller adoption, with fresh locked platform checks.
 This CI guidance has no public product-page impact and claims no site or
 package publication. Preparation does not establish a full gate, hosted
 acceptance or native certification for the new head.
+
+## Byte-preserving release caller repair
+
+Protected harness base `42e4f9cf33bd3525aec344cfdffabc251271f782` uses
+`c4f2873ef0eef5bc3c7d75cf71fa3489a911d134` at both workflow callers and
+the release `standards-ref`. Update those three sites together to retained
+shared revision `6717b433c462e01abaed86e2118e4843827598cb`, tree
+`c07344ae6f5d5f04408b5423857c5da3d41df896`. The shared owner supplies the
+release validator and workflow implementation; the harness consumes its public
+reusable workflows. Runtime code, SDK contracts, manifests, locks, product
+gates, permissions and secret names remain unchanged. Dependencies still point
+from consumers to the harness, never from the harness to a product.
+
+The old release validator normalizes line endings when reading expected
+documents. The repaired validator preserves bytes for archive comparison,
+including original CRLF font notices. The shared positive
+[draft pilot](https://github.com/ejmlabs/.github/actions/runs/39340565293)
+and separate
+[duplicate refusal](https://github.com/ejmlabs/.github/actions/runs/39341034364)
+verified the retained implementation. They do not verify a harness release.
+
+The target retains the fixed Linux harness D-Bus setup, the existing three-OS
+quality and registry gate commands, and the complete two-pass review guard.
+New CLI/IDE harness selection and UI-profile checks do not change this harness
+profile. Optional UI acquisition reads only protected base metadata. This
+harness has no `.github/ui-source.json`, so no UI checkout, archive or npm
+install is added. Existing credentials and admission rules remain in place.
+
+Rotate only `.github/review-context` with the shared exporter for the actual
+`c4f2873` to `6717` transition. Verify its fixed allowlist, complete Git identity,
+ordinary nonexecutable files and combined byte cap. Keep uniform root community
+guides byte-identical to the target templates; put local release guidance in
+`docs/contributing.md` and the changelog. No product API or page changes, so
+the public site needs no content or build change. No package installation,
+native/full product gate, model call, CI dispatch, tag, draft, package upload or
+deployment is part of local preparation. Fresh exact-head human decisions and
+all hosted merge gates remain required. Sync and archive only after the wider
+change's remaining verification is complete.

@@ -17,6 +17,8 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ### Fixed
 
+- Update both shared callers and release standards to preserve original document and license bytes, including CRLF line endings, during source archive validation. The harness runtime, dependencies and package versions are unchanged; fresh hosted caller acceptance remains required.
+
 - Retire the Unix auth process-group identity after successful termination and reaping so a later owner drop cannot signal a reused group identifier. Pending cleanup, errors and Windows Job ownership retain their existing behavior. The bounded regression and fresh local and hosted acceptance remain pending.
 
 ## [0.1.0] - 2026-10-18

@@ -17,12 +17,17 @@ Each repository MUST use a canonical SemVer version and keep its releasable pack
 
 ### Requirement: Releases use checked immutable commits
 
-A release MUST select an exact main commit with successful required checks, validate its version and notes, and produce a draft release with source archives and SHA-256 checksums. Existing version tags or released assets MUST NOT be overwritten.
+A release MUST select an exact main commit with successful required checks, validate its version and notes, and produce a draft release with source archives and SHA-256 checksums. Archive validation MUST preserve original source and notice bytes, including line endings. Existing version tags or released assets MUST NOT be overwritten.
 
 #### Scenario: A release is prepared
 
 - **WHEN** a maintainer requests a release of a checked main commit
 - **THEN** the pipeline validates the version and creates a draft with traceable sources and checksums
+
+#### Scenario: A notice uses CRLF line endings
+
+- **WHEN** the checked source contains an original notice with CRLF line endings
+- **THEN** archive validation compares the original bytes without normalizing them
 
 #### Scenario: A version already exists
 

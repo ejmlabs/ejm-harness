@@ -37,9 +37,12 @@ def archive_requirements(root, sha, profile):
     required.update(path for path in names if path.endswith(("-OFL.txt", "/OFL.txt", "/OFL.md")))
     if profile == "ejm-harness":
         required.update(("sdk/python/LICENSE", "sdk/typescript/LICENSE", "sdk/python/pyproject.toml", "sdk/typescript/package.json"))
+    if profile == "ejm-ui":
+        required.update(("package.json", "package-lock.json", "crates/ejm-tui/Cargo.toml", "crates/ejm-tui/Cargo.lock", *UI_FONT_NOTICES))
+        required.update(path + "/" + name for path in UI_PACKAGES for name in ("package.json", "LICENSE", "THIRD_PARTY_NOTICES.md"))
     if profile in ("ejm-cli", "ejm-ide"):
         required.add(".github/harness-revision")
-    return {path: read(root, path).encode("utf-8") for path in required}
+    return {path: read(root, path, preserve_newlines=True).encode("utf-8") for path in required}
 
 
 def release(api, root, sha, requested):
