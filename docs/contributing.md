@@ -93,9 +93,16 @@ and the same permission and warranty terms as the [MIT license](../LICENSE).
 Fresh exact-head human readiness and separate approval remain required before
 costly work and merging. A changed caller must pass the existing Linux, macOS
 and Windows quality jobs, registry and standards checks, two complete actual
-Codex Sol 6.1 medium reviews, and the protected approval gates. After adoption,
-use a fresh admitted PR to verify the installed caller. Local source checks
-and prior-head results do not establish either hosted acceptance.
+Codex Sol 6.1 medium reviews, and the protected approval gates.
+
+[PR #15](https://github.com/ejmlabs/ejm-harness/pull/15) adopted these pins on
+protected main `1542f7c2c97d247df0d4744103d0e5e02660fbb0`.
+Its [admitted run](https://github.com/ejmlabs/ejm-harness/actions/runs/39344288127)
+passed all three OS quality jobs, registry, standards and two complete actual
+Codex Sol 6.1 medium reviews with no findings. It merged with all protections
+enforced. That run used the previous `c4f2873` shared caller. A fresh admitted
+PR must still verify the installed `6717b433` caller; local checks and the
+adoption run do not establish its hosted acceptance.
 
 ### Draft release validation
 
