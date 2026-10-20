@@ -24,6 +24,17 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
 - Uniform repository guidance, explicit human admission, protected merge gates,
   two complete Codex reviews, and independent SemVer source-draft preparation.
 
+### Changed
+
+- The `0.1.0` package registry origin leaves `https://harness.meetgerry.ai` for
+  an `ejmlabs.com` host. Everett still chooses between
+  `https://registry.ejmlabs.com` and `https://harness.ejmlabs.com`. The client
+  default, both Workers' `REGISTRY_ORIGIN`, and the GitHub OAuth callback move
+  together. The harness rejects `meetgerry.ai`, does not follow redirects, and
+  does not send or reuse sessions saved for the retired origin. The plan is
+  `openspec/changes/move-registry-to-ejmlabs-domain/`. These notes do not deploy
+  a registry, and they do not create or replace a tag or GitHub release.
+
 ### Fixed
 
 - Align registry device login with the registered `ejm-cli` client. Deny protected
