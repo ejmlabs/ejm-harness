@@ -80,3 +80,22 @@ An `http` provider endpoint is accepted only for loopback. The HTTP client built
 
 - **WHEN** a provider is configured with `http://127.0.0.1:1234/v1` and `HTTP_PROXY` names another host
 - **THEN** no request carrying the API key is sent to the proxy
+
+### Requirement: Plain HTTP loopback endpoints bypass proxies
+
+A plain-http loopback endpoint MUST use no proxy from any source (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and their lowercase forms, or system proxy settings on macOS and Windows), whatever `NO_PROXY` says. `https` endpoints MUST still honor the configured proxy.
+
+#### Scenario: Loopback request ignores HTTP_PROXY
+
+- **WHEN** the base URL is `http://127.0.0.1:1234/v1` and `HTTP_PROXY` names another host
+- **THEN** the request with the API key goes straight to `127.0.0.1:1234` and the proxy gets no connection
+
+#### Scenario: Loopback request ignores all_proxy
+
+- **WHEN** only `all_proxy` is set and the base URL is `http://localhost:<port>`
+- **THEN** the request goes direct
+
+#### Scenario: HTTPS request uses HTTPS_PROXY
+
+- **WHEN** the base URL is `https` and `HTTPS_PROXY` is set
+- **THEN** the request goes through the proxy

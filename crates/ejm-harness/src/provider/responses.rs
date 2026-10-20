@@ -73,7 +73,7 @@ impl ResponsesProvider {
     }
 
     /// Use a loopback HTTP fixture without exposing credentials to arbitrary hosts.
-    /// The fixture client does not use `HTTP_PROXY` or `ALL_PROXY`.
+    /// The fixture URL is not `https`, so its client uses no proxy.
     ///
     /// # Errors
     /// Rejects any destination other than an HTTP loopback address, an invalid

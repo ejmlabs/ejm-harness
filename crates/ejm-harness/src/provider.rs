@@ -116,7 +116,7 @@ impl OpenAiProvider {
     ///
     /// The base URL must use `https`, or `http` on a loopback host: exact
     /// `localhost`, an IPv4 address in `127.0.0.0/8`, or `::1`. There is no
-    /// insecure override. Plain `http` does not use `HTTP_PROXY` or `ALL_PROXY`.
+    /// insecure override. Any scheme other than `https` skips every proxy.
     ///
     /// # Errors
     ///
@@ -278,7 +278,7 @@ impl AnthropicProvider {
     ///
     /// The base URL must use `https`, or `http` on a loopback host: exact
     /// `localhost`, an IPv4 address in `127.0.0.0/8`, or `::1`. There is no
-    /// insecure override. Plain `http` does not use `HTTP_PROXY` or `ALL_PROXY`.
+    /// insecure override. Any scheme other than `https` skips every proxy.
     ///
     /// # Errors
     ///
@@ -439,10 +439,11 @@ fn http_client(base_url: &str) -> Result<reqwest::Client> {
         .timeout(Duration::from_secs(600))
         .pool_max_idle_per_host(4)
         .redirect(reqwest::redirect::Policy::none());
-    // Plain `http` is accepted only for loopback. The system proxy would send
-    // that request, and the API key, to `HTTP_PROXY` or `ALL_PROXY` in cleartext.
-    // `https` keeps the process proxy, so a CONNECT tunnel can still be used.
-    if reqwest::Url::parse(base_url).is_ok_and(|url| url.scheme() == "http") {
+    // Skip every proxy unless the scheme is `https`. Plain `http` is the only
+    // non-https scheme the endpoint check accepts, and it is always loopback.
+    // A proxy would send the API key in cleartext. `https` keeps the process
+    // proxy so a CONNECT tunnel can still be used.
+    if !reqwest::Url::parse(base_url).is_ok_and(|url| url.scheme() == "https") {
         builder = builder.no_proxy();
     }
     builder.build().context("HTTP client initialization failed")

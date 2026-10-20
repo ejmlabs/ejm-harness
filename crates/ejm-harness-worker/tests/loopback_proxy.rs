@@ -31,6 +31,7 @@ const TEST_NAME: &str = "plain_http_loopback_does_not_send_the_key_to_a_proxy";
 async fn plain_http_loopback_does_not_send_the_key_to_a_proxy() -> Result<()> {
     match std::env::var("EJM_HARNESS_PROXY_ROLE") {
         Ok(role) if role == "http" => http_child().await,
+        Ok(role) if role == "all_proxy" => all_proxy_child().await,
         Ok(role) if role == "https" => https_child().await,
         Ok(role) => bail!("unknown proxy role {role}"),
         Err(std::env::VarError::NotPresent) => parent().await,
@@ -55,6 +56,18 @@ async fn parent() -> Result<()> {
             cleartext_capture.len(),
             clip(&cleartext.stdout),
             clip(&cleartext.stderr)
+        );
+    }
+
+    let direct = run_child("all_proxy", &proxy_url).await?;
+    let direct_capture = snapshot(&captured);
+    if !direct.status.success() || !direct_capture.is_empty() {
+        bail!(
+            "all_proxy received a plain http localhost request or the child failed\nstatus: {:?}\nbytes: {}\nstdout: {}\nstderr: {}",
+            direct.status.code(),
+            direct_capture.len(),
+            clip(&direct.stdout),
+            clip(&direct.stderr)
         );
     }
 
@@ -89,22 +102,35 @@ async fn run_child(role: &str, proxy_url: &str) -> Result<std::process::Output> 
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
-    if role == "http" {
-        command
-            .env("HTTP_PROXY", proxy_url)
-            .env("http_proxy", proxy_url)
-            .env("ALL_PROXY", proxy_url)
-            .env("all_proxy", proxy_url)
-            .env_remove("HTTPS_PROXY")
-            .env_remove("https_proxy");
-    } else {
-        command
-            .env("HTTPS_PROXY", proxy_url)
-            .env("https_proxy", proxy_url)
-            .env_remove("HTTP_PROXY")
-            .env_remove("http_proxy")
-            .env_remove("ALL_PROXY")
-            .env_remove("all_proxy");
+    match role {
+        "http" => {
+            command
+                .env("HTTP_PROXY", proxy_url)
+                .env("http_proxy", proxy_url)
+                .env("ALL_PROXY", proxy_url)
+                .env("all_proxy", proxy_url)
+                .env_remove("HTTPS_PROXY")
+                .env_remove("https_proxy");
+        }
+        "all_proxy" => {
+            command
+                .env("all_proxy", proxy_url)
+                .env_remove("HTTP_PROXY")
+                .env_remove("http_proxy")
+                .env_remove("ALL_PROXY")
+                .env_remove("HTTPS_PROXY")
+                .env_remove("https_proxy");
+        }
+        "https" => {
+            command
+                .env("HTTPS_PROXY", proxy_url)
+                .env("https_proxy", proxy_url)
+                .env_remove("HTTP_PROXY")
+                .env_remove("http_proxy")
+                .env_remove("ALL_PROXY")
+                .env_remove("all_proxy");
+        }
+        _ => bail!("unknown proxy role {role}"),
     }
     command
         .output()
@@ -141,6 +167,19 @@ fn snapshot(captured: &Mutex<Vec<u8>>) -> Vec<u8> {
 
 fn clip(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).chars().take(2_000).collect()
+}
+
+async fn all_proxy_child() -> Result<()> {
+    let (ipv4, ipv6, port) = localhost_pair().await?;
+    let before_v4 = request_count(&ipv4).await?;
+    let before_v6 = request_count(&ipv6).await?;
+    stream_openai(&format!("http://localhost:{port}/v1")).await?;
+    let added = request_count(&ipv4).await?.saturating_sub(before_v4)
+        + request_count(&ipv6).await?.saturating_sub(before_v6);
+    ensure!(added == 1, "all_proxy localhost sent {added} requests");
+    assert_new_requests_carry_the_key(&ipv4, before_v4).await?;
+    assert_new_requests_carry_the_key(&ipv6, before_v6).await?;
+    Ok(())
 }
 
 async fn http_child() -> Result<()> {

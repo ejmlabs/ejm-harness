@@ -174,11 +174,13 @@ or EJM_CLI_BASE_URL.` The spec requires the error to state that HTTPS is
    `x-api-key` is attached to a request. Callers switch the endpoint to
    `https` or bind the server to a loopback host. The client continues to use
    `redirect::Policy::none()`, so an accepted `https` URL cannot redirect the
-   key onto `http`. When the endpoint scheme is `http`, that client also calls
-   `.no_proxy()`. Reqwest would otherwise send the loopback request, including
-   `Authorization` or `x-api-key`, in cleartext to `HTTP_PROXY` or `ALL_PROXY`.
-   `https` clients do not call `.no_proxy()`, so the process proxy still applies
-   and an `https` request can use a CONNECT tunnel. `OpenAiProvider::new`,
+   key onto `http`. The client calls `.no_proxy()` unless the scheme is
+   `https`, so every other scheme skips `HTTP_PROXY`, `HTTPS_PROXY`,
+   `ALL_PROXY`, their lowercase forms, and system proxy settings, whatever
+   `NO_PROXY` says. Reqwest 0.13.5's `no_proxy()` also disables macOS and
+   Windows system proxies. `https` clients do not call `.no_proxy()`, so the
+   process proxy still applies and an `https` request can use a CONNECT tunnel.
+   `OpenAiProvider::new`,
    `AnthropicProvider::new`, the worker `openai` path, and
    `ResponsesProvider::for_endpoint` all use this client. `ResponsesProvider::new`
    and `available_models` stay on `https://api.openai.com/v1` and keep the proxy.
