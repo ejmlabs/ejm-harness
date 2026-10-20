@@ -16,8 +16,8 @@ use tokio_util::sync::CancellationToken;
 mod credentials;
 pub use credentials::{
     RetiredRegistrySession, delete_registry_token, discard_retired_registry_sessions,
-    load_registry_token, locate_retired_registry_sessions, migrate_registry_token,
-    retired_registry_session_notice, save_registry_token,
+    force_discard_legacy_registry_session, load_registry_token, locate_retired_registry_sessions,
+    migrate_registry_token, retired_registry_session_notice, save_registry_token,
 };
 
 pub const DEFAULT_REGISTRY: &str = "https://registry.ejmlabs.com";
@@ -73,12 +73,17 @@ impl RegistryClient {
     /// Rejects unsafe origins, credentials in URLs, and HTTP client setup errors.
     pub fn new(origin: &str) -> Result<Self> {
         let origin = validate_registry_origin(origin)?;
-        let http = Client::builder()
+        let mut builder = Client::builder()
             .redirect(Policy::none())
             .connect_timeout(Duration::from_secs(10))
             .timeout(Duration::from_secs(30))
-            .user_agent(concat!("ejm-harness/", env!("CARGO_PKG_VERSION")))
-            .build()?;
+            .user_agent(concat!("ejm-harness/", env!("CARGO_PKG_VERSION")));
+        // Plain HTTP is loopback only. Leave system proxies off so a bearer cannot
+        // travel to an HTTP proxy in cleartext. HTTPS keeps the process proxy environment.
+        if origin.scheme() != "https" {
+            builder = builder.no_proxy();
+        }
+        let http = builder.build()?;
         Ok(Self { origin, http })
     }
 
@@ -332,15 +337,12 @@ impl RegistryClient {
 /// # Errors
 /// Rejects credentials, a query, a fragment, a non-root path, public HTTP, and a retired host.
 pub fn validate_registry_origin(value: &str) -> Result<Url> {
-    let origin = normalize_origin(value)?;
-    ensure!(
-        origin
-            .host_str()
-            .is_some_and(|host| !retired_registry_host(host)),
-        "{}",
-        retired_registry_message()
-    );
-    Ok(origin)
+    // A retired host is reported before generic path, userinfo, or scheme errors.
+    let parsed = Url::parse(value)?;
+    if parsed.host_str().is_some_and(retired_registry_host) {
+        bail!("{}", retired_registry_message());
+    }
+    normalize_origin(value)
 }
 
 /// Whether a validated origin is [`DEFAULT_REGISTRY`].

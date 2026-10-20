@@ -15,9 +15,9 @@ pub use manager::{PackageManager, PackageRecord, pack_directory, read_bounded};
 pub use registry::{
     DEFAULT_REGISTRY, DISCARD_RETIRED_REGISTRY_COMMAND, DeviceCode, RegistryClient,
     RetiredRegistrySession, VersionRecord, delete_registry_token,
-    discard_retired_registry_sessions, load_registry_token, locate_retired_registry_sessions,
-    migrate_registry_token, registry_origin_is_default, retired_registry_session_notice,
-    save_registry_token, validate_registry_origin,
+    discard_retired_registry_sessions, force_discard_legacy_registry_session, load_registry_token,
+    locate_retired_registry_sessions, migrate_registry_token, registry_origin_is_default,
+    retired_registry_session_notice, save_registry_token, validate_registry_origin,
 };
 pub use runtime::{
     InstalledPackage, PackageContext, PackageGrants, RuntimeConfig, RuntimeEvent, RuntimePool,

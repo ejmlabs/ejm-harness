@@ -11,15 +11,15 @@ Everett confirmed `https://registry.ejmlabs.com` on 2026-10-20. The `AGENTS.md` 
 ## 2. ejm-harness retired sessions
 
 - [x] 2.1 When `registry-session.json` belongs to `meetgerry.ai` or a subdomain, stop blocking other origins with the missing `ejm-cli package migrate-credentials` command. Return a message that the session is for the retired registry, that the token is not sent, and that the host can discard it locally. Verify a fixture with that legacy file performs no HTTP request and does not import the token into the new origin.
-- [x] 2.2 Add a local discard for that retired legacy file and its vault record. Verify the file and vault record are removed with no network request, a later save for the confirmed origin succeeds, and a legacy file for any other origin is refused.
+- [x] 2.2 Add a local discard for that retired legacy file and its vault record. An unsafe or unreadable `registry-session.json` is unlinked without following it. Verify the file and vault record are removed with no network request, a later save for the confirmed origin succeeds, and a legacy file for any other origin is refused.
 - [x] 2.3 Keep `migrate_registry_token` for a legacy file whose origin matches the requested origin. Remove `ejm-cli package migrate-credentials --old-clients-stopped` from `credentials.rs` and `docs/packages.md`. Verify the repository no longer contains that command string, and the same-origin handoff still names `migrate_registry_token`.
 
 ## 3. ejm-harness registry configuration and docs
 
 - [x] 3.1 Set `REGISTRY_ORIGIN` in `registry/wrangler.jsonc`, `registry/auth/wrangler.jsonc`, and `registry/auth/scripts/generate-schema.ts` to the confirmed origin. Add that host as a custom domain on the public Worker only. Keep `workers_dev` and `preview_urls` false, and leave the auth Worker without a route. Verify the three literals equal `DEFAULT_REGISTRY` and the auth Wrangler file has no `routes` entry.
-- [x] 3.2 Update the origin, GitHub callback, and custom-domain sentences in `registry/README.md`, and the origin sentence in `docs/packages.md`, to the confirmed origin. Verify the callback is `https://<confirmed-host>/api/auth/callback/github`. Leave Worker, D1, R2, and npm names, `registry/public` branding, `appName`, the consent plugin id, and the reserved handle `gerry` unchanged.
+- [x] 3.2 Update the origin, GitHub callback, and custom-domain sentences in `registry/README.md`, and the origin sentence in `docs/packages.md`, to the confirmed origin. Verify the callback is `https://<confirmed-host>/api/auth/callback/github`. Name the Workers, D1 databases, and R2 bucket `ejm-registry`, `ejm-registry-auth`, and `ejm-registry-packages`. Leave the npm package, the Cargo package, `registry/public` branding, `appName`, the consent plugin id, and the reserved handle `gerry` unchanged.
 - [x] 3.3 Run the auth schema check. Verify `registry/auth/migrations/0001_auth.sql` changes only when the generator emits a difference, and that the committed SQL matches the generator.
-- [x] 3.4 Update the origin sentence in `.agents/skills/harness-hosts/SKILL.md`. Keep the `gerry.package.json` clause. Leave `AGENTS.md`, `README.md` Gerry wording, `site/public/index.html`, and `docs/contributing.md` unchanged. Verify the skill names the confirmed origin and those four files have no new diff beyond what this change already required in `docs/packages.md` and `registry/README.md`.
+- [x] 3.4 Update `.agents/skills/harness-hosts/SKILL.md` so it names `https://registry.ejmlabs.com` and still keeps the `gerry.package.json` clause. Update the `AGENTS.md` names table to `https://registry.ejmlabs.com`. Leave `gerry.package.json` pending until the user decides. Leave the Gerry wording in `README.md` and `site/public/index.html` unchanged.
 - [x] 3.5 Add a dated decision-record row in `docs/contributing.md` for the confirmed registry origin, pointing at the same-origin download test and the retired-origin rejection test. Verify the new row does not rename `gerry.package.json` or edit the existing Gerry wording.
 
 ## 4. ejm-cli dependency
@@ -32,7 +32,7 @@ Everett confirmed `https://registry.ejmlabs.com` on 2026-10-20. The `AGENTS.md` 
 
 ## 6. Release notes and checks
 
-- [x] 6.1 Keep this change's note in the `## [0.1.0]` section of `CHANGELOG.md`. Leave `## [Unreleased]` empty of this work, and do not add `0.2.0`. Do not create, delete, move, or republish a tag or GitHub release. Verify the `0.1.0` section names the confirmed origin and `git status` shows no tag or release workflow edits.
+- [x] 6.1 Keep this change's note in the `## [0.1.0]` section of `CHANGELOG.md`, including that builds from the earlier v0.1.0 tag (commit 8d3dc39) must not be used for registry commands. Leave `## [Unreleased]` empty of this work, and do not add `0.2.0`. Do not create, delete, move, or republish a tag or GitHub release. Verify the `0.1.0` section names the confirmed origin and `git status` shows no tag or release workflow edits.
 - [x] 6.2 Run the focused `ejm-harness-packages` tests, `./scripts/check-registry`, and `openspec validate --strict`. Verify the same-origin download rejection and the redirect refusal still pass. Do not deploy Cloudflare resources.
 
 ## Workflow follow-up

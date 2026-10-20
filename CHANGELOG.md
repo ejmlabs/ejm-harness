@@ -32,7 +32,9 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
   sessions saved for the retired origin are not sent or reused. Discard a leftover
   session with `ejm-cli package discard-retired-session` and sign in again. These
   notes do not deploy a registry, and they do not create or replace a tag or
-  GitHub release.
+  GitHub release. Builds from the earlier v0.1.0 tag (commit 8d3dc39) default
+  to a retired registry domain and must not be used for registry commands.
+  Upgrade to the reissued v0.1.0.
 
 ### Fixed
 

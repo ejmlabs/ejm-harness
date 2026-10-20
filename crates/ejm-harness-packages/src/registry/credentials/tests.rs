@@ -283,6 +283,153 @@ fn legacy_fifo_is_rejected_without_waiting_or_changing_credentials() -> Result<(
     Ok(())
 }
 
+fn assert_unusable_sign_in(fixture: &Fixture) -> Result<()> {
+    let path = fixture.root.join(LEGACY).display().to_string();
+    let attempts = [
+        load(&fixture.vault, &fixture.root, ORIGIN).map(|_| ()),
+        save(
+            &fixture.vault,
+            &fixture.root,
+            ORIGIN,
+            &ejm_harness_auth::SecretString::new("new-token"),
+        ),
+    ];
+    for result in attempts {
+        let Err(error) = result else {
+            bail!("unusable legacy file did not block sign-in");
+        };
+        let message = error.to_string();
+        ensure!(message.contains(&path), "{message}");
+        ensure!(
+            message.contains(super::super::DISCARD_RETIRED_REGISTRY_COMMAND),
+            "{message}"
+        );
+        ensure!(message.contains("was not sent"), "{message}");
+        ensure!(!message.contains("migrate-credentials"), "{message}");
+    }
+    Ok(())
+}
+
+fn assert_migrate_leaves_legacy(fixture: &Fixture) -> Result<()> {
+    ensure!(
+        migrate(&fixture.vault, &fixture.root, ORIGIN).is_err(),
+        "migrate deleted or accepted an unusable legacy file"
+    );
+    ensure!(
+        fs::symlink_metadata(fixture.root.join(LEGACY)).is_ok(),
+        "unusable legacy file was removed by migrate"
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+fn write_legacy_mode(path: &std::path::Path, bytes: &[u8], mode: u32) -> Result<()> {
+    use std::io::Write;
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(path)?;
+    file.write_all(bytes)?;
+    fs::set_permissions(path, fs::Permissions::from_mode(mode))?;
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn world_readable_retired_legacy_file_is_force_discarded() -> Result<()> {
+    let fixture = Fixture::new()?;
+    let bytes = serde_json::to_vec(&serde_json::json!({"origin":RETIRED,"token":"retired-loose"}))?;
+    write_legacy_mode(&fixture.root.join(LEGACY), &bytes, 0o644)?;
+    assert_unusable_sign_in(&fixture)?;
+    assert_migrate_leaves_legacy(&fixture)?;
+    ensure!(discard(&fixture.vault, &fixture.root)?.is_empty());
+    assert!(fs::symlink_metadata(fixture.root.join(LEGACY)).is_err());
+    write_legacy_mode(&fixture.root.join(LEGACY), &bytes, 0o644)?;
+    ensure!(force_discard_legacy_registry_session(&fixture.root)?);
+    assert!(fs::symlink_metadata(fixture.root.join(LEGACY)).is_err());
+    ensure!(!force_discard_legacy_registry_session(&fixture.root)?);
+    save(
+        &fixture.vault,
+        &fixture.root,
+        ORIGIN,
+        &ejm_harness_auth::SecretString::new("current-after-discard"),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn retired_legacy_file_with_extra_field_is_force_discarded() -> Result<()> {
+    let fixture = Fixture::new()?;
+    let bytes = serde_json::to_vec(
+        &serde_json::json!({"origin":RETIRED,"token":"retired-extra","extra":true}),
+    )?;
+    #[cfg(unix)]
+    write_legacy_mode(&fixture.root.join(LEGACY), &bytes, 0o600)?;
+    #[cfg(windows)]
+    rightkit_fs::private::write_private_file(&fixture.root.join(LEGACY), &bytes)?;
+    assert_unusable_sign_in(&fixture)?;
+    assert_migrate_leaves_legacy(&fixture)?;
+    ensure!(discard(&fixture.vault, &fixture.root)?.is_empty());
+    assert!(fs::symlink_metadata(fixture.root.join(LEGACY)).is_err());
+    #[cfg(unix)]
+    write_legacy_mode(&fixture.root.join(LEGACY), &bytes, 0o600)?;
+    #[cfg(windows)]
+    rightkit_fs::private::write_private_file(&fixture.root.join(LEGACY), &bytes)?;
+    ensure!(force_discard_legacy_registry_session(&fixture.root)?);
+    assert!(fs::symlink_metadata(fixture.root.join(LEGACY)).is_err());
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn symlink_legacy_session_is_unlinked_without_following() -> Result<()> {
+    use std::os::unix::fs::symlink;
+    let fixture = Fixture::new()?;
+    let outside = fixture.root.with_file_name("outside-session");
+    fs::write(&outside, b"must remain untouched")?;
+    let link = fixture.root.join(LEGACY);
+    symlink(&outside, &link)?;
+    let Err(error) = load(&fixture.vault, &fixture.root, ORIGIN) else {
+        bail!("symlink legacy file did not block sign-in");
+    };
+    let message = error.to_string();
+    let path = link.display().to_string();
+    ensure!(message.contains(&path), "{message}");
+    ensure!(
+        !message.contains(&outside.display().to_string()),
+        "{message}"
+    );
+    assert_unusable_sign_in(&fixture)?;
+    assert_migrate_leaves_legacy(&fixture)?;
+    assert_eq!(fs::read(&outside)?, b"must remain untouched");
+    assert!(fs::symlink_metadata(&link)?.is_symlink());
+    ensure!(discard(&fixture.vault, &fixture.root)?.is_empty());
+    assert!(fs::symlink_metadata(&link).is_err());
+    assert_eq!(fs::read(&outside)?, b"must remain untouched");
+    symlink(&outside, &link)?;
+    ensure!(force_discard_legacy_registry_session(&fixture.root)?);
+    assert!(fs::symlink_metadata(&link).is_err());
+    assert_eq!(fs::read(&outside)?, b"must remain untouched");
+    Ok(())
+}
+
+#[test]
+fn force_discard_leaves_a_private_well_formed_legacy_file() -> Result<()> {
+    let fixture = Fixture::new()?;
+    ensure!(!force_discard_legacy_registry_session(&fixture.root)?);
+    let source = fixture.legacy(ORIGIN)?;
+    ensure!(!force_discard_legacy_registry_session(&fixture.root)?);
+    assert_eq!(fs::read(fixture.root.join(LEGACY))?, source);
+    fs::remove_file(fixture.root.join(LEGACY))?;
+    let retired = fixture.legacy(RETIRED)?;
+    ensure!(!force_discard_legacy_registry_session(&fixture.root)?);
+    assert_eq!(fs::read(fixture.root.join(LEGACY))?, retired);
+    Ok(())
+}
+
 #[cfg(target_os = "macos")]
 #[test]
 fn legacy_allow_acl_is_not_imported_or_deleted() -> Result<()> {

@@ -82,11 +82,9 @@ fn legacy_gate(transaction: &VaultTransaction, root: &Path, id: &SecretId) -> Re
     if transaction.migrated(id) {
         return Ok(());
     }
-    let Some(bytes) = read_legacy(root)? else {
+    let Some(legacy) = read_legacy_session(root)? else {
         return Ok(());
     };
-    let legacy: LegacySession = serde_json::from_slice(&bytes)
-        .map_err(|_| anyhow::anyhow!("invalid legacy registry session"))?;
     if origin_is_retired(&legacy.origin)? {
         if identity(&legacy.origin)? == *id {
             bail!("{}", super::retired_registry_message());
@@ -137,12 +135,37 @@ pub fn locate_retired_registry_sessions(root: &Path) -> Result<Vec<RetiredRegist
 /// Delete leftover retired-registry sessions locally. Nothing is sent on the network.
 ///
 /// A legacy file for any other origin is left in place. Retired tokens are not copied
-/// into another origin.
+/// into another origin. An unsafe or unreadable `registry-session.json` is unlinked
+/// without following it and without parsing it into a credential.
 ///
 /// # Errors
-/// Reports an unreadable legacy file, an unavailable key service, or a failed delete.
+/// Reports an unavailable key service or a failed delete.
 pub fn discard_retired_registry_sessions(root: &Path) -> Result<Vec<RetiredRegistrySession>> {
     discard(&open(root)?, root)
+}
+
+/// Unlink an unsafe or unreadable legacy `registry-session.json`.
+///
+/// Returns whether a directory entry was removed. A missing path returns `false`.
+/// A private, well-formed legacy file is left in place and returns `false`.
+/// Nothing is sent on the network. A symlink or other unsafe entry is removed
+/// with `symlink_metadata` and `remove_file`, without reading it. A private
+/// file is read only to tell a well-formed session from one that does not parse.
+///
+/// # Errors
+/// Reports a directory or unlink failure. A well-formed file is not an error.
+pub fn force_discard_legacy_registry_session(root: &Path) -> Result<bool> {
+    match classify_legacy(root)? {
+        LegacyRead::Missing => Ok(false),
+        LegacyRead::Unusable => unlink_legacy_entry(root),
+        LegacyRead::Bytes(bytes) => {
+            if serde_json::from_slice::<LegacySession>(&bytes).is_err() {
+                unlink_legacy_entry(root)
+            } else {
+                Ok(false)
+            }
+        }
+    }
 }
 
 /// Message a host can show when a retired session is still stored.
@@ -169,20 +192,18 @@ fn locate(vault: &SecretVault, root: &Path) -> Result<Vec<RetiredRegistrySession
         }
     }
     drop(transaction);
-    if let Some(bytes) = read_legacy(root)? {
-        let legacy: LegacySession = serde_json::from_slice(&bytes)
-            .map_err(|_| anyhow::anyhow!("invalid legacy registry session"))?;
-        if origin_is_retired(&legacy.origin)? {
-            let origin = super::normalize_origin(&legacy.origin)?.to_string();
-            if let Some(existing) = found.iter_mut().find(|session| session.origin == origin) {
-                existing.legacy_file = true;
-            } else {
-                found.push(RetiredRegistrySession {
-                    origin,
-                    legacy_file: true,
-                    vault_record: false,
-                });
-            }
+    if let Some(legacy) = read_legacy_session(root)?
+        && origin_is_retired(&legacy.origin)?
+    {
+        let origin = super::normalize_origin(&legacy.origin)?.to_string();
+        if let Some(existing) = found.iter_mut().find(|session| session.origin == origin) {
+            existing.legacy_file = true;
+        } else {
+            found.push(RetiredRegistrySession {
+                origin,
+                legacy_file: true,
+                vault_record: false,
+            });
         }
     }
     found.sort_by(|left, right| left.origin.cmp(&right.origin));
@@ -190,22 +211,64 @@ fn locate(vault: &SecretVault, root: &Path) -> Result<Vec<RetiredRegistrySession
 }
 
 fn discard(vault: &SecretVault, root: &Path) -> Result<Vec<RetiredRegistrySession>> {
-    let found = locate(vault, root)?;
-    if found.is_empty() {
-        return Ok(found);
-    }
-    let mut transaction = vault.lock_blocking(&CancellationToken::new())?;
-    for session in &found {
-        if session.vault_record {
-            let id = identity(&session.origin)?;
-            transaction.delete(&id);
-            transaction.mark_migrated(id)?;
+    let transaction = vault.lock_blocking(&CancellationToken::new())?;
+    let mut found = Vec::new();
+    for stored in transaction.identities(PRODUCT, PURPOSE) {
+        if origin_is_retired(&stored)? {
+            found.push(RetiredRegistrySession {
+                origin: stored,
+                legacy_file: false,
+                vault_record: true,
+            });
         }
     }
-    transaction.commit()?;
     drop(transaction);
-    if found.iter().any(|session| session.legacy_file) {
-        remove_legacy(root)?;
+    let legacy_action = match classify_legacy(root)? {
+        LegacyRead::Missing => LegacyDiscard::Leave,
+        LegacyRead::Unusable => LegacyDiscard::Unlink,
+        LegacyRead::Bytes(bytes) => match serde_json::from_slice::<LegacySession>(&bytes) {
+            Err(_) => LegacyDiscard::Unlink,
+            Ok(legacy) => {
+                if origin_is_retired(&legacy.origin)? {
+                    let origin = super::normalize_origin(&legacy.origin)?.to_string();
+                    if let Some(existing) =
+                        found.iter_mut().find(|session| session.origin == origin)
+                    {
+                        existing.legacy_file = true;
+                    } else {
+                        found.push(RetiredRegistrySession {
+                            origin,
+                            legacy_file: true,
+                            vault_record: false,
+                        });
+                    }
+                    LegacyDiscard::RemoveWellFormed
+                } else {
+                    LegacyDiscard::Leave
+                }
+            }
+        },
+    };
+    if found.is_empty() && legacy_action != LegacyDiscard::Unlink {
+        return Ok(found);
+    }
+    if found.iter().any(|session| session.vault_record) {
+        let mut transaction = vault.lock_blocking(&CancellationToken::new())?;
+        for session in &found {
+            if session.vault_record {
+                let id = identity(&session.origin)?;
+                transaction.delete(&id);
+                transaction.mark_migrated(id)?;
+            }
+        }
+        transaction.commit()?;
+    }
+    match legacy_action {
+        LegacyDiscard::Unlink => {
+            unlink_legacy_entry(root)?;
+        }
+        LegacyDiscard::RemoveWellFormed => remove_legacy(root)?,
+        LegacyDiscard::Leave => {}
     }
     Ok(found)
 }
@@ -233,11 +296,9 @@ pub fn migrate_registry_token(
 fn migrate(vault: &SecretVault, root: &Path, origin: &str) -> Result<bool> {
     let id = identity(origin)?;
     let mut transaction = vault.lock_blocking(&CancellationToken::new())?;
-    let Some(source) = read_legacy(root)? else {
+    let Some(legacy) = read_legacy_session(root)? else {
         return Ok(false);
     };
-    let legacy: LegacySession = serde_json::from_slice(&source)
-        .map_err(|_| anyhow::anyhow!("invalid legacy registry session"))?;
     if origin_is_retired(&legacy.origin)? {
         bail!("{}", super::retired_registry_message());
     }
@@ -285,14 +346,82 @@ fn secret<'de, D: Deserializer<'de>>(
     String::deserialize(deserializer).map(SecretString::new)
 }
 
+enum LegacyRead {
+    Missing,
+    Bytes(Zeroizing<Vec<u8>>),
+    Unusable,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LegacyDiscard {
+    Leave,
+    Unlink,
+    RemoveWellFormed,
+}
+
+fn unusable_legacy_message(root: &Path) -> String {
+    format!(
+        "legacy registry session at {} is unsafe or unreadable and was not sent. Discard it with `{}`",
+        root.join(LEGACY).display(),
+        super::DISCARD_RETIRED_REGISTRY_COMMAND
+    )
+}
+
+fn read_legacy_session(root: &Path) -> Result<Option<LegacySession>> {
+    match classify_legacy(root)? {
+        LegacyRead::Missing => Ok(None),
+        LegacyRead::Unusable => bail!("{}", unusable_legacy_message(root)),
+        LegacyRead::Bytes(bytes) => match serde_json::from_slice(&bytes) {
+            Ok(session) => Ok(Some(session)),
+            Err(_) => bail!("{}", unusable_legacy_message(root)),
+        },
+    }
+}
+
+/// Remove the legacy directory entry itself. `symlink_metadata` does not follow,
+/// and `remove_file` unlinks that entry. File bytes are not read here.
+fn unlink_legacy_entry(root: &Path) -> Result<bool> {
+    let path = root.join(LEGACY);
+    match fs::symlink_metadata(&path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error).context("cannot inspect legacy registry session"),
+        Ok(_) => {
+            fs::remove_file(&path).context("cannot discard legacy registry session")?;
+            #[cfg(unix)]
+            fs::File::open(root)?.sync_all()?;
+            Ok(true)
+        }
+    }
+}
+
 #[cfg(unix)]
-fn read_legacy(root: &Path) -> Result<Option<Zeroizing<Vec<u8>>>> {
+fn legacy_metadata_is_private(metadata: &fs::Metadata) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    metadata.is_file()
+        && metadata.nlink() == 1
+        && metadata.mode() & 0o7777 == 0o600
+        && metadata.uid() == rustix::process::geteuid().as_raw()
+}
+
+#[cfg(unix)]
+fn classify_legacy(root: &Path) -> Result<LegacyRead> {
     use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
     crate::manager::private_directory(root)?;
     let path = root.join(LEGACY);
+    let listed = match fs::symlink_metadata(&path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(LegacyRead::Missing);
+        }
+        Err(error) => return Err(error).context("cannot inspect legacy registry session"),
+    };
+    // Safety failures stop before any read, including a symlink, loose mode, or extra link.
+    if !legacy_metadata_is_private(&listed) || listed.len() > u64::try_from(MAX_LEGACY)? {
+        return Ok(LegacyRead::Unusable);
+    }
     #[cfg(target_os = "macos")]
-    if path.try_exists()? {
-        rightkit_fs::private::verify_owner_only(&path)?;
+    if rightkit_fs::private::verify_owner_only(&path).is_err() {
+        return Ok(LegacyRead::Unusable);
     }
     let file = match fs::OpenOptions::new()
         .read(true)
@@ -304,42 +433,51 @@ fn read_legacy(root: &Path) -> Result<Option<Zeroizing<Vec<u8>>>> {
         .open(&path)
     {
         Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(_) => bail!("cannot open protected legacy registry session"),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(LegacyRead::Missing);
+        }
+        Err(_) => return Ok(LegacyRead::Unusable),
     };
     let metadata = file.metadata()?;
-    ensure!(
-        metadata.is_file()
-            && metadata.nlink() == 1
-            && metadata.mode() & 0o7777 == 0o600
-            && metadata.uid() == rustix::process::geteuid().as_raw(),
-        "legacy registry session must be a private owner-only regular file"
-    );
+    if !legacy_metadata_is_private(&metadata) || metadata.len() > u64::try_from(MAX_LEGACY)? {
+        return Ok(LegacyRead::Unusable);
+    }
     let bytes = read_bounded(file)?;
     let current = fs::symlink_metadata(&path)?;
     #[cfg(target_os = "macos")]
-    rightkit_fs::private::verify_owner_only(&path)?;
+    if rightkit_fs::private::verify_owner_only(&path).is_err() {
+        return Ok(LegacyRead::Unusable);
+    }
     ensure!(
         current.dev() == metadata.dev() && current.ino() == metadata.ino(),
         "legacy registry session changed during read"
     );
-    Ok(Some(bytes))
+    Ok(LegacyRead::Bytes(bytes))
 }
 
 #[cfg(windows)]
-fn read_legacy(root: &Path) -> Result<Option<Zeroizing<Vec<u8>>>> {
+fn classify_legacy(root: &Path) -> Result<LegacyRead> {
     let directory = rightkit_fs::StateDir::open(root)?;
     if !directory.exists(LEGACY)? {
-        return Ok(None);
+        return Ok(LegacyRead::Missing);
     }
-    let file = directory.open_read(
+    let file = match directory.open_read(
         LEGACY,
         &rightkit_fs::handle::ReadOptions::new()
             .require_single_link(true)
             .share_read_only(true),
-    )?;
-    rightkit_fs::private::verify_owner_only(&root.join(LEGACY))?;
-    Ok(Some(read_bounded(file)?))
+    ) {
+        Ok(file) => file,
+        Err(_) => return Ok(LegacyRead::Unusable),
+    };
+    if rightkit_fs::private::verify_owner_only(&root.join(LEGACY)).is_err() {
+        return Ok(LegacyRead::Unusable);
+    }
+    let metadata = file.metadata()?;
+    if metadata.len() > u64::try_from(MAX_LEGACY)? {
+        return Ok(LegacyRead::Unusable);
+    }
+    Ok(LegacyRead::Bytes(read_bounded(file)?))
 }
 
 fn read_bounded(file: fs::File) -> Result<Zeroizing<Vec<u8>>> {

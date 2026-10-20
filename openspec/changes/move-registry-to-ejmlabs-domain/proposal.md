@@ -2,22 +2,22 @@
 
 ## Why
 
-The default package registry is hard-coded to `https://harness.meetgerry.ai` (`crates/ejm-harness-packages/src/registry.rs:21`, `DEFAULT_REGISTRY`). Everett does not operate `meetgerry.ai`. Every ejmlabs host is on `ejmlabs.com`. A default that points at a domain outside his control is a supply-chain risk. The audit (`security-baseline-2026-10-19.md`, Info 2) flags that a lapsed or third-party registry domain would let someone else serve packages, receive registry account tokens, and run the device-login page.
+The default package registry was hard-coded to `https://harness.meetgerry.ai`. Everett does not operate `meetgerry.ai`. Every ejmlabs host is on `ejmlabs.com`. A default that points at a domain outside his control is a supply-chain risk. The audit (`security-baseline-2026-10-19.md`, Info 2) flags that a lapsed or third-party registry domain would let someone else serve packages, receive registry account tokens, and run the device-login page.
 
-The registry is the trust root for package installs. The client fetches the version record, size, SHA-256 and download URL from it, and the download must come from the same origin. So the host has to be one Everett owns. Before this change, `AGENTS.md` recorded the registry origin as unchanged until the user decides. This change is that decision, and the names table now says `https://registry.ejmlabs.com`.
+The registry is the trust root for package installs. The client fetches the version record, size, SHA-256 and download URL from it, and the download must come from the same origin. So the host has to be one Everett owns. The default is now `https://registry.ejmlabs.com`. The `AGENTS.md` names table records that origin. Only `gerry.package.json` stays unchanged until the user decides.
 
 ## What Changes
 
-- **BREAKING:** `DEFAULT_REGISTRY` moves to an `ejmlabs.com` origin. Recommended: `https://registry.ejmlabs.com` (decision pending, see Open Questions). Registry search, info, install, update, login, whoami, publisher claim, publish and logout all use the new origin.
+- **BREAKING:** `DEFAULT_REGISTRY` is `https://registry.ejmlabs.com`. Registry search, info, install, update, login, whoami, publisher claim, publish and logout all use that origin.
 - The registry Workers' `REGISTRY_ORIGIN` must equal the new default: `registry/wrangler.jsonc:9`, `registry/auth/wrangler.jsonc:10` and `registry/auth/scripts/generate-schema.ts:9`. So must the deployment steps in `registry/README.md` (custom domain, GitHub OAuth callback). The client rejects any version record whose `download_url` has a different origin (`registry.rs:131-135`), so client and server must change together.
 - **BREAKING:** the harness rejects the retired `meetgerry.ai` origin, including subdomains. It never falls back to that host, never sends it a credential, and never carries its sessions over to the new origin.
 - Registry sessions saved for the retired origin are never sent anywhere. Users get a clear message and a supported way to discard them. Today a leftover legacy `registry-session.json` for the old origin blocks every new login (`registry/credentials.rs:50-53`), and migrating it to a different origin is refused (`credentials.rs:125-128`). That is a dead end unless this change handles it.
 - No weakening of package integrity: exact size, SHA-256, manifest identity, same-origin download, no redirects, no credentials on downloads, and reinstall clearing trust all stay as they are.
-- No host-side override is added in the harness. `RegistryClient::new(origin)` already takes any origin, so overrides belong to each host (see the ejm-cli change of the same name). The origin rules stay: HTTPS, plain origin, loopback HTTP for local development. The loopback set should match whatever Everett decides in `require-https-provider-endpoints`.
+- No host-side override is added in the harness. `RegistryClient::new(origin)` already takes any origin, so overrides belong to each host (see the ejm-cli change of the same name). The origin rules stay: HTTPS, a plain origin, and HTTP only for `localhost`, `127.0.0.1`, and `[::1]` (design decision 5).
 
 ### Out of scope
 
-- Renaming the `gerry.package.json` manifest, the `gerry-registry*` Worker, D1 and R2 names, and the "Gerry" branding in `registry/public/*.html`. These are part of the Engineer's wider meetgerry/Gerry sweep.
+- Renaming `gerry.package.json`, the Cargo package `gerry-registry`, the npm package `@gerry/registry-development`, and the "Gerry" branding in `registry/public/*.html`. Wrangler names the Workers `ejm-registry` and `ejm-registry-auth`, the D1 databases `ejm-registry` and `ejm-registry-auth`, and the R2 bucket `ejm-registry-packages`. Placeholder D1 ids stay. This change does not deploy those resources.
 - Actually deploying the registry. That needs Everett's explicit authorization, per `registry/README.md`.
 - Package signing, which does not exist today.
 - Moving packages published on the old registry.
@@ -46,7 +46,7 @@ None. `openspec/specs/` has no main specs. Related registry capabilities exist o
     - The real D1 database IDs, which are still placeholder UUIDs in both `wrangler.jsonc` files.
 - **Coordination:** the Engineer is sweeping every `meetgerry` reference across all five repos. This change covers only the registry default origin and what directly depends on it (server origin config, retired-origin handling, tests and docs that name the origin). Other `meetgerry`/Gerry references seen in ejm-harness, left to the sweep:
     - the manifest name `gerry.package.json`: `crates/ejm-harness-package-spec/src/lib.rs:12`, `archive.rs:109`, and many tests and SDK tests
-    - Worker, database and bucket names `gerry-registry`, `gerry-registry-auth`, `gerry-registry-packages`: `registry/wrangler.jsonc:3,10,14,19`, `registry/auth/wrangler.jsonc:3,16`, `registry/Cargo.toml:2`, `registry/Cargo.lock:241`, `registry/package.json:2` and `package-lock.json` (`@gerry/registry-development`)
+    - Wrangler Worker, D1, and R2 names are `ejm-registry`, `ejm-registry-auth`, and `ejm-registry-packages`. The Cargo package stays `gerry-registry` (`registry/Cargo.toml`). The npm package stays `@gerry/registry-development`
     - branding: `registry/src/lib.rs:1`, `registry/README.md:1,3,241,244`, `registry/public/{index,device,account}.html` ("Gerry extensions"), `registry/auth/src/auth.ts:21` ("Gerry Registry"), `registry/auth/src/consent.ts:5`
     - `registry/src/policy.rs:44,169`: `gerry` as a reserved handle
     - the test client id `gerry-cli`: `registry/tests/auth.test.ts:88,206`
@@ -54,15 +54,8 @@ None. `openspec/specs/` has no main specs. Related registry capabilities exist o
 
 ## Open Questions
 
-1. **New default origin.** (Everett.) Recommendation: **`https://registry.ejmlabs.com`**.
-    - The client accepts only a bare origin; `parse_origin` rejects any path (`registry.rs:338-347`).
-    - The registry Worker owns the whole origin: its public pages (`registry/public/index.html`, `account.html`, `device.html`), `/api/auth/*` and `/v1/*`.
-    - It builds download URLs as `{REGISTRY_ORIGIN}/v1/...` (`registry/src/edge.rs:319,327`).
-    - Its cookie/Origin mutation policy assumes a dedicated origin (`policy.rs:84-101`).
-    - `harness.ejmlabs.com` already serves the static site Worker as a root custom domain (`site/wrangler.jsonc:9`).
-    - So `harness.ejmlabs.com/registry` or `ejmlabs.com/registry` would need path-prefix support in both client and server, and would put registry auth cookies on a marketing-site origin.
-    - Taking over `harness.ejmlabs.com` itself would mean moving the site.
-2. **Retired origin: reject, redirect or support?** Recommendation: **reject**, with a clear message and no fallback. Rewriting old sessions to the new origin is not possible safely: those tokens were issued by a server Everett doesn't run, so sending them to the new host would leak them and they wouldn't work anyway. Should the rejection cover all of `*.meetgerry.ai`, or only `harness.meetgerry.ai`? Recommendation: all of it.
-3. **Saved sessions for the retired origin.** Recommendation: never send them; tell the user and offer a discard step. The alternative is to delete them automatically on first run. That is simpler, but it deletes user state without asking.
-4. **Was the old registry ever live?** Both `wrangler.jsonc` files still have placeholder D1 IDs and no route, and `harness.meetgerry.ai` could not be reached from the box today (the box proxy masks DNS, so this is not proof). If nothing was ever published there, migration is mostly theoretical. Please confirm.
-5. **Loopback set** for development origins. Today it is `localhost`, `127.0.0.1` and `[::1]`. It should match the decision in `require-https-provider-endpoints` (recommended there: `localhost`, `127.0.0.0/8`, `::1`).
+1. **New default origin.** Resolved. The default is `https://registry.ejmlabs.com`. Design decision 1 and the requirement "Default registry origin is on ejmlabs.com" record that choice. `harness.ejmlabs.com` stays the static site.
+2. **Retired origin: reject, redirect or support?** Resolved. Reject `meetgerry.ai` and every subdomain, with no redirect and no fallback. Design decision 3 and the requirement "The retired meetgerry registry is never trusted" settle this.
+3. **Saved sessions for the retired origin.** Resolved. Never send them and never re-key them. The host discards them locally. Design decision 4 and the requirement "Saved sessions for the retired origin are never sent" settle this.
+4. **Was the old registry ever live?** Resolved for this change. The source still has placeholder D1 ids and this change does not deploy. Either history uses the same rule: old sessions are not sent, not copied, and not redirected. Design decision 3 and the requirement "Saved sessions for the retired origin are never sent" settle this.
+5. **Loopback set** for development origins. Resolved. HTTP loopback is only `localhost`, `127.0.0.1`, and `[::1]`. `http://127.0.0.2` is rejected. Design decision 5 and the requirement "Registry origins are plain HTTPS origins" settle this.

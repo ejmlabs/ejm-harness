@@ -208,9 +208,14 @@ A session for `meetgerry.ai` or a subdomain is not imported and is not sent to
 `DEFAULT_REGISTRY`. `locate_retired_registry_sessions` lists leftover retired
 origins without returning token values. `discard_retired_registry_sessions`
 deletes those local records and does not make a network request. The user-facing
-command is `ejm-cli package discard-retired-session`. Hosts sign in again on the
-new origin. `retired_registry_session_notice` returns that instruction when a
-leftover retired session is present.
+command is `ejm-cli package discard-retired-session`. An unsafe or unreadable
+`registry-session.json` makes sign-in name that file's path and the same command.
+`force_discard_legacy_registry_session` unlinks that directory entry without
+following it or sending anything on the network, and it leaves a private
+well-formed file in place. A plain HTTP loopback client does not use `HTTP_PROXY`
+or `ALL_PROXY`. Hosts sign in again on the new origin.
+`retired_registry_session_notice` returns that instruction when a leftover retired
+session is present.
 
 An existing vault with a missing key requires recovery of the original OS
 record. Read [credential storage](auth.md#storage-and-renewal) for key setup,

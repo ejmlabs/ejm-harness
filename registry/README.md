@@ -238,10 +238,10 @@ arguments, source, fixture files, or logs.
 
 Remote changes require explicit owner authorization. Before a deployment:
 
-1. Create separate `gerry-registry` and `gerry-registry-auth` D1 databases and
+1. Create separate `ejm-registry` and `ejm-registry-auth` D1 databases and
    replace placeholder UUIDs in their Wrangler files. Apply the reviewed registry
    and generated auth migrations to the matching databases.
-2. Create `gerry-registry-packages` as a private R2 bucket. Disable public bucket
+2. Create `ejm-registry-packages` as a private R2 bucket. Disable public bucket
    access and public custom domains. Restrict deployment and storage credentials
    to the required Workers, D1 databases, and bucket.
 3. Register a GitHub OAuth application with callback

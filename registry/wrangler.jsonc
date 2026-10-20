@@ -1,6 +1,6 @@
 {
     "$schema": "./node_modules/wrangler/config-schema.json",
-    "name": "gerry-registry",
+    "name": "ejm-registry",
     "main": "build/worker/shim.mjs",
     "compatibility_date": "2026-10-18",
     "workers_dev": false,
@@ -8,16 +8,16 @@
     "routes": [{ "pattern": "registry.ejmlabs.com", "custom_domain": true }],
     "build": { "command": "worker-build --release -- --locked" },
     "vars": { "REGISTRY_ORIGIN": "https://registry.ejmlabs.com" },
-    "services": [{ "binding": "AUTH", "service": "gerry-registry-auth" }],
+    "services": [{ "binding": "AUTH", "service": "ejm-registry-auth" }],
     "d1_databases": [
         {
             "binding": "DB",
-            "database_name": "gerry-registry",
+            "database_name": "ejm-registry",
             "database_id": "00000000-0000-0000-0000-000000000001",
             "migrations_dir": "migrations",
         },
     ],
-    "r2_buckets": [{ "binding": "PACKAGES", "bucket_name": "gerry-registry-packages" }],
+    "r2_buckets": [{ "binding": "PACKAGES", "bucket_name": "ejm-registry-packages" }],
     "ratelimits": [
         { "name": "EDGE_LIMIT", "namespace_id": "1001", "simple": { "limit": 120, "period": 60 } },
     ],

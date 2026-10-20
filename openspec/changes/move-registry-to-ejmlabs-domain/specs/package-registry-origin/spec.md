@@ -27,7 +27,7 @@ The harness MUST publish `https://registry.ejmlabs.com` as its default package r
 
 ### Requirement: Registry origins are plain HTTPS origins
 
-A registry origin MUST be a plain origin with no path, credentials, query or fragment. It MUST use `https`, except plain `http` to a loopback host for local development, using the same loopback set as the provider-endpoint rule. Registry HTTP clients MUST NOT follow redirects.
+A registry origin MUST be a plain origin with no path, credentials, query or fragment. It MUST use `https`, except plain `http` to only `localhost`, `127.0.0.1`, or `[::1]`. Registry HTTP clients MUST NOT follow redirects. A plain HTTP loopback client MUST NOT send requests through `HTTP_PROXY`, `http_proxy`, `ALL_PROXY`, or `all_proxy`.
 
 #### Scenario: HTTPS origin accepted
 
@@ -41,8 +41,18 @@ A registry origin MUST be a plain origin with no path, credentials, query or fra
 
 #### Scenario: Loopback development registry
 
-- **WHEN** a host creates a registry client for `http://127.0.0.1:8787`
+- **WHEN** a host creates a registry client for `http://127.0.0.1:8787`, `http://localhost:8787`, or `http://[::1]:8787`
 - **THEN** the client is created
+
+#### Scenario: Other loopback addresses are rejected
+
+- **WHEN** a host creates a registry client for `http://127.0.0.2`
+- **THEN** creation fails and no request is sent
+
+#### Scenario: Loopback HTTP ignores an HTTP proxy
+
+- **WHEN** a host creates a registry client for `http://127.0.0.1` while `HTTP_PROXY` points at another host
+- **THEN** the request is sent to that loopback origin and not to the proxy
 
 #### Scenario: Redirect is not followed
 
@@ -51,11 +61,11 @@ A registry origin MUST be a plain origin with no path, credentials, query or fra
 
 ### Requirement: The retired meetgerry registry is never trusted
 
-The harness MUST NOT contain the retired `meetgerry.ai` registry as a default or fallback. It MUST reject any registry origin whose host is `meetgerry.ai` or a subdomain of it, with an error that names the current default. When the default registry is unavailable, the harness MUST NOT try any other origin.
+The harness MUST NOT contain the retired `meetgerry.ai` registry as a default or fallback. It MUST reject any registry origin whose host is `meetgerry.ai` or a subdomain of it, including a path, userinfo, or `http` scheme, with an error that names the current default. When the default registry is unavailable, the harness MUST NOT try any other origin.
 
 #### Scenario: Old origin requested explicitly
 
-- **WHEN** a host creates a registry client for `https://harness.meetgerry.ai`
+- **WHEN** a host creates a registry client for `https://harness.meetgerry.ai`, `http://harness.meetgerry.ai`, `https://user:pw@harness.meetgerry.ai`, or `https://harness.meetgerry.ai/registry`
 - **THEN** creation fails with a message that the meetgerry registry is retired and that `https://registry.ejmlabs.com` is the default
 
 #### Scenario: Default registry unreachable
@@ -81,6 +91,15 @@ The harness MUST NOT send a registry session saved for the retired origin to any
 
 - **WHEN** the encrypted vault holds a session for the retired origin
 - **THEN** loading a session for the default origin does not return it
+
+### Requirement: Unsafe legacy registry files are discarded without being followed
+
+The harness MUST NOT treat an unsafe or unreadable `registry-session.json` as a credential. Sign-in MUST name that file's path and `ejm-cli package discard-retired-session`. Discard MUST unlink that directory entry without following it and without a network request. Force discard MUST leave a private well-formed legacy file in place. `migrate_registry_token` MUST NOT delete an unsafe or unreadable file.
+
+#### Scenario: Unsafe legacy file
+
+- **WHEN** `registry-session.json` is a symlink, is not mode `0600`, or contains a field other than origin and token
+- **THEN** sign-in names the file path and `ejm-cli package discard-retired-session`, the token is not sent, and discard removes the directory entry without following a symlink
 
 ### Requirement: Package integrity is unchanged by the move
 

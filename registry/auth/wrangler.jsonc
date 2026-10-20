@@ -1,6 +1,6 @@
 {
     "$schema": "../node_modules/wrangler/config-schema.json",
-    "name": "gerry-registry-auth",
+    "name": "ejm-registry-auth",
     "main": "src/index.ts",
     "compatibility_date": "2026-10-18",
     "compatibility_flags": ["nodejs_compat"],
@@ -14,7 +14,7 @@
     "d1_databases": [
         {
             "binding": "DB",
-            "database_name": "gerry-registry-auth",
+            "database_name": "ejm-registry-auth",
             "database_id": "00000000-0000-0000-0000-000000000002",
             "migrations_dir": "migrations",
         },
