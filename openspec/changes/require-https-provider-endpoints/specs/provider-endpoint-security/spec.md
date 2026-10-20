@@ -71,3 +71,12 @@ Key-bearing provider HTTP clients MUST NOT follow redirects, so an accepted HTTP
 
 - **WHEN** an accepted HTTPS provider endpoint responds with a redirect to an `http://` URL
 - **THEN** the redirect is not followed and the request fails without re-sending the credential
+
+### Requirement: Plain HTTP loopback does not use a proxy
+
+An `http` provider endpoint is accepted only for loopback. The HTTP client built for that endpoint MUST NOT send the request through `HTTP_PROXY`, `http_proxy`, `ALL_PROXY`, or `all_proxy`. The API key MUST remain on the loopback connection. An `https` provider endpoint MUST continue to honor the process environment's proxies.
+
+#### Scenario: Loopback HTTP ignores an HTTP proxy
+
+- **WHEN** a provider is configured with `http://127.0.0.1:1234/v1` and `HTTP_PROXY` names another host
+- **THEN** no request carrying the API key is sent to the proxy

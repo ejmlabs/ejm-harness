@@ -52,6 +52,6 @@ If the change alters a durable or public contract, use
 
 Use `with_optional_provider` and `configure_provider` for interactive hosts. Reject turns before journaling when no provider is configured. Replace providers only while all managed work is idle. Keep durable nonsecret binding and continuation removal atomic under admission ownership, retaining readable history and tool evidence.
 
-`OpenAiProvider` and `AnthropicProvider` accept `https`, or `http` only for exact `localhost`, `127.0.0.0/8`, or `::1`. Reject `0.0.0.0`, LAN, and other private addresses. There is no insecure opt-out. Construction fails before a request.
+`OpenAiProvider` and `AnthropicProvider` accept `https`, or `http` only for exact `localhost`, `127.0.0.0/8`, or `::1`. Reject `0.0.0.0`, LAN, and other private addresses. There is no insecure opt-out. Construction fails before a request. Plain `http` does not use `HTTP_PROXY` or `ALL_PROXY`. `https` keeps the process proxy.
 
 Claude subscription checks and inference use the shared executor as separate sequential jobs. Keep native tools and ordinary customizations disabled, return proposals to the normal tool loop and retain managed provider policy. Read the [official-client contract](../../../docs/claude-code.md).

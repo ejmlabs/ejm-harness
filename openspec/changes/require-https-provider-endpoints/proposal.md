@@ -17,7 +17,7 @@ Security audit finding **L2** (`security-baseline-2026-10-19.md`, ejm-harness at
 
 - `ResponsesProvider::for_endpoint` (`provider/responses.rs:80-99`). It is already stricter: HTTP loopback IPs only, for test fixtures. It is left unchanged.
 - The registry and auth origin policies (`ejm-harness-packages/src/registry.rs:335`, `ejm-harness-auth/src/engine.rs:139`).
-- Certificate pinning, custom CA handling, and proxy configuration.
+- Certificate pinning and custom CA handling. Plain `http` loopback does not use `HTTP_PROXY` or `ALL_PROXY`. Broader proxy policy is otherwise unchanged.
 - ejm-ide, which already enforces this rule.
 - CLI-side flag and env handling, which is covered by the same-named change in ejm-cli.
 

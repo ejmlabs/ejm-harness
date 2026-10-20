@@ -1045,7 +1045,7 @@ mod tests {
         const PLANTED: &str = "planted-worker-key-9f3c";
         let rejected = configure_provider(serde_json::from_value(json!({
             "kind": "openai",
-            "base_url": "http://api.example.com/v1",
+            "base_url": "http://api.example.invalid/v1",
             "api_key": PLANTED,
             "model": "fixture-model",
         }))?);
@@ -1058,6 +1058,8 @@ mod tests {
                 .contains("provider URL must use HTTPS, or HTTP on a loopback host")
         );
         assert!(!format!("{error:#}").contains(PLANTED));
+        assert!(!format!("{error:?}").contains(PLANTED));
+        assert!(!format!("{error:#?}").contains(PLANTED));
 
         let accepted = configure_provider(serde_json::from_value(json!({
             "kind": "openai",

@@ -40,7 +40,9 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
   addresses, and other private addresses are rejected when the provider is
   constructed, before a connection or an API key is sent. The error does not
   include the API key. There is no opt-out. Worker protocol 1 and the generated
-  schema are unchanged. `VERSION` stays `0.1.0`. Everett recreates the
+  schema are unchanged. Plain `http` loopback requests do not use `HTTP_PROXY`
+  or `ALL_PROXY`. `https` still uses the process proxy. `VERSION` stays `0.1.0`.
+  Everett recreates the
   unpublished `v0.1.0` tag at the protected `main` commit after this change
   and the registry move land.
 

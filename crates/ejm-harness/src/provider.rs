@@ -116,7 +116,7 @@ impl OpenAiProvider {
     ///
     /// The base URL must use `https`, or `http` on a loopback host: exact
     /// `localhost`, an IPv4 address in `127.0.0.0/8`, or `::1`. There is no
-    /// insecure override.
+    /// insecure override. Plain `http` does not use `HTTP_PROXY` or `ALL_PROXY`.
     ///
     /// # Errors
     ///
@@ -128,7 +128,7 @@ impl OpenAiProvider {
         let endpoint = endpoint(&config.base_url, "/chat/completions")?;
         Ok(Self {
             config,
-            client: http_client()?,
+            client: http_client(&endpoint)?,
             endpoint,
         })
     }
@@ -278,7 +278,7 @@ impl AnthropicProvider {
     ///
     /// The base URL must use `https`, or `http` on a loopback host: exact
     /// `localhost`, an IPv4 address in `127.0.0.0/8`, or `::1`. There is no
-    /// insecure override.
+    /// insecure override. Plain `http` does not use `HTTP_PROXY` or `ALL_PROXY`.
     ///
     /// # Errors
     ///
@@ -290,7 +290,7 @@ impl AnthropicProvider {
         let endpoint = endpoint(&config.base_url, "/messages")?;
         Ok(Self {
             config,
-            client: http_client()?,
+            client: http_client(&endpoint)?,
             endpoint,
         })
     }
@@ -433,14 +433,19 @@ fn block_index(value: &Value) -> Result<usize> {
     usize::try_from(index).context("tool block index exceeds platform limit")
 }
 
-fn http_client() -> Result<reqwest::Client> {
-    reqwest::Client::builder()
+fn http_client(base_url: &str) -> Result<reqwest::Client> {
+    let mut builder = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(600))
         .pool_max_idle_per_host(4)
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .context("HTTP client initialization failed")
+        .redirect(reqwest::redirect::Policy::none());
+    // Plain `http` is accepted only for loopback. The system proxy would send
+    // that request, and the API key, to `HTTP_PROXY` or `ALL_PROXY` in cleartext.
+    // `https` keeps the process proxy, so a CONNECT tunnel can still be used.
+    if reqwest::Url::parse(base_url).is_ok_and(|url| url.scheme() == "http") {
+        builder = builder.no_proxy();
+    }
+    builder.build().context("HTTP client initialization failed")
 }
 
 fn endpoint(base: &str, suffix: &str) -> Result<String> {
@@ -803,9 +808,9 @@ mod tests {
     fn provider_endpoints_reject_remote_private_and_other_schemes() -> Result<()> {
         const HTTPS: &str = "provider URL must use HTTPS, or HTTP on a loopback host";
         let remote_http = [
-            "http://api.example.com/v1",
+            "http://api.example.invalid/v1",
             "http://api.example.test:443/v1",
-            "http://localhost.evil.com/v1",
+            "http://localhost.evil.invalid/v1",
             "http://127.0.0.1.nip.io/v1",
             "http://localhost./v1",
             "http://evil-localhost/v1",
@@ -816,9 +821,9 @@ mod tests {
             "http://172.16.5.5/v1",
             "http://192.168.1.10:11434",
             "http://[fd00::1]/v1",
-            "ws://api.example.com/v1",
-            "wss://api.example.com/v1",
-            "ftp://api.example.com/v1",
+            "ws://api.example.invalid/v1",
+            "wss://api.example.invalid/v1",
+            "ftp://api.example.invalid/v1",
             "file:///tmp/a",
         ];
         for base in remote_http {
@@ -827,11 +832,11 @@ mod tests {
                 .with_context(|| format!("{base} was accepted"))?;
             assert_eq!(error.to_string(), HTTPS, "{base}");
         }
-        let unparsed = endpoint("api.example.com/v1", "/messages")
+        let unparsed = endpoint("api.example.invalid/v1", "/messages")
             .err()
             .context("schemeless URL was accepted")?;
         assert_eq!(unparsed.to_string(), "invalid provider base URL");
-        assert!(!format!("{unparsed:#}").contains("api.example.com"));
+        assert!(!format!("{unparsed:#}").contains("api.example.invalid"));
         Ok(())
     }
 
@@ -841,18 +846,63 @@ mod tests {
         const CREDENTIALS: &str = "provider URL must not contain credentials, query, or fragment";
         const PLANTED: &str = "planted-provider-secret";
         let credential_urls = [
-            "https://key:secret@api.example.com/v1",
+            "https://key:secret@api.example.invalid/v1",
             &format!("http://user:{PLANTED}@127.0.0.1/v1"),
-            "https://api.example.com/v1?token=1",
-            "https://api.example.com/v1#fragment",
+            "https://api.example.invalid/v1?token=1",
+            "https://api.example.invalid/v1#fragment",
         ];
         for base in credential_urls {
             let error = endpoint(base, "/messages")
                 .err()
                 .with_context(|| format!("{base} was accepted"))?;
             assert_eq!(error.to_string(), CREDENTIALS, "{base}");
-            assert!(!format!("{error:#}").contains(PLANTED), "{base}");
             assert!(!error.to_string().contains(HTTPS), "{base}");
+            assert_secret_absent(&error, PLANTED);
+        }
+        let userinfo = endpoint("http://localhost@evil.invalid/v1", "/messages")
+            .err()
+            .context("localhost@evil.invalid was accepted")?;
+        assert_eq!(userinfo.to_string(), CREDENTIALS);
+        assert_secret_absent(&userinfo, "evil.invalid");
+        Ok(())
+    }
+
+    #[test]
+    fn provider_endpoints_cover_expanded_loopback_and_hostile_spellings() -> Result<()> {
+        const HTTPS: &str = "provider URL must use HTTPS, or HTTP on a loopback host";
+        let accepted = [
+            (
+                "http://[0:0:0:0:0:0:0:1]/v1",
+                "http://[0:0:0:0:0:0:0:1]/v1/messages",
+            ),
+            ("http://[::0001]/v1", "http://[::0001]/v1/messages"),
+            ("http://127.1/v1", "http://127.1/v1/messages"),
+            ("http://0x7f.0.0.1/v1", "http://0x7f.0.0.1/v1/messages"),
+            ("http://0177.0.0.1/v1", "http://0177.0.0.1/v1/messages"),
+            (
+                "http://localhost\\@evil.invalid/v1",
+                "http://localhost\\@evil.invalid/v1/messages",
+            ),
+        ];
+        for (base, expected) in accepted {
+            assert_eq!(endpoint(base, "/messages")?, expected, "{base}");
+        }
+        for base in [
+            "http://[::]/v1",
+            "http://[fe80::1]/v1",
+            "http://[fc00::1]/v1",
+            "http://169.254.169.254/v1",
+            "http://evil.invalid\\@localhost/v1",
+        ] {
+            let error = endpoint(base, "/messages")
+                .err()
+                .with_context(|| format!("{base} was accepted"))?;
+            assert_eq!(error.to_string(), HTTPS, "{base}");
+            for marker in ["[::]", "fe80", "fc00", "169.254", "evil.invalid"] {
+                if base.contains(marker) {
+                    assert_secret_absent(&error, marker);
+                }
+            }
         }
         Ok(())
     }
@@ -862,13 +912,13 @@ mod tests {
         const PLANTED: &str = "planted-provider-secret";
         for result in [
             OpenAiProvider::new(OpenAiConfig {
-                base_url: "http://api.example.com/v1".into(),
+                base_url: "http://api.example.invalid/v1".into(),
                 api_key: PLANTED.into(),
                 model: "fixture-model".into(),
             })
             .map(|_| ()),
             AnthropicProvider::new(AnthropicConfig {
-                base_url: "http://api.example.com/v1".into(),
+                base_url: "http://api.example.invalid/v1".into(),
                 api_key: PLANTED.into(),
                 model: "fixture-model".into(),
             })
@@ -881,8 +931,18 @@ mod tests {
                 error.to_string(),
                 "provider URL must use HTTPS, or HTTP on a loopback host"
             );
-            assert!(!format!("{error:#}").contains(PLANTED));
+            assert_secret_absent(&error, PLANTED);
         }
         Ok(())
+    }
+
+    fn assert_secret_absent(error: &anyhow::Error, secret: &str) {
+        for rendered in [
+            format!("{error:#}"),
+            format!("{error:?}"),
+            format!("{error:#?}"),
+        ] {
+            assert!(!rendered.contains(secret), "{rendered}");
+        }
     }
 }
