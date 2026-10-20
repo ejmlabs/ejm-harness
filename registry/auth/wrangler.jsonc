@@ -6,8 +6,9 @@
     "compatibility_flags": ["nodejs_compat"],
     "workers_dev": false,
     "preview_urls": false,
+    // No routes. This Worker has no public hostname or custom domain.
     "vars": {
-        "REGISTRY_ORIGIN": "https://harness.meetgerry.ai",
+        "REGISTRY_ORIGIN": "https://registry.ejmlabs.com",
         "OPERATOR_SUBJECT_IDS": "",
     },
     "d1_databases": [

@@ -8,7 +8,7 @@ Point hosts at a package registry Everett controls on `ejmlabs.com`, never trust
 
 ### Requirement: Default registry origin is on ejmlabs.com
 
-The harness MUST publish `https://registry.ejmlabs.com` as its default package registry origin (pending Everett's final choice of `ejmlabs.com` host). Every registry operation a host performs with the default MUST go to that origin. The hosted registry and auth Workers MUST be configured with the same origin, so the version records they return point downloads at it.
+The harness MUST publish `https://registry.ejmlabs.com` as its default package registry origin. Everett confirmed this host on 2026-10-20. Every registry operation a host performs with the default MUST go to that origin. The hosted registry and auth Workers MUST be configured with the same origin, so the version records they return point downloads at it.
 
 #### Scenario: Install from the default registry
 

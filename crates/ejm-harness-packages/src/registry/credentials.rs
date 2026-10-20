@@ -1,7 +1,7 @@
 use std::{fs, io::Read, path::Path};
 
 use anyhow::{Context, Result, bail, ensure};
-use ejm_harness_auth::{SecretId, SecretString, SecretVault};
+use ejm_harness_auth::{SecretId, SecretString, SecretVault, VaultTransaction};
 use serde::{Deserialize, Deserializer};
 use tokio_util::sync::CancellationToken;
 use zeroize::Zeroizing;
@@ -14,20 +14,17 @@ fn open(root: &Path) -> Result<SecretVault> {
     SecretVault::open(root.join("credentials"))
 }
 
+const PRODUCT: &str = "ejm-harness-packages";
+const PURPOSE: &str = "registry-session";
+
 fn identity(origin: &str) -> Result<SecretId> {
-    SecretId::new(
-        "ejm-harness-packages",
-        "registry-session",
-        super::parse_origin(origin)?.as_str(),
-    )
+    SecretId::new(PRODUCT, PURPOSE, super::normalize_origin(origin)?.as_str())
 }
 
-fn legacy_exists(root: &Path) -> Result<bool> {
-    match fs::symlink_metadata(root.join(LEGACY)) {
-        Ok(_) => Ok(true),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(error) => Err(error).context("inspect legacy registry session"),
-    }
+fn origin_is_retired(origin: &str) -> Result<bool> {
+    Ok(super::normalize_origin(origin)?
+        .host_str()
+        .is_some_and(super::retired_registry_host))
 }
 
 /// Save an origin-scoped registry bearer in the common encrypted vault.
@@ -44,12 +41,14 @@ fn save(vault: &SecretVault, root: &Path, origin: &str, token: &SecretString) ->
         !token.expose_secret().is_empty() && token.expose_secret().len() <= 4096,
         "invalid registry account token"
     );
+    ensure!(
+        !origin_is_retired(origin)?,
+        "{}",
+        super::retired_registry_message()
+    );
     let id = identity(origin)?;
     let mut transaction = vault.lock_blocking(&CancellationToken::new())?;
-    ensure!(
-        transaction.migrated(&id) || !legacy_exists(root)?,
-        "legacy registry credentials require a controlled upgrade; stop older clients and run ejm-cli package migrate-credentials --old-clients-stopped"
-    );
+    legacy_gate(&transaction, root, &id)?;
     transaction.set(id.clone(), token.clone())?;
     transaction.mark_migrated(id)?;
     transaction.commit()
@@ -65,16 +64,38 @@ pub fn load_registry_token(root: &Path, origin: &str) -> Result<SecretString> {
 }
 
 fn load(vault: &SecretVault, root: &Path, origin: &str) -> Result<SecretString> {
+    ensure!(
+        !origin_is_retired(origin)?,
+        "{}",
+        super::retired_registry_message()
+    );
     let id = identity(origin)?;
     let transaction = vault.lock_blocking(&CancellationToken::new())?;
     if let Some(token) = transaction.get(&id) {
         return Ok(token);
     }
-    ensure!(
-        transaction.migrated(&id) || !legacy_exists(root)?,
-        "legacy registry credentials require a controlled upgrade; stop older clients and run ejm-cli package migrate-credentials --old-clients-stopped"
-    );
+    legacy_gate(&transaction, root, &id)?;
     bail!("sign in with ejm-cli package login first")
+}
+
+fn legacy_gate(transaction: &VaultTransaction, root: &Path, id: &SecretId) -> Result<()> {
+    if transaction.migrated(id) {
+        return Ok(());
+    }
+    let Some(bytes) = read_legacy(root)? else {
+        return Ok(());
+    };
+    let legacy: LegacySession = serde_json::from_slice(&bytes)
+        .map_err(|_| anyhow::anyhow!("invalid legacy registry session"))?;
+    if origin_is_retired(&legacy.origin)? {
+        if identity(&legacy.origin)? == *id {
+            bail!("{}", super::retired_registry_message());
+        }
+        return Ok(());
+    }
+    bail!(
+        "legacy registry credentials require a controlled upgrade; stop older clients and call migrate_registry_token for this same origin"
+    )
 }
 
 /// Clear the selected registry session, retaining its permanent migration marker.
@@ -92,6 +113,101 @@ fn delete(vault: &SecretVault, origin: &str) -> Result<()> {
     transaction.delete(&id);
     transaction.mark_migrated(id)?;
     transaction.commit()
+}
+
+/// A leftover registry session for `meetgerry.ai` or one of its subdomains.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RetiredRegistrySession {
+    /// Normalized origin, including the root path.
+    pub origin: String,
+    /// The private `registry-session.json` file names this origin.
+    pub legacy_file: bool,
+    /// The encrypted vault has a record for this origin.
+    pub vault_record: bool,
+}
+
+/// List leftover sessions for the retired registry. Token values are not returned.
+///
+/// # Errors
+/// Reports an unreadable legacy file, an unavailable key service, or invalid stored state.
+pub fn locate_retired_registry_sessions(root: &Path) -> Result<Vec<RetiredRegistrySession>> {
+    locate(&open(root)?, root)
+}
+
+/// Delete leftover retired-registry sessions locally. Nothing is sent on the network.
+///
+/// A legacy file for any other origin is left in place. Retired tokens are not copied
+/// into another origin.
+///
+/// # Errors
+/// Reports an unreadable legacy file, an unavailable key service, or a failed delete.
+pub fn discard_retired_registry_sessions(root: &Path) -> Result<Vec<RetiredRegistrySession>> {
+    discard(&open(root)?, root)
+}
+
+/// Message a host can show when a retired session is still stored.
+///
+/// `None` means sign-in to another origin is not affected by a retired session.
+///
+/// # Errors
+/// Reports the same storage failures as [`locate_retired_registry_sessions`].
+pub fn retired_registry_session_notice(root: &Path) -> Result<Option<String>> {
+    let found = locate_retired_registry_sessions(root)?;
+    Ok((!found.is_empty()).then(super::retired_registry_message))
+}
+
+fn locate(vault: &SecretVault, root: &Path) -> Result<Vec<RetiredRegistrySession>> {
+    let transaction = vault.lock_blocking(&CancellationToken::new())?;
+    let mut found = Vec::new();
+    for stored in transaction.identities(PRODUCT, PURPOSE) {
+        if origin_is_retired(&stored)? {
+            found.push(RetiredRegistrySession {
+                origin: stored,
+                legacy_file: false,
+                vault_record: true,
+            });
+        }
+    }
+    drop(transaction);
+    if let Some(bytes) = read_legacy(root)? {
+        let legacy: LegacySession = serde_json::from_slice(&bytes)
+            .map_err(|_| anyhow::anyhow!("invalid legacy registry session"))?;
+        if origin_is_retired(&legacy.origin)? {
+            let origin = super::normalize_origin(&legacy.origin)?.to_string();
+            if let Some(existing) = found.iter_mut().find(|session| session.origin == origin) {
+                existing.legacy_file = true;
+            } else {
+                found.push(RetiredRegistrySession {
+                    origin,
+                    legacy_file: true,
+                    vault_record: false,
+                });
+            }
+        }
+    }
+    found.sort_by(|left, right| left.origin.cmp(&right.origin));
+    Ok(found)
+}
+
+fn discard(vault: &SecretVault, root: &Path) -> Result<Vec<RetiredRegistrySession>> {
+    let found = locate(vault, root)?;
+    if found.is_empty() {
+        return Ok(found);
+    }
+    let mut transaction = vault.lock_blocking(&CancellationToken::new())?;
+    for session in &found {
+        if session.vault_record {
+            let id = identity(&session.origin)?;
+            transaction.delete(&id);
+            transaction.mark_migrated(id)?;
+        }
+    }
+    transaction.commit()?;
+    drop(transaction);
+    if found.iter().any(|session| session.legacy_file) {
+        remove_legacy(root)?;
+    }
+    Ok(found)
 }
 
 /// Import a legacy session only after the host confirms older clients have stopped.
@@ -122,6 +238,9 @@ fn migrate(vault: &SecretVault, root: &Path, origin: &str) -> Result<bool> {
     };
     let legacy: LegacySession = serde_json::from_slice(&source)
         .map_err(|_| anyhow::anyhow!("invalid legacy registry session"))?;
+    if origin_is_retired(&legacy.origin)? {
+        bail!("{}", super::retired_registry_message());
+    }
     ensure!(
         identity(&legacy.origin)? == id,
         "saved registry session belongs to another origin"

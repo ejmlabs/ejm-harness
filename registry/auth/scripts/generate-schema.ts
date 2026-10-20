@@ -6,7 +6,7 @@ import { authOptions } from "../src/auth.js";
 
 const options = authOptions(
   {
-    REGISTRY_ORIGIN: "https://harness.meetgerry.ai",
+    REGISTRY_ORIGIN: "https://registry.ejmlabs.com",
     BETTER_AUTH_SECRET: "schema-generation-only-not-a-deployment-secret",
     GITHUB_CLIENT_ID: "schema-generation",
     GITHUB_CLIENT_SECRET: "schema-generation",

@@ -26,14 +26,13 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
 
 ### Changed
 
-- The `0.1.0` package registry origin leaves `https://harness.meetgerry.ai` for
-  an `ejmlabs.com` host. Everett still chooses between
-  `https://registry.ejmlabs.com` and `https://harness.ejmlabs.com`. The client
-  default, both Workers' `REGISTRY_ORIGIN`, and the GitHub OAuth callback move
-  together. The harness rejects `meetgerry.ai`, does not follow redirects, and
-  does not send or reuse sessions saved for the retired origin. The plan is
-  `openspec/changes/move-registry-to-ejmlabs-domain/`. These notes do not deploy
-  a registry, and they do not create or replace a tag or GitHub release.
+- The default package registry is `https://registry.ejmlabs.com`. The client,
+  both Workers' `REGISTRY_ORIGIN`, and the GitHub OAuth callback use that origin.
+  `meetgerry.ai` and its subdomains are rejected, redirects are not followed, and
+  sessions saved for the retired origin are not sent or reused. Discard a leftover
+  session with `ejm-cli package discard-retired-session` and sign in again. These
+  notes do not deploy a registry, and they do not create or replace a tag or
+  GitHub release.
 
 ### Fixed
 

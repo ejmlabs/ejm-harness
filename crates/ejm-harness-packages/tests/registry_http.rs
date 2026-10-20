@@ -1,5 +1,8 @@
-use anyhow::Result;
-use ejm_harness_packages::{RegistryClient, pack_directory};
+use anyhow::{Result, bail, ensure};
+use ejm_harness_packages::{
+    DEFAULT_REGISTRY, DISCARD_RETIRED_REGISTRY_COMMAND, RegistryClient, pack_directory,
+    registry_origin_is_default,
+};
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 use wiremock::{
@@ -101,13 +104,37 @@ async fn cross_origin_download_and_identity_substitution_are_rejected() -> Resul
 }
 
 #[test]
-fn registry_origin_rejects_plain_http_credentials_and_paths() {
+fn registry_origin_rejects_plain_http_credentials_paths_and_the_retired_host() -> Result<()> {
     for origin in [
         "http://registry.example",
         "https://user:secret@registry.example",
         "https://registry.example/publish",
         "https://registry.example/?key=secret",
     ] {
-        assert!(RegistryClient::new(origin).is_err());
+        if RegistryClient::new(origin).is_ok() {
+            bail!("{origin} was accepted");
+        }
     }
+    for origin in [
+        "https://harness.meetgerry.ai",
+        "https://other.meetgerry.ai",
+        "https://meetgerry.ai",
+    ] {
+        let Err(error) = RegistryClient::new(origin) else {
+            bail!("{origin} was accepted");
+        };
+        let message = format!("{error:#}");
+        ensure!(message.contains("retired"), "{origin}: {message}");
+        ensure!(message.contains(DEFAULT_REGISTRY), "{origin}: {message}");
+        ensure!(
+            message.contains(DISCARD_RETIRED_REGISTRY_COMMAND),
+            "{origin}: {message}"
+        );
+    }
+    RegistryClient::new(DEFAULT_REGISTRY)?;
+    RegistryClient::new("http://127.0.0.1:8787")?;
+    RegistryClient::new("https://notmeetgerry.ai")?;
+    ensure!(registry_origin_is_default("https://registry.ejmlabs.com/")?);
+    ensure!(!registry_origin_is_default("https://notmeetgerry.ai")?);
+    Ok(())
 }

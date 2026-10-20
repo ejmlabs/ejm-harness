@@ -3,8 +3,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use anyhow::Result;
+use anyhow::{Result, bail, ensure};
 use ejm_harness_auth::VaultKeyStore;
+use tokio_util::sync::CancellationToken;
 
 use super::*;
 
@@ -27,7 +28,8 @@ impl VaultKeyStore for Keys {
     }
 }
 
-const ORIGIN: &str = "https://harness.meetgerry.ai/";
+const ORIGIN: &str = "https://registry.ejmlabs.com/";
+const RETIRED: &str = "https://harness.meetgerry.ai/";
 
 struct Fixture {
     _directory: tempfile::TempDir,
@@ -94,6 +96,57 @@ fn encrypted_registry_sessions_are_origin_bound_and_deletion_is_permanent() -> R
     assert!(migrate(&fixture.vault, &fixture.root, ORIGIN)?);
     assert!(load(&fixture.vault, &fixture.root, ORIGIN).is_err());
     assert!(!fixture.root.join(LEGACY).exists());
+    Ok(())
+}
+
+#[test]
+fn retired_sessions_are_not_imported_and_discard_is_local() -> Result<()> {
+    let fixture = Fixture::new()?;
+    let retired = SecretString::new("retired-fixture-token");
+    let id = identity(RETIRED)?;
+    let mut transaction = fixture.vault.lock_blocking(&CancellationToken::new())?;
+    transaction.set(id, retired.clone())?;
+    transaction.commit()?;
+    drop(transaction);
+    fixture.legacy(RETIRED)?;
+    let current = SecretString::new("current-fixture-token");
+    save(&fixture.vault, &fixture.root, ORIGIN, &current)?;
+    assert_eq!(
+        load(&fixture.vault, &fixture.root, ORIGIN)?.expose_secret(),
+        current.expose_secret()
+    );
+    let Err(retired_load) = load(&fixture.vault, &fixture.root, RETIRED) else {
+        bail!("retired origin is not loaded");
+    };
+    let retired_load = retired_load.to_string();
+    ensure!(retired_load.contains(super::super::DISCARD_RETIRED_REGISTRY_COMMAND));
+    ensure!(retired_load.contains(super::super::DEFAULT_REGISTRY));
+    ensure!(!retired_load.contains("migrate-credentials"));
+    let Err(refused) = migrate(&fixture.vault, &fixture.root, ORIGIN) else {
+        bail!("retired legacy file is not imported");
+    };
+    ensure!(
+        refused
+            .to_string()
+            .contains(super::super::DISCARD_RETIRED_REGISTRY_COMMAND)
+    );
+    assert!(fixture.root.join(LEGACY).exists());
+    assert_eq!(
+        load(&fixture.vault, &fixture.root, ORIGIN)?.expose_secret(),
+        current.expose_secret()
+    );
+    let notice = locate(&fixture.vault, &fixture.root)?;
+    assert_eq!(notice.len(), 1);
+    assert!(notice[0].legacy_file && notice[0].vault_record);
+    assert!(!notice[0].origin.contains("retired-fixture-token"));
+    let removed = discard(&fixture.vault, &fixture.root)?;
+    assert_eq!(removed, notice);
+    assert!(!fixture.root.join(LEGACY).exists());
+    assert!(load(&fixture.vault, &fixture.root, RETIRED).is_err());
+    ensure!(locate(&fixture.vault, &fixture.root)?.is_empty());
+    fixture.legacy(ORIGIN)?;
+    ensure!(discard(&fixture.vault, &fixture.root)?.is_empty());
+    assert!(fixture.root.join(LEGACY).exists());
     Ok(())
 }
 

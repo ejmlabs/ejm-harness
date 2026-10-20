@@ -3,7 +3,7 @@
 ejm-cli demonstrates the package system. Other Rust, TypeScript, and Python
 hosts can use the same public contracts without terminal dependencies or a
 Gerry Workspace account. The registry is designed for self-service publishing
-at `https://harness.meetgerry.ai`.
+at `https://registry.ejmlabs.com`.
 
 ## Contracts and ownership
 
@@ -194,14 +194,24 @@ boundaries; call them on a blocking worker when the host has a UI or async loop.
 They require the current user's OS key service. They never create a plaintext
 `registry-session.json` or fall back to one when vault access fails.
 
-For an existing private legacy session, stop older clients and run
-`ejm-cli package migrate-credentials --old-clients-stopped` for the same registry
-origin. Rust hosts use `migrate_registry_token(root, origin, true)` after the
-same confirmation. An unconfirmed handoff refuses before key access or source
-changes. Migration validates the source's privacy and origin, commits its
-encrypted record and permanent marker, reopens the authenticated state, then
-retires the source. Interrupted cleanup can be retried. A marker survives
-logout and replacement, preventing any stale reimport from a leftover source.
+For an existing private legacy session on the same origin, stop older clients and
+call `migrate_registry_token(root, origin, true)`. An unconfirmed handoff refuses
+before key access or source changes. Migration validates the source's privacy and
+origin, commits its encrypted record and permanent marker, reopens the
+authenticated state, then retires the source. Interrupted cleanup can be retried.
+A marker survives logout and replacement, preventing any stale reimport from a
+leftover source.
+
+A session for `meetgerry.ai` or a subdomain is not imported and is not sent to
+`https://registry.ejmlabs.com`. `validate_registry_origin` rejects that host.
+`registry_origin_is_default` tells a host when a chosen origin differs from
+`DEFAULT_REGISTRY`. `locate_retired_registry_sessions` lists leftover retired
+origins without returning token values. `discard_retired_registry_sessions`
+deletes those local records and does not make a network request. The user-facing
+command is `ejm-cli package discard-retired-session`. Hosts sign in again on the
+new origin. `retired_registry_session_notice` returns that instruction when a
+leftover retired session is present.
+
 An existing vault with a missing key requires recovery of the original OS
 record. Read [credential storage](auth.md#storage-and-renewal) for key setup,
 limits, headless Linux behavior, and the storage trust boundary. Native OS
