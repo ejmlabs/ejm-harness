@@ -91,7 +91,7 @@ Add the note to `## [0.1.0]`, not `## [Unreleased]` and not a `0.2.0` section. W
 
 ## Risks / Trade-offs
 
-- [`AGENTS.md` still says the registry origin is unchanged until the user decides] → That line is intentionally kept. The hosts skill names `https://registry.ejmlabs.com`, and the manifest-name clause stays. The stale `AGENTS.md` row remains until the wider wording sweep.
+- [`AGENTS.md` names an undecided registry origin] → The names table says `https://registry.ejmlabs.com`. The `gerry.package.json` clause stays until the user decides otherwise.
 - [A legacy `registry-session.json` for the retired origin blocks every login] → Sign-in to `https://registry.ejmlabs.com` proceeds. The notice names `ejm-cli package discard-retired-session`. The token is not imported. Same-origin legacy files still require `migrate_registry_token`.
 - [The CLI implements a different discard command name] → This crate publishes `DISCARD_RETIRED_REGISTRY_COMMAND`. The CLI change should use that string. The old `migrate-credentials` command is not named.
 - [Someone sets cookie `Domain` to `ejmlabs.com`, or adds a redirect on the old host] → Cookies stay host-only. `validate_registry_origin` rejects the old host. The client already ignores redirects. Tests cover both.

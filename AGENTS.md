@@ -54,7 +54,8 @@ SDKs. ejm-cli lives in its own sibling repository. No Gerry Workspace dependency
 | SDK packages           | npm `ejm-harness`, Python `ejm_harness`                                                   |
 | Public page            | "harness by ejmlabs" at harness.ejmlabs.com                                               |
 | Hosts                  | `ejm-cli` at `../ejm-cli` and `ejm-ide` at `../ejm-ide`, not part of this repo            |
-| Unchanged on purpose   | the manifest file `gerry.package.json` and the registry origin, until the user decides    |
+| Package registry       | `https://registry.ejmlabs.com`                                                            |
+| Unchanged on purpose   | the manifest file `gerry.package.json`, until the user decides                            |
 
 ## Commands
 

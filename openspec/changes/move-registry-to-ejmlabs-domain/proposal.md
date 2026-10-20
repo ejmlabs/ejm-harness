@@ -4,7 +4,7 @@
 
 The default package registry is hard-coded to `https://harness.meetgerry.ai` (`crates/ejm-harness-packages/src/registry.rs:21`, `DEFAULT_REGISTRY`). Everett does not operate `meetgerry.ai`. Every ejmlabs host is on `ejmlabs.com`. A default that points at a domain outside his control is a supply-chain risk. The audit (`security-baseline-2026-10-19.md`, Info 2) flags that a lapsed or third-party registry domain would let someone else serve packages, receive registry account tokens, and run the device-login page.
 
-The registry is the trust root for package installs. The client fetches the version record, size, SHA-256 and download URL from it, and the download must come from the same origin. So the host has to be one Everett owns. `AGENTS.md:57` records the registry origin as "unchanged on purpose until the user decides". This change is that decision.
+The registry is the trust root for package installs. The client fetches the version record, size, SHA-256 and download URL from it, and the download must come from the same origin. So the host has to be one Everett owns. Before this change, `AGENTS.md` recorded the registry origin as unchanged until the user decides. This change is that decision, and the names table now says `https://registry.ejmlabs.com`.
 
 ## What Changes
 

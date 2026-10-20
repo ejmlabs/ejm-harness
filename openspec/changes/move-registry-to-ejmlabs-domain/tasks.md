@@ -1,6 +1,6 @@
 # Tasks
 
-Everett confirmed `https://registry.ejmlabs.com` on 2026-10-20. Do not deploy, and do not create, delete, or move a tag or GitHub release. The CLI command for a leftover retired session is `ejm-cli package discard-retired-session`.
+Everett confirmed `https://registry.ejmlabs.com` on 2026-10-20. The `AGENTS.md` names table records that origin. Only `gerry.package.json` stays unchanged until the user decides. Do not deploy, and do not create, delete, or move a tag or GitHub release. The CLI command for a leftover retired session is `ejm-cli package discard-retired-session`.
 
 ## 1. ejm-harness client origin
 
