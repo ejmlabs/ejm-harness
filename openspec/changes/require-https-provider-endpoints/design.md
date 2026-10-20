@@ -44,9 +44,10 @@ rejects hostname `localhost`, `https`, userinfo, query, and fragment. Registry
 origins already require `https`, with an `http` exception only for the host
 strings `localhost`, `127.0.0.1`, and `[::1]`.
 
-`proposal.md` and delta specs are intentionally absent. The product manager
-owns those files and may add them on this branch. Implementation waits for
-those artifacts and for Everett's approval.
+`proposal.md` and `specs/provider-endpoint-security/spec.md` are the product
+requirements for this change. Implementation still waits for Everett's
+approval. This change does not edit Rust, the worker, the SDKs, or the
+registry.
 
 ## Goals / Non-Goals
 
@@ -82,19 +83,33 @@ those artifacts and for Everett's approval.
 
 ## Decisions
 
-1. **Validate in private `endpoint()`, not in the worker, SDKs, or CLI.**
+1. **Validate in private `endpoint()` for every sender, and let the CLI pre-check.**
    `OpenAiProvider::new` and `AnthropicProvider::new` are the public
    constructors both the CLI and the worker call. A check there covers direct
-   Rust hosts and the worker with one implementation. The CLI keeps passing
-   the string through. The worker keeps mapping `anyhow` to
-   `configuration`. SDK facades keep forwarding that error.
+   Rust hosts and the worker with one implementation. The worker keeps
+   mapping `anyhow` to `configuration`. SDK facades keep forwarding that
+   error. The CLI may reject earlier, as pull request 11 does, and still
+   reaches this check when it calls `new`.
 
-   Alternative considered: duplicate the check in `ejm-cli` before reading the
-   API key. Rejected as the enforcement point. The key is read into the config
-   value before `new` returns, and a failed constructor must still send no
-   request. A second parser in the CLI can drift. The CLI draft may update
-   help text and its own changelog. It should keep treating a harness error as
-   authoritative.
+   `ejm-cli` pull request
+   <https://github.com/ejmlabs/ejm-cli/pull/11> adds an earlier check in
+   `api_base_url()`, before the API key is read and before the constructors.
+   That early check is part of the coordinated plan. It is not a substitute
+   for `endpoint()`. Its sentence is `provider base URL must use https, or
+   http on a loopback host (localhost, 127.0.0.0/8, or ::1). Change --base-url
+   or EJM_CLI_BASE_URL.` The spec requires the error to state that HTTPS is
+   required except for loopback. Both sentences do that. A CLI user sees the
+   CLI sentence because `api_base_url()` returns first. Direct Rust callers
+   and the worker still get the harness sentence below, mapped to protocol
+   code `configuration`. Pull request 11 does not move
+   `.github/harness-revision`. That pin stays
+   `4a751c6a3f24d7d143140f79ff53517fb93e3531` until a later adoption after
+   this behavior is on protected `main`.
+
+   Alternative considered: validate only in the CLI and leave `endpoint()`
+   unchanged. Rejected. The worker and any other Rust host would still send
+   a key over cleartext. A second parser can also drift, so the harness check
+   stays mandatory.
 
    Alternative considered: validate only in the worker. Rejected because the
    CLI links the Rust crate and never sends `base_url` through the worker.
@@ -164,10 +179,13 @@ those artifacts and for Everett's approval.
 6. **Documentation records a public behavior change.** Update the rustdoc on
    both constructors, the provider bullets in `docs/implementation-contract.md`
    and `docs/sdk.md`, the compatible-endpoint sentence in
-   `docs/ide-integration.md`, and `## [Unreleased]` in `CHANGELOG.md`. Add a
-   dated decision-record row in `docs/contributing.md`. Do not edit the dated
-   `0.1.0` section. Do not change `VERSION`, workspace package versions, or
-   the worker handshake version string (it reads `CARGO_PKG_VERSION`).
+   `docs/ide-integration.md`, and the existing `## [0.1.0] - 2026-10-19`
+   section in `CHANGELOG.md`. Add a dated decision-record row in
+   `docs/contributing.md`. Do not add an `## [Unreleased]` bullet for this
+   behavior and do not open a `0.2.0` section. Do not change `VERSION`,
+   workspace package versions, or the worker handshake version string (it
+   reads `CARGO_PKG_VERSION`). Keep the re-point sentence already in the
+   `0.1.0` section.
 
 ## Edge cases
 
@@ -185,9 +203,9 @@ as their lowercase forms. `Http://LocalHost/v1` is loopback.
 | `http://[::1]:1234/v1` | Accepted. The parser requires brackets. `http://::1/v1` is an invalid URL. |
 | `http://api.example.test/v1`, `http://api.example.test:443/v1` | Rejected. Port 443 does not make `http` safe. |
 | `http://192.168.1.1/v1`, `http://10.0.0.1/v1`, `http://0.0.0.0/v1`, `http://[::ffff:127.0.0.1]/v1` | Rejected. IPv4-mapped IPv6 is not `Ipv6Addr::is_loopback()`. |
-| `http://foo.localhost/v1`, `http://localhost.example/v1` | Rejected. The domain must be exactly `localhost`. |
-| `http://user@127.0.0.1/v1`, `https://key:secret@host/v1`, query, fragment | Rejected by the existing credential rule. The secret must not appear in the error. |
-| `file:///tmp/a`, a relative string, an empty host | Rejected by the new scheme message, or by `invalid provider base URL` when parse fails. |
+| `http://foo.localhost/v1`, `http://localhost.example/v1`, `http://localhost.evil.com/v1`, `http://localhost./v1`, `http://evil-localhost/v1`, `http://127.0.0.1.nip.io/v1` | Rejected. The domain must be exactly `localhost`. |
+| `http://user@127.0.0.1/v1`, `https://key:secret@api.example.com/v1`, query, fragment | Rejected by the existing credential rule, including when the scheme is `https`. The secret must not appear in the error. This is not the HTTPS message. |
+| `ws://api.example.test/v1`, `wss://api.example.test/v1`, `ftp://api.example.test/v1`, `file:///tmp/a`, a schemeless string, a relative string, an empty host | Rejected by the new scheme message, or by `invalid provider base URL` when parse fails. |
 | Exotic IPv4 text the parser rewrites into `127.0.0.0/8` | Accepted, because the parsed host is loopback. Text the parser leaves as a domain is rejected. |
 
 A trailing dot that survives parsing as `localhost.` is a different domain and
@@ -210,26 +228,38 @@ keep working. `https://api.openai.com/v1` and `https://api.anthropic.com/v1`
 keep working. Cleartext to a LAN address, a Docker host name, or a custom DNS
 name stops at construction.
 
-**ejm-cli.** The CLI repository depends on this crate by path and versions
-itself separately. Nothing in either repository is published yet. After this
-behavior is on the harness revision the CLI builds, `--base-url` and
-`EJM_CLI_BASE_URL` for OpenAI-compatible and Anthropic API-key access fail
-inside `new` with the stable message above. `main` already prints the `anyhow`
-chain. The CLI does not need a new error type. Its draft should update the
-`--base-url` help text and any fixture that expects cleartext to a non-loopback
-host to succeed. It should not reimplement `Url::host()`. Doctor prints the
-configured base URL and does not attach the API key. That print stays out of
-this change.
+**ejm-cli.** The CLI repository depends on this crate by path
+(`ejm-cli/Cargo.toml` lines 18-23) and versions itself separately. Nothing in
+either repository is published yet. Pull request 11 validates `--base-url` and
+`EJM_CLI_BASE_URL` in `api_base_url()` before the key is read, and doctor
+fails before it prints the URL. The CLI sentence differs from the harness
+sentence, and both meet the spec. After the CLI adopts a harness revision
+that contains `endpoint()`, a direct constructor call still fails closed if
+the CLI check is skipped. `main` already prints the `anyhow` chain. The CLI
+does not need a new error type. Its change owns help text and fixtures. This
+repository does not edit `ejm-cli`. The CLI pin `.github/harness-revision`
+stays `4a751c6a3f24d7d143140f79ff53517fb93e3531` until a later adoption.
+`ejm-ide` uses the same pin path and currently records
+`09b779ee0452dda07b7f52503be22e65fe238373`. Moving either pin waits until the
+published `0.1.0` commit exists.
 
-**Versioning.** `RELEASING.md` says that before 1.0 a minor release may break
-behavior and a patch may not. Record the break under `## [Unreleased]`. Leave
-the dated `0.1.0` notes and `VERSION` untouched in the implementation. The
-release that first ships this behavior should be a minor (`0.2.0`), not a
-`0.1.x` patch. SDK package versions track the harness version and change in
-that same release, not in the implementation patch. The CLI's own `VERSION`
-moves only in the CLI repository, after it adopts the harness revision. No
-worker protocol bump is required, because `hello.protocol` stays `1` and
-`base_url` stays a string.
+**Versioning.** The first published harness release stays `0.1.0`. Everett
+will delete the existing `v0.1.0` draft and tag, whose assets were built from
+`8d3dc39`, and recreate the tag at the protected `main` commit that contains
+the published tree. That recreation follows `RELEASING.md` and the Draft
+source release workflow. It is not part of this change. Record this behavior
+in the existing `## [0.1.0] - 2026-10-19` section. Do not put it under
+`## [Unreleased]` and do not open `0.2.0`. Do not change `VERSION` in the
+implementation. Before 1.0, `RELEASING.md` allows a minor to break behavior.
+Keeping `0.1.0` is the release decision for the first publication, because
+`0.1.0` has not been published. The `0.1.0` section already says `v0.1.0` was
+re-pointed from `8d3dc39` to the protected main commit recorded in
+provenance.json before publication. Keep that sentence when the implementation
+adds the behavior bullet. The published commit SHA cannot appear inside the
+commit that is being tagged. SDK package versions stay on the harness
+`VERSION`. The CLI's own `VERSION` moves only in the CLI repository, after it
+adopts the harness revision. No worker protocol bump is required, because
+`hello.protocol` stays `1` and `base_url` stays a string.
 
 **ejm-ide.** It already rejects the same non-loopback `http` URLs before use.
 No IDE change is required for this finding. Public Rust signatures do not
@@ -260,27 +290,46 @@ change.
 - A direct `url` dependency, if required to name `Host`, must stay on the
   locked 2.5.8 line. A second `url` crate would fail the duplicate-version
   policy.
-- Implementation on current main changes source behavior while `VERSION` still
-  reads `0.1.0`. The Unreleased changelog is the notice. Shipping it inside the
-  already dated `0.1.0` section would hide a break in notes that were prepared
-  as the first source release.
+- `VERSION` stays `0.1.0` while this behavior lands on `main`. The notice is
+  the existing `0.1.0` section, because that version has not been published.
+  The draft built from `8d3dc39` is withdrawn before publication. A later
+  `0.2.0` is not the vehicle for this break.
 
 ## Test strategy
 
 Tests stay offline. No paid model, no live provider, and no new HTTP server.
 
 In `crates/ejm-harness/src/provider.rs`, extend the existing `endpoint()` unit
-test. Cover the accepted and rejected rows above, the uppercase scheme, an
-explicit `https` port, userinfo on loopback, and a planted secret that must be
-absent from every error string. Preserve the DeepSeek suffix assertion and the
-embedded-credential assertion.
+test. Cover every row above, including the spec's exact loopback URLs
+(`http://localhost:11434/v1`, `http://LOCALHOST:8080`,
+`http://127.0.0.1:1234/v1`, `http://127.0.0.2:1234`, `http://[::1]:1234/v1`),
+the spec's lookalikes, `ws`, `wss`, `ftp`, `file`, and a schemeless string.
+`https://api.deepseek.com/v1` stays accepted, including the existing suffix
+assertion. `https://key:secret@api.example.com/v1`, plus a query and a
+fragment, still fail with `provider URL must not contain credentials, query,
+or fragment`. A planted secret must be absent from every error string.
+
+Call `OpenAiProvider::new` and `AnthropicProvider::new` with
+`http://api.example.com/v1` and a planted non-empty key, with no server
+listening. Both constructors fail, and neither error contains the key. That
+is the spec's "no connection" evidence: construction returns before
+`bearer_auth` or `x-api-key` is attached to a request.
 
 In `crates/ejm-harness-worker/src/server.rs`, extend provider configuration
-tests. `configure_provider` with `kind: openai`, a cleartext non-loopback
-`base_url`, and a planted API key returns an error whose `Display` contains the
-stable message and does not contain the key. The same helper accepts
-`http://127.0.0.1:9/v1` and `http://[::1]:9/v1` without connecting. Worker
-Anthropic and Responses cases stay on their fixed HTTPS endpoints.
+tests. `configure_provider` with `kind: openai`, `base_url`
+`http://api.example.com/v1`, and a planted API key returns an error whose
+`Display` contains the stable message and does not contain the key, and the
+worker keeps no provider from that configuration. The same helper accepts
+`http://127.0.0.1:8080/v1` without connecting. Worker Anthropic and Responses
+cases stay on their fixed HTTPS endpoints.
+
+Redirects use the shared `http_client()`, which sets `redirect::Policy::none()`
+for every scheme. Wiremock's `MockServer::uri()` is `http://127.0.0.1:<port>`,
+so an offline fixture cannot terminate TLS. Add a loopback fixture that
+returns `302` to an `http://` URL, assert exactly one request reached the
+mock, and assert the call fails without a second request. That shows the
+credential is not re-sent. The policy is the same client an accepted HTTPS
+endpoint uses.
 
 Run `cargo test -p ejm-harness --test provider_http` to show existing loopback
 wiremock fixtures still construct OpenAI, Anthropic, and Responses providers.
@@ -289,11 +338,22 @@ change. Then run `./scripts/check` with `CARGO_BUILD_JOBS=2`. SDK suites need
 no new assertion unless a fixture was sending cleartext to a non-loopback host.
 Registry tests stay untouched.
 
-## Open questions
+## Settled decisions
 
-1. Confirm `127.0.0.0/8`, chosen so the predicate matches ejm-ide
-   `Ipv4Addr::is_loopback()`, rather than only `127.0.0.1`.
-2. Confirm exact `localhost` only. `foo.localhost` stays rejected.
-3. Confirm the terse harness message rather than ejm-ide's longer sentence.
-4. Confirm the break stays under `## [Unreleased]` and ships later as minor
-   `0.2.0`, leaving the prepared `0.1.0` notes unchanged.
+1. Loopback is exact `localhost` (ASCII case-insensitive), every IPv4 address
+   in `127.0.0.0/8`, and `::1`. The spec and proposal settle this. It matches
+   ejm-ide `Ipv4Addr::is_loopback()`. The registry predicate stays narrower.
+2. `::ffff:127.0.0.1` and `0.0.0.0` are rejected. The spec lists both as
+   lookalikes. `Ipv6Addr::is_loopback()` is false for the mapped address.
+3. There is no insecure opt-out. The spec says no configuration value,
+   environment variable, or flag may disable the rule.
+4. `localhost` is trusted as a name and is not resolved. The proposal settles
+   this. A hostile resolver is outside the check.
+5. The spec requires the error to state that HTTPS is required except for
+   loopback. It does not require one shared sentence. The harness keeps
+   `provider URL must use HTTPS, or HTTP on a loopback host`. ejm-ide keeps
+   its own sentence. ejm-cli pull request 11 keeps its longer sentence.
+6. The first published release stays `0.1.0`. Everett deletes and recreates
+   the `v0.1.0` tag at the protected `main` commit. The note lives in the
+   dated `0.1.0` section. It does not go under `## [Unreleased]` and it does
+   not open `0.2.0`.

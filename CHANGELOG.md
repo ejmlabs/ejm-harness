@@ -48,3 +48,6 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
 - The SDKs require a separately built compatible `ejm-harness-worker`; they do not
   bundle or fetch prebuilt executables. Package registry publication, worker
   distribution and registry deployment each need their own release gates.
+- `v0.1.0` was re-pointed from `8d3dc39` to the protected main commit recorded in provenance.json
+  before publication. Discard archives from the withdrawn draft
+  `untagged-d41ae33f280d24c8daa7`.
