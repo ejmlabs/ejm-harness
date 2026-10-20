@@ -4,18 +4,6 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ## [Unreleased]
 
-### Changed
-
-- Provider base URLs require `https`. Plain `http` is accepted only for exact
-  `localhost`, an IPv4 address in `127.0.0.0/8`, or `::1`. `0.0.0.0`, LAN
-  addresses, and other private addresses are rejected when the provider is
-  constructed, before a connection or an API key is sent. The error does not
-  include the API key. There is no opt-out. Worker protocol 1 and the generated
-  schema are unchanged.
-- The published version for this break is not pinned as `0.2.0`. Everett is
-  holding the unpublished `v0.1.0` draft until this change and the registry
-  move land. Version assignment remains his decision.
-
 ## [0.1.0] - 2026-10-19
 
 Prepared development source for the first `0.1.0` release. These notes do not
@@ -52,8 +40,9 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
   addresses, and other private addresses are rejected when the provider is
   constructed, before a connection or an API key is sent. The error does not
   include the API key. There is no opt-out. Worker protocol 1 and the generated
-  schema are unchanged. The published version for this break is not pinned as
-  `0.2.0` and remains Everett's decision while the unpublished draft is held.
+  schema are unchanged. `VERSION` stays `0.1.0`. Everett recreates the
+  unpublished `v0.1.0` tag at the protected `main` commit after this change
+  and the registry move land.
 
 ### Verification and limits
 

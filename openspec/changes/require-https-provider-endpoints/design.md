@@ -179,12 +179,12 @@ or EJM_CLI_BASE_URL.` The spec requires the error to state that HTTPS is
 6. **Documentation records a public behavior change.** Update the rustdoc on
    both constructors, the provider bullets in `docs/implementation-contract.md`
    and `docs/sdk.md`, the compatible-endpoint sentence in
-   `docs/ide-integration.md`, `## [Unreleased]` in `CHANGELOG.md`, and the
-   existing `## [0.1.0] - 2026-10-19` section. Add a dated decision-record row
-   in `docs/contributing.md`. Do not open a `0.2.0` section and do not change
-   `VERSION`, workspace package versions, or the worker handshake version
-   string (it reads `CARGO_PKG_VERSION`). Keep the re-point sentence already
-   in the `0.1.0` section. Version assignment stays pending with Everett.
+   `docs/ide-integration.md`, and the existing `## [0.1.0] - 2026-10-19`
+   section in `CHANGELOG.md`. Leave `## [Unreleased]` empty for this behavior.
+   Add a dated decision-record row in `docs/contributing.md`. Do not open a
+   `0.2.0` section and do not change `VERSION`, workspace package versions, or
+   the worker handshake version string (it reads `CARGO_PKG_VERSION`). Keep
+   the re-point sentence already in the `0.1.0` section.
 
 ## Edge cases
 
@@ -242,13 +242,13 @@ stays `4a751c6a3f24d7d143140f79ff53517fb93e3531` until a later adoption.
 `09b779ee0452dda07b7f52503be22e65fe238373`. Moving either pin waits until the
 published `0.1.0` commit exists.
 
-**Versioning.** Do not pin this break as `0.2.0`, and do not change `VERSION`.
-Everett is holding the unpublished `v0.1.0` draft until this change and the
-registry move land. Which published version carries the break is his decision.
-Record the behavior under `## [Unreleased]` and in the dated `## [0.1.0]`
-notes, which are the unpublished release notes. Keep the sentence that
-`v0.1.0` was re-pointed from `8d3dc39` to the protected main commit recorded
-in provenance.json before publication. The published commit SHA cannot appear
+**Versioning.** `VERSION` stays `0.1.0`. Everett deletes and recreates the
+unpublished `v0.1.0` tag at the protected `main` commit after this pull
+request and the registry pull request merge. Record the HTTPS break only in
+the dated `## [0.1.0] - 2026-10-19` section. Do not leave a copy under
+`## [Unreleased]`, and do not open `0.2.0`. Keep the sentence that `v0.1.0`
+was re-pointed from `8d3dc39` to the protected main commit recorded in
+provenance.json before publication. The published commit SHA cannot appear
 inside the commit that is being tagged. SDK package versions stay on the
 harness `VERSION`. The CLI's own `VERSION` moves only in the CLI repository,
 after it adopts the harness revision. No worker protocol bump is required,
@@ -284,9 +284,9 @@ change.
 - A direct `url` dependency, if required to name `Host`, must stay on the
   locked 2.5.8 line. A second `url` crate would fail the duplicate-version
   policy.
-- `VERSION` stays `0.1.0` while this behavior lands on `main`. The notice is
-  in `## [Unreleased]` and the unpublished `0.1.0` section. The published
-  version is pending Everett's decision. It is not pinned as `0.2.0`.
+- `VERSION` stays `0.1.0`. The notice is only in the dated `0.1.0` section.
+  Everett recreates that unpublished tag after this change and the registry
+  move are on protected `main`.
 
 ## Test strategy
 
@@ -346,7 +346,7 @@ Registry tests stay untouched.
    loopback. It does not require one shared sentence. The harness keeps
    `provider URL must use HTTPS, or HTTP on a loopback host`. ejm-ide keeps
    its own sentence. ejm-cli pull request 11 keeps its longer sentence.
-6. The break is not pinned as `0.2.0`. Everett is holding the unpublished
-   `v0.1.0` draft until this change and the registry move land. The notes
-   live under `## [Unreleased]` and the dated `0.1.0` section. The published
-   version remains his decision.
+6. `VERSION` stays `0.1.0`. The HTTPS break is recorded only in the dated
+   `0.1.0` section. Everett deletes and recreates the unpublished `v0.1.0`
+   tag at the protected `main` commit after this change and the registry move
+   land. There is no `0.2.0` section and no Unreleased copy.
