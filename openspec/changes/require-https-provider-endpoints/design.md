@@ -91,28 +91,28 @@ registry.
    error. The CLI may reject earlier, as pull request 11 does, and still
    reaches this check when it calls `new`.
 
-   `ejm-cli` pull request
-   <https://github.com/ejmlabs/ejm-cli/pull/11> adds an earlier check in
-   `api_base_url()`, before the API key is read and before the constructors.
-   That early check is part of the coordinated plan. It is not a substitute
-   for `endpoint()`. Its sentence is `provider base URL must use https, or
-   http on a loopback host (localhost, 127.0.0.0/8, or ::1). Change --base-url
-   or EJM_CLI_BASE_URL.` The spec requires the error to state that HTTPS is
-   required except for loopback. Both sentences do that. A CLI user sees the
-   CLI sentence because `api_base_url()` returns first. Direct Rust callers
-   and the worker still get the harness sentence below, mapped to protocol
-   code `configuration`. Pull request 11 does not move
-   `.github/harness-revision`. That pin stays
-   `4a751c6a3f24d7d143140f79ff53517fb93e3531` until a later adoption after
-   this behavior is on protected `main`.
+    `ejm-cli` pull request
+    <https://github.com/ejmlabs/ejm-cli/pull/11> adds an earlier check in
+    `api_base_url()`, before the API key is read and before the constructors.
+    That early check is part of the coordinated plan. It is not a substitute
+    for `endpoint()`. Its sentence is `provider base URL must use https, or
+http on a loopback host (localhost, 127.0.0.0/8, or ::1). Change --base-url
+or EJM_CLI_BASE_URL.` The spec requires the error to state that HTTPS is
+    required except for loopback. Both sentences do that. A CLI user sees the
+    CLI sentence because `api_base_url()` returns first. Direct Rust callers
+    and the worker still get the harness sentence below, mapped to protocol
+    code `configuration`. Pull request 11 does not move
+    `.github/harness-revision`. That pin stays
+    `4a751c6a3f24d7d143140f79ff53517fb93e3531` until a later adoption after
+    this behavior is on protected `main`.
 
-   Alternative considered: validate only in the CLI and leave `endpoint()`
-   unchanged. Rejected. The worker and any other Rust host would still send
-   a key over cleartext. A second parser can also drift, so the harness check
-   stays mandatory.
+    Alternative considered: validate only in the CLI and leave `endpoint()`
+    unchanged. Rejected. The worker and any other Rust host would still send
+    a key over cleartext. A second parser can also drift, so the harness check
+    stays mandatory.
 
-   Alternative considered: validate only in the worker. Rejected because the
-   CLI links the Rust crate and never sends `base_url` through the worker.
+    Alternative considered: validate only in the worker. Rejected because the
+    CLI links the Rust crate and never sends `base_url` through the worker.
 
 2. **Keep `anyhow::Result` and one stable message.** Do not add a public error
    enum. Parse failure stays `invalid provider base URL`, using
@@ -121,47 +121,47 @@ registry.
    `provider URL must not contain credentials, query, or fragment`, including
    on loopback. Every other scheme or host failure uses:
 
-   `provider URL must use HTTPS, or HTTP on a loopback host`
+    `provider URL must use HTTPS, or HTTP on a loopback host`
 
-   Check credentials before the scheme so `http://key:secret@host` still hits
-   the credential message. Neither message includes the URL or the API key.
-   Replace `provider URL must use HTTP or HTTPS`. That sentence would describe
-   cleartext to a remote host as valid.
+    Check credentials before the scheme so `http://key:secret@host` still hits
+    the credential message. Neither message includes the URL or the API key.
+    Replace `provider URL must use HTTP or HTTPS`. That sentence would describe
+    cleartext to a remote host as valid.
 
-   Alternative considered: copy ejm-ide's sentence verbatim. Rejected so this
-   crate keeps its existing short error style. The IDE keeps its own string.
-   Hosts can match on the harness sentence above.
+    Alternative considered: copy ejm-ide's sentence verbatim. Rejected so this
+    crate keeps its existing short error style. The IDE keeps its own string.
+    Hosts can match on the harness sentence above.
 
-   Alternative considered: a typed error variant for the worker. Rejected
-   because protocol code `configuration` already identifies constructor
-   failure, and a new code would be a schema change for no extra safety.
+    Alternative considered: a typed error variant for the worker. Rejected
+    because protocol code `configuration` already identifies constructor
+    failure, and a new code would be a schema change for no extra safety.
 
 3. **Loopback matches ejm-ide's parsed host, which is wider than the three
    names in the audit summary.** After `reqwest::Url::parse` (the `url` crate
    already locked at 2.5.8):
 
-   - `https` is allowed for any host that passes the existing checks.
-   - `http` is allowed only when `Url::host()` is a domain equal to
-     `localhost` with `eq_ignore_ascii_case`, an `Ipv4Addr` for which
-     `is_loopback()` is true (`127.0.0.0/8`), or an `Ipv6Addr` for which
-     `is_loopback()` is true (`::1`).
-   - Any other scheme, or `http` with any other host, fails.
+    - `https` is allowed for any host that passes the existing checks.
+    - `http` is allowed only when `Url::host()` is a domain equal to
+      `localhost` with `eq_ignore_ascii_case`, an `Ipv4Addr` for which
+      `is_loopback()` is true (`127.0.0.0/8`), or an `Ipv6Addr` for which
+      `is_loopback()` is true (`::1`).
+    - Any other scheme, or `http` with any other host, fails.
 
-   Name `url::Host` for that match. Add a direct `url = "2.5.8"` dependency
-   only if naming `Host` requires it. That crate is already in the lock
-   through `reqwest` 0.13.5. Do not take a second `url` version. Do not
-   hand-roll bracket stripping or IPv4 parsing.
+    Name `url::Host` for that match. Add a direct `url = "2.5.8"` dependency
+    only if naming `Host` requires it. That crate is already in the lock
+    through `reqwest` 0.13.5. Do not take a second `url` version. Do not
+    hand-roll bracket stripping or IPv4 parsing.
 
-   `127.0.0.0/8` is intentional. `127.0.0.1` alone would reject a local
-   listener on `127.0.0.2` and would disagree with ejm-ide. Exact `localhost`
-   is intentional. `foo.localhost` and `localhost.example` are domains, so
-   they fail.
+    `127.0.0.0/8` is intentional. `127.0.0.1` alone would reject a local
+    listener on `127.0.0.2` and would disagree with ejm-ide. Exact `localhost`
+    is intentional. `foo.localhost` and `localhost.example` are domains, so
+    they fail.
 
-   Alternative considered: string-match only `127.0.0.1`, `::1`, and
-   `localhost`, as the audit's parenthetical list and as registry
-   `parse_origin` does. Rejected for provider URLs. The parsed `Host` is the
-   address reqwest will use, and it closes numeric forms the URL parser
-   normalizes into `127.0.0.0/8`. Leave the registry predicate unchanged.
+    Alternative considered: string-match only `127.0.0.1`, `::1`, and
+    `localhost`, as the audit's parenthetical list and as registry
+    `parse_origin` does. Rejected for provider URLs. The parsed `Host` is the
+    address reqwest will use, and it closes numeric forms the URL parser
+    normalizes into `127.0.0.0/8`. Leave the registry predicate unchanged.
 
 4. **Do not loosen `ResponsesProvider::for_endpoint`.** It remains an HTTP
    IP-loopback fixture gate. Routing it through `endpoint()` would accept
@@ -179,13 +179,12 @@ registry.
 6. **Documentation records a public behavior change.** Update the rustdoc on
    both constructors, the provider bullets in `docs/implementation-contract.md`
    and `docs/sdk.md`, the compatible-endpoint sentence in
-   `docs/ide-integration.md`, and the existing `## [0.1.0] - 2026-10-19`
-   section in `CHANGELOG.md`. Add a dated decision-record row in
-   `docs/contributing.md`. Do not add an `## [Unreleased]` bullet for this
-   behavior and do not open a `0.2.0` section. Do not change `VERSION`,
-   workspace package versions, or the worker handshake version string (it
-   reads `CARGO_PKG_VERSION`). Keep the re-point sentence already in the
-   `0.1.0` section.
+   `docs/ide-integration.md`, `## [Unreleased]` in `CHANGELOG.md`, and the
+   existing `## [0.1.0] - 2026-10-19` section. Add a dated decision-record row
+   in `docs/contributing.md`. Do not open a `0.2.0` section and do not change
+   `VERSION`, workspace package versions, or the worker handshake version
+   string (it reads `CARGO_PKG_VERSION`). Keep the re-point sentence already
+   in the `0.1.0` section. Version assignment stays pending with Everett.
 
 ## Edge cases
 
@@ -194,19 +193,19 @@ Decide from the parsed URL, then run the existing suffix join unchanged.
 `HTTPS://api.example.test/v1` and `HTTP://127.0.0.1/v1` follow the same rules
 as their lowercase forms. `Http://LocalHost/v1` is loopback.
 
-| Input | Result |
-| --- | --- |
-| `https://api.deepseek.com` and `https://api.deepseek.com/chat/completions` | Accepted. Suffix join stays as it is today. |
-| `https://api.example.test:8443/v1` | Accepted. A non-443 port does not matter. |
-| `https://127.0.0.1/v1` and `https://localhost/v1` | Accepted. |
-| `http://127.0.0.1:11434/v1`, `http://127.0.0.2/v1`, `http://localhost/v1`, `http://LOCALHOST:9/v1` | Accepted. |
-| `http://[::1]:1234/v1` | Accepted. The parser requires brackets. `http://::1/v1` is an invalid URL. |
-| `http://api.example.test/v1`, `http://api.example.test:443/v1` | Rejected. Port 443 does not make `http` safe. |
-| `http://192.168.1.1/v1`, `http://10.0.0.1/v1`, `http://0.0.0.0/v1`, `http://[::ffff:127.0.0.1]/v1` | Rejected. IPv4-mapped IPv6 is not `Ipv6Addr::is_loopback()`. |
-| `http://foo.localhost/v1`, `http://localhost.example/v1`, `http://localhost.evil.com/v1`, `http://localhost./v1`, `http://evil-localhost/v1`, `http://127.0.0.1.nip.io/v1` | Rejected. The domain must be exactly `localhost`. |
-| `http://user@127.0.0.1/v1`, `https://key:secret@api.example.com/v1`, query, fragment | Rejected by the existing credential rule, including when the scheme is `https`. The secret must not appear in the error. This is not the HTTPS message. |
-| `ws://api.example.test/v1`, `wss://api.example.test/v1`, `ftp://api.example.test/v1`, `file:///tmp/a`, a schemeless string, a relative string, an empty host | Rejected by the new scheme message, or by `invalid provider base URL` when parse fails. |
-| Exotic IPv4 text the parser rewrites into `127.0.0.0/8` | Accepted, because the parsed host is loopback. Text the parser leaves as a domain is rejected. |
+| Input                                                                                                                                                                      | Result                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `https://api.deepseek.com` and `https://api.deepseek.com/chat/completions`                                                                                                 | Accepted. Suffix join stays as it is today.                                                                                                             |
+| `https://api.example.test:8443/v1`                                                                                                                                         | Accepted. A non-443 port does not matter.                                                                                                               |
+| `https://127.0.0.1/v1` and `https://localhost/v1`                                                                                                                          | Accepted.                                                                                                                                               |
+| `http://127.0.0.1:11434/v1`, `http://127.0.0.2/v1`, `http://localhost/v1`, `http://LOCALHOST:9/v1`                                                                         | Accepted.                                                                                                                                               |
+| `http://[::1]:1234/v1`                                                                                                                                                     | Accepted. The parser requires brackets. `http://::1/v1` is an invalid URL.                                                                              |
+| `http://api.example.test/v1`, `http://api.example.test:443/v1`                                                                                                             | Rejected. Port 443 does not make `http` safe.                                                                                                           |
+| `http://192.168.1.1/v1`, `http://10.1.2.3/v1`, `http://172.16.5.5/v1`, `http://0.0.0.0/v1`, `http://[::ffff:127.0.0.1]/v1`                                                 | Rejected. Private, LAN, unspecified, and IPv4-mapped addresses are not loopback. `Ipv6Addr::is_loopback()` is false for the mapped address.             |
+| `http://foo.localhost/v1`, `http://localhost.example/v1`, `http://localhost.evil.com/v1`, `http://localhost./v1`, `http://evil-localhost/v1`, `http://127.0.0.1.nip.io/v1` | Rejected. The domain must be exactly `localhost`.                                                                                                       |
+| `http://user@127.0.0.1/v1`, `https://key:secret@api.example.com/v1`, query, fragment                                                                                       | Rejected by the existing credential rule, including when the scheme is `https`. The secret must not appear in the error. This is not the HTTPS message. |
+| `ws://api.example.test/v1`, `wss://api.example.test/v1`, `ftp://api.example.test/v1`, `file:///tmp/a`, a schemeless string, a relative string, an empty host               | Rejected by the new scheme message, or by `invalid provider base URL` when parse fails.                                                                 |
+| Exotic IPv4 text the parser rewrites into `127.0.0.0/8`                                                                                                                    | Accepted, because the parsed host is loopback. Text the parser leaves as a domain is rejected.                                                          |
 
 A trailing dot that survives parsing as `localhost.` is a different domain and
 is rejected. Do not special-case it.
@@ -243,23 +242,18 @@ stays `4a751c6a3f24d7d143140f79ff53517fb93e3531` until a later adoption.
 `09b779ee0452dda07b7f52503be22e65fe238373`. Moving either pin waits until the
 published `0.1.0` commit exists.
 
-**Versioning.** The first published harness release stays `0.1.0`. Everett
-will delete the existing `v0.1.0` draft and tag, whose assets were built from
-`8d3dc39`, and recreate the tag at the protected `main` commit that contains
-the published tree. That recreation follows `RELEASING.md` and the Draft
-source release workflow. It is not part of this change. Record this behavior
-in the existing `## [0.1.0] - 2026-10-19` section. Do not put it under
-`## [Unreleased]` and do not open `0.2.0`. Do not change `VERSION` in the
-implementation. Before 1.0, `RELEASING.md` allows a minor to break behavior.
-Keeping `0.1.0` is the release decision for the first publication, because
-`0.1.0` has not been published. The `0.1.0` section already says `v0.1.0` was
-re-pointed from `8d3dc39` to the protected main commit recorded in
-provenance.json before publication. Keep that sentence when the implementation
-adds the behavior bullet. The published commit SHA cannot appear inside the
-commit that is being tagged. SDK package versions stay on the harness
-`VERSION`. The CLI's own `VERSION` moves only in the CLI repository, after it
-adopts the harness revision. No worker protocol bump is required, because
-`hello.protocol` stays `1` and `base_url` stays a string.
+**Versioning.** Do not pin this break as `0.2.0`, and do not change `VERSION`.
+Everett is holding the unpublished `v0.1.0` draft until this change and the
+registry move land. Which published version carries the break is his decision.
+Record the behavior under `## [Unreleased]` and in the dated `## [0.1.0]`
+notes, which are the unpublished release notes. Keep the sentence that
+`v0.1.0` was re-pointed from `8d3dc39` to the protected main commit recorded
+in provenance.json before publication. The published commit SHA cannot appear
+inside the commit that is being tagged. SDK package versions stay on the
+harness `VERSION`. The CLI's own `VERSION` moves only in the CLI repository,
+after it adopts the harness revision. No worker protocol bump is required,
+because `hello.protocol` stays `1` and `base_url` stays a string. Recreating
+the tag follows `RELEASING.md` and is not part of this change.
 
 **ejm-ide.** It already rejects the same non-loopback `http` URLs before use.
 No IDE change is required for this finding. Public Rust signatures do not
@@ -291,9 +285,8 @@ change.
   locked 2.5.8 line. A second `url` crate would fail the duplicate-version
   policy.
 - `VERSION` stays `0.1.0` while this behavior lands on `main`. The notice is
-  the existing `0.1.0` section, because that version has not been published.
-  The draft built from `8d3dc39` is withdrawn before publication. A later
-  `0.2.0` is not the vehicle for this break.
+  in `## [Unreleased]` and the unpublished `0.1.0` section. The published
+  version is pending Everett's decision. It is not pinned as `0.2.0`.
 
 ## Test strategy
 
@@ -353,7 +346,7 @@ Registry tests stay untouched.
    loopback. It does not require one shared sentence. The harness keeps
    `provider URL must use HTTPS, or HTTP on a loopback host`. ejm-ide keeps
    its own sentence. ejm-cli pull request 11 keeps its longer sentence.
-6. The first published release stays `0.1.0`. Everett deletes and recreates
-   the `v0.1.0` tag at the protected `main` commit. The note lives in the
-   dated `0.1.0` section. It does not go under `## [Unreleased]` and it does
-   not open `0.2.0`.
+6. The break is not pinned as `0.2.0`. Everett is holding the unpublished
+   `v0.1.0` draft until this change and the registry move land. The notes
+   live under `## [Unreleased]` and the dated `0.1.0` section. The published
+   version remains his decision.

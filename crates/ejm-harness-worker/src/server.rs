@@ -1041,6 +1041,46 @@ mod tests {
     }
 
     #[test]
+    fn openai_worker_rejects_cleartext_remote_and_accepts_loopback() -> Result<()> {
+        const PLANTED: &str = "planted-worker-key-9f3c";
+        let rejected = configure_provider(serde_json::from_value(json!({
+            "kind": "openai",
+            "base_url": "http://api.example.com/v1",
+            "api_key": PLANTED,
+            "model": "fixture-model",
+        }))?);
+        let error = rejected
+            .err()
+            .context("cleartext remote worker provider was retained")?;
+        assert!(
+            error
+                .to_string()
+                .contains("provider URL must use HTTPS, or HTTP on a loopback host")
+        );
+        assert!(!format!("{error:#}").contains(PLANTED));
+
+        let accepted = configure_provider(serde_json::from_value(json!({
+            "kind": "openai",
+            "base_url": "http://127.0.0.1:8080/v1",
+            "api_key": PLANTED,
+            "model": "fixture-model",
+        }))?)?;
+        drop(accepted);
+
+        configure_provider(serde_json::from_value(json!({
+            "kind": "anthropic",
+            "api_key": "fixture-key",
+            "model": "fixture-model",
+        }))?)?;
+        configure_provider(serde_json::from_value(json!({
+            "kind": "responses",
+            "api_key": "fixture-key",
+            "model": "fixture-model",
+        }))?)?;
+        Ok(())
+    }
+
+    #[test]
     fn provider_configuration_debug_redacts_api_keys() -> Result<()> {
         for kind in ["openai", "responses", "anthropic"] {
             let provider = json!({

@@ -32,7 +32,9 @@ Surface a provider rejection rather than silently changing either choice.
 attach per-call capture while sharing the client and credential source.
 
 Use native Responses for OpenAI profiles. Other vendors using a compatible
-endpoint can use `OpenAiProvider`, which implements Chat Completions.
+endpoint can use `OpenAiProvider`, which implements Chat Completions. That
+base URL must use `https`, or `http` on exact `localhost`, `127.0.0.0/8`, or
+`::1`. `0.0.0.0` and LAN or private addresses are rejected at construction.
 `AnthropicProvider` uses native API keys. Subscription sign-in belongs to
 unmodified Claude Code and is not a credential source for that HTTP provider.
 Use `ClaudeCodeClient` for its account controls and `ClaudeCodeProvider` with an

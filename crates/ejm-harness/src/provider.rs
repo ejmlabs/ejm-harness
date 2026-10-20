@@ -112,12 +112,17 @@ pub struct OpenAiProvider {
 }
 
 impl OpenAiProvider {
-    /// Create a streaming Chat Completions adapter for an HTTP-compatible endpoint.
+    /// Create a streaming Chat Completions adapter for an HTTPS-compatible endpoint.
+    ///
+    /// The base URL must use `https`, or `http` on a loopback host: exact
+    /// `localhost`, an IPv4 address in `127.0.0.0/8`, or `::1`. There is no
+    /// insecure override.
     ///
     /// # Errors
     ///
     /// Returns an error when the model or base URL is invalid, or the HTTP client
-    /// cannot be initialized. Construction does not contact the provider.
+    /// cannot be initialized. Construction does not contact the provider and does
+    /// not place the API key on a request.
     pub fn new(config: OpenAiConfig) -> Result<Self> {
         ensure!(!config.model.trim().is_empty(), "model is required");
         let endpoint = endpoint(&config.base_url, "/chat/completions")?;
@@ -271,10 +276,15 @@ pub struct AnthropicProvider {
 impl AnthropicProvider {
     /// Create a streaming Anthropic Messages adapter.
     ///
+    /// The base URL must use `https`, or `http` on a loopback host: exact
+    /// `localhost`, an IPv4 address in `127.0.0.0/8`, or `::1`. There is no
+    /// insecure override.
+    ///
     /// # Errors
     ///
     /// Returns an error when the model or base URL is invalid, or the HTTP client
-    /// cannot be initialized. Construction does not contact the provider.
+    /// cannot be initialized. Construction does not contact the provider and does
+    /// not place the API key on a request.
     pub fn new(config: AnthropicConfig) -> Result<Self> {
         ensure!(!config.model.trim().is_empty(), "model is required");
         let endpoint = endpoint(&config.base_url, "/messages")?;
@@ -436,21 +446,30 @@ fn http_client() -> Result<reqwest::Client> {
 fn endpoint(base: &str, suffix: &str) -> Result<String> {
     let url = reqwest::Url::parse(base).context("invalid provider base URL")?;
     ensure!(
-        matches!(url.scheme(), "http" | "https") && url.host_str().is_some(),
-        "provider URL must use HTTP or HTTPS"
-    );
-    ensure!(
         url.username().is_empty()
             && url.password().is_none()
             && url.query().is_none()
             && url.fragment().is_none(),
         "provider URL must not contain credentials, query, or fragment"
     );
+    ensure!(
+        url.scheme() == "https" || (url.scheme() == "http" && http_host_is_loopback(&url)),
+        "provider URL must use HTTPS, or HTTP on a loopback host"
+    );
     Ok(if base.trim_end_matches('/').ends_with(suffix) {
         base.trim_end_matches('/').into()
     } else {
         format!("{}{suffix}", base.trim_end_matches('/'))
     })
+}
+
+fn http_host_is_loopback(url: &reqwest::Url) -> bool {
+    match url.host() {
+        Some(url::Host::Domain(domain)) => domain.eq_ignore_ascii_case("localhost"),
+        Some(url::Host::Ipv4(address)) => address.is_loopback(),
+        Some(url::Host::Ipv6(address)) => address.is_loopback(),
+        None => false,
+    }
 }
 
 #[derive(Default)]
@@ -692,11 +711,178 @@ mod tests {
 
     #[test]
     fn endpoints_never_accept_embedded_credentials() -> Result<()> {
-        assert!(endpoint("https://key:secret@host/v1", "/messages").is_err());
+        let error = endpoint("https://key:secret@host/v1", "/messages")
+            .err()
+            .context("embedded credentials were accepted")?;
+        assert_eq!(
+            error.to_string(),
+            "provider URL must not contain credentials, query, or fragment"
+        );
         assert_eq!(
             endpoint("https://api.deepseek.com", "/chat/completions")?,
             "https://api.deepseek.com/chat/completions"
         );
+        assert_eq!(
+            endpoint("https://api.deepseek.com/v1", "/chat/completions")?,
+            "https://api.deepseek.com/v1/chat/completions"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn provider_endpoints_accept_https_and_loopback_http() -> Result<()> {
+        let accepted = [
+            (
+                "https://api.deepseek.com/v1",
+                "/chat/completions",
+                "https://api.deepseek.com/v1/chat/completions",
+            ),
+            (
+                "https://api.example.test:8443/v1",
+                "/messages",
+                "https://api.example.test:8443/v1/messages",
+            ),
+            (
+                "HTTPS://api.example.test/v1",
+                "/messages",
+                "HTTPS://api.example.test/v1/messages",
+            ),
+            (
+                "https://127.0.0.1/v1",
+                "/messages",
+                "https://127.0.0.1/v1/messages",
+            ),
+            (
+                "https://localhost/v1",
+                "/messages",
+                "https://localhost/v1/messages",
+            ),
+            (
+                "http://localhost:11434/v1",
+                "/chat/completions",
+                "http://localhost:11434/v1/chat/completions",
+            ),
+            (
+                "http://LOCALHOST:8080",
+                "/messages",
+                "http://LOCALHOST:8080/messages",
+            ),
+            (
+                "http://127.0.0.1:1234/v1",
+                "/messages",
+                "http://127.0.0.1:1234/v1/messages",
+            ),
+            (
+                "http://127.0.0.2:1234",
+                "/messages",
+                "http://127.0.0.2:1234/messages",
+            ),
+            (
+                "http://[::1]:1234/v1",
+                "/messages",
+                "http://[::1]:1234/v1/messages",
+            ),
+            (
+                "HTTP://127.0.0.1/v1",
+                "/chat/completions",
+                "HTTP://127.0.0.1/v1/chat/completions",
+            ),
+            (
+                "http://2130706433/v1",
+                "/messages",
+                "http://2130706433/v1/messages",
+            ),
+        ];
+        for (base, suffix, expected) in accepted {
+            assert_eq!(endpoint(base, suffix)?, expected, "{base}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn provider_endpoints_reject_remote_private_and_other_schemes() -> Result<()> {
+        const HTTPS: &str = "provider URL must use HTTPS, or HTTP on a loopback host";
+        let remote_http = [
+            "http://api.example.com/v1",
+            "http://api.example.test:443/v1",
+            "http://localhost.evil.com/v1",
+            "http://127.0.0.1.nip.io/v1",
+            "http://localhost./v1",
+            "http://evil-localhost/v1",
+            "http://foo.localhost/v1",
+            "http://0.0.0.0:8080",
+            "http://[::ffff:127.0.0.1]:8080",
+            "http://10.1.2.3/v1",
+            "http://172.16.5.5/v1",
+            "http://192.168.1.10:11434",
+            "http://[fd00::1]/v1",
+            "ws://api.example.com/v1",
+            "wss://api.example.com/v1",
+            "ftp://api.example.com/v1",
+            "file:///tmp/a",
+        ];
+        for base in remote_http {
+            let error = endpoint(base, "/messages")
+                .err()
+                .with_context(|| format!("{base} was accepted"))?;
+            assert_eq!(error.to_string(), HTTPS, "{base}");
+        }
+        let unparsed = endpoint("api.example.com/v1", "/messages")
+            .err()
+            .context("schemeless URL was accepted")?;
+        assert_eq!(unparsed.to_string(), "invalid provider base URL");
+        assert!(!format!("{unparsed:#}").contains("api.example.com"));
+        Ok(())
+    }
+
+    #[test]
+    fn provider_endpoints_keep_rejecting_credentials_query_and_fragment() -> Result<()> {
+        const HTTPS: &str = "provider URL must use HTTPS, or HTTP on a loopback host";
+        const CREDENTIALS: &str = "provider URL must not contain credentials, query, or fragment";
+        const PLANTED: &str = "planted-provider-secret";
+        let credential_urls = [
+            "https://key:secret@api.example.com/v1",
+            &format!("http://user:{PLANTED}@127.0.0.1/v1"),
+            "https://api.example.com/v1?token=1",
+            "https://api.example.com/v1#fragment",
+        ];
+        for base in credential_urls {
+            let error = endpoint(base, "/messages")
+                .err()
+                .with_context(|| format!("{base} was accepted"))?;
+            assert_eq!(error.to_string(), CREDENTIALS, "{base}");
+            assert!(!format!("{error:#}").contains(PLANTED), "{base}");
+            assert!(!error.to_string().contains(HTTPS), "{base}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn cleartext_remote_constructors_send_no_credential() -> Result<()> {
+        const PLANTED: &str = "planted-provider-secret";
+        for result in [
+            OpenAiProvider::new(OpenAiConfig {
+                base_url: "http://api.example.com/v1".into(),
+                api_key: PLANTED.into(),
+                model: "fixture-model".into(),
+            })
+            .map(|_| ()),
+            AnthropicProvider::new(AnthropicConfig {
+                base_url: "http://api.example.com/v1".into(),
+                api_key: PLANTED.into(),
+                model: "fixture-model".into(),
+            })
+            .map(|_| ()),
+        ] {
+            let error = result
+                .err()
+                .context("cleartext remote provider was created")?;
+            assert_eq!(
+                error.to_string(),
+                "provider URL must use HTTPS, or HTTP on a loopback host"
+            );
+            assert!(!format!("{error:#}").contains(PLANTED));
+        }
         Ok(())
     }
 }

@@ -584,3 +584,55 @@ async fn anthropic_rejects_oversized_tool_identity() -> Result<()> {
     fixture.request().await?;
     Ok(())
 }
+
+#[tokio::test]
+async fn provider_does_not_follow_a_redirect_to_plaintext() -> Result<()> {
+    let origin = MockServer::start().await;
+    let redirected = MockServer::start().await;
+    Mock::given(any())
+        .respond_with(
+            ResponseTemplate::new(302)
+                .insert_header("location", format!("{}/stolen", redirected.uri())),
+        )
+        .expect(1)
+        .mount(&origin)
+        .await;
+    Mock::given(any())
+        .respond_with(ResponseTemplate::new(200).set_body_string("should-not-run"))
+        .expect(0)
+        .mount(&redirected)
+        .await;
+
+    let provider = openai(&format!("{}/v1", origin.uri()))?;
+    let error = collect(&provider)
+        .await
+        .err()
+        .context("redirected provider request succeeded")?;
+    assert!(!format!("{error:#}").contains("fixture-key"));
+
+    let origin_requests = origin
+        .received_requests()
+        .await
+        .context("origin recording disabled")?;
+    let redirected_requests = redirected
+        .received_requests()
+        .await
+        .context("redirect recording disabled")?;
+    ensure!(
+        origin_requests.len() == 1,
+        "origin saw {}",
+        origin_requests.len()
+    );
+    ensure!(
+        redirected_requests.is_empty(),
+        "credential was re-sent to the redirect target"
+    );
+    let authorization = origin_requests[0]
+        .headers
+        .get("authorization")
+        .context("missing authorization")?
+        .to_str()
+        .context("authorization was not text")?;
+    assert!(authorization.contains("fixture-key"));
+    Ok(())
+}
