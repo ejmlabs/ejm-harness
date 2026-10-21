@@ -22,6 +22,7 @@ tokio-util.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
 tempfile.workspace = true
-ejm-harness.workspace = true
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+ejm-harness = { workspace = true, features = ["test-support"] }
 ejm-harness-exec.workspace = true
 

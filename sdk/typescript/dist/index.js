@@ -7,6 +7,8 @@ const MAX_NORMAL_PENDING = MAX_PENDING - MAX_CONTROL_PENDING;
 const MAX_QUEUED = 256;
 const MAX_OUTPUT = 4 * MAX_FRAME;
 const CLEANUP_TIMEOUT_MS = 5_000;
+const MAX_SESSION_HINTS = 1000;
+const MAX_SESSION_WAITS = 4096;
 export class HarnessError extends Error {
     code;
     constructor(code, message) {
@@ -58,6 +60,7 @@ export class Harness {
     exited;
     chunks = [];
     inputBytes = 0;
+    capabilities = new Set();
     constructor(options) {
         this.tools = new Map((options.tools ?? []).map((tool) => [tool.definition.name, tool]));
         if (this.tools.size !== (options.tools ?? []).length || this.tools.size > MAX_PENDING) {
@@ -66,7 +69,9 @@ export class Harness {
         this.requestTimeoutMs = options.requestTimeoutMs ?? 30_000;
         if (!Number.isFinite(this.requestTimeoutMs) || this.requestTimeoutMs <= 0)
             throw new HarnessError("configuration", "requestTimeoutMs must be positive");
-        this.process = spawn(options.workerPath ?? process.env["EJM_HARNESS_WORKER_PATH"] ?? "ejm-harness-worker", [], { stdio: ["pipe", "pipe", "pipe"] });
+        this.process = spawn(options.workerPath ??
+            process.env["EJM_HARNESS_WORKER_PATH"] ??
+            (process.platform === "win32" ? "ejm-harness-worker.exe" : "ejm-harness-worker"), [], { stdio: ["pipe", "pipe", "pipe"] });
         this.exited = new Promise((resolve) => {
             this.process.once("error", (error) => {
                 this.fail(error);
@@ -100,6 +105,11 @@ export class Harness {
             const hello = await harness.request("hello", { protocol: 1 });
             if (hello.protocol !== 1)
                 throw new HarnessError("protocol", "worker protocol 1 is required");
+            harness.capabilities = new Set(Array.isArray(hello.capabilities) ? hello.capabilities : []);
+            if (options.capacity != null)
+                harness.requireCapability("capacity");
+            if (options.provider_capacity != null)
+                harness.requireCapability("provider_capacity");
             if (((options.packages?.length ?? 0) > 0 || options.provider?.kind === "package") &&
                 (!Array.isArray(hello.capabilities) || !hello.capabilities.includes("packages"))) {
                 throw new HarnessError("protocol", "update ejm-harness-worker to a version that supports packages");
@@ -129,11 +139,42 @@ export class Harness {
     async listSessions() {
         return (await this.request("session.list", {})).map((info) => new Session(this, info));
     }
+    /** Read a bounded page. Keep its opaque cursor with the same query. */
+    async sessionsPage(query = {}) {
+        this.requireCapability("session_views");
+        return this.request("session.page", query);
+    }
+    async resolveSession(prefix) {
+        this.requireCapability("session_views");
+        return new Session(this, await this.request("session.resolve", { prefix }));
+    }
+    async sessionView(sessionId, bounds = {}) {
+        this.requireCapability("session_views");
+        return this.request("session.view", { session_id: sessionId, bounds });
+    }
+    async eventsPage(sessionId, options) {
+        this.requireCapability("session_views");
+        return this.request("events.page", { ...options, session_id: sessionId });
+    }
+    /** Null means this worker uses the legacy process-local fixed composition. */
+    async capacityStatus() {
+        this.requireCapability("capacity");
+        return this.request("capacity.status", {});
+    }
+    async resetCapacityLearning() {
+        this.requireCapability("capacity");
+        return (await this.request("capacity.reset", {})).profiles_reset;
+    }
     async governor() {
         return this.request("governor.status", {});
     }
     async status() {
         return this.request("harness.status", {});
+    }
+    /** Cached local engine phases; callback counts do not prove native child exit. */
+    async schedulingStatus() {
+        this.requireCapability("scheduling");
+        return this.request("scheduling.status", {});
     }
     async listPackages() {
         const packages = [];
@@ -324,6 +365,8 @@ export class Harness {
     }
     async changed(sessionId) {
         this.assertOpen();
+        if (!this.waiters.has(sessionId) && this.waiters.size >= MAX_SESSION_WAITS)
+            throw new HarnessError("busy", "session iterator capacity exceeded");
         const waiters = this.waiters.get(sessionId) ?? new Set();
         this.waiters.set(sessionId, waiters);
         if (waiters.size >= MAX_PENDING)
@@ -346,6 +389,10 @@ export class Harness {
             throw this.failure;
         if (this.closing && !duringClose)
             throw new HarnessError("closed", "harness is closing");
+    }
+    requireCapability(capability) {
+        if (!this.capabilities.has(capability))
+            throw new HarnessError("protocol", `update ejm-harness-worker to a version that supports ${capability}`);
     }
     encode(value) {
         const frame = Buffer.from(JSON.stringify(value) + "\n");
@@ -419,9 +466,14 @@ export class Harness {
         }
         else if ("method" in value && value.method === "event") {
             const event = value.params;
-            if (!this.cursors.has(event.session_id) && this.cursors.size >= 1000)
-                throw new HarnessError("protocol", "session capacity exceeded");
-            this.cursors.set(event.session_id, Math.max(this.cursor(event.session_id), event.sequence));
+            const sequence = Math.max(this.cursor(event.session_id), event.sequence);
+            this.cursors.delete(event.session_id);
+            if (this.cursors.size >= MAX_SESSION_HINTS) {
+                const oldest = this.cursors.keys().next().value;
+                if (oldest !== undefined)
+                    this.cursors.delete(oldest);
+            }
+            this.cursors.set(event.session_id, sequence);
             for (const done of [...(this.waiters.get(event.session_id) ?? [])])
                 done();
         }
@@ -556,6 +608,12 @@ export class Session {
     }
     async events(after = 0, limit = 64) {
         return this.harness.events(this.id, after, limit);
+    }
+    async view(bounds = {}) {
+        return this.harness.sessionView(this.id, bounds);
+    }
+    async eventsPage(options) {
+        return this.harness.eventsPage(this.id, options);
     }
     async invokePackageCommand(packageName, name, args = {}) {
         return this.harness.invokePackageCommand(packageName, name, this.id, args);

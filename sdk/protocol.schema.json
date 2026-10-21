@@ -4,6 +4,15 @@
   "description": "Collect every public wire type in one authoritative JSON Schema.",
   "type": "object",
   "properties": {
+    "capacity": {
+      "$ref": "#/$defs/CapacitySnapshot"
+    },
+    "capacity_reset": {
+      "$ref": "#/$defs/CapacityResetResult"
+    },
+    "event_page": {
+      "$ref": "#/$defs/EventPage"
+    },
     "governor": {
       "$ref": "#/$defs/GovernorSnapshot"
     },
@@ -31,8 +40,17 @@
     "run_summary": {
       "$ref": "#/$defs/RunSummary"
     },
+    "scheduling": {
+      "$ref": "#/$defs/SchedulingSnapshot"
+    },
     "session": {
       "$ref": "#/$defs/Session"
+    },
+    "session_page": {
+      "$ref": "#/$defs/SessionPage"
+    },
+    "session_view": {
+      "$ref": "#/$defs/SessionView"
     },
     "tool_output": {
       "$ref": "#/$defs/ToolOutput"
@@ -48,14 +66,198 @@
     "tool_request",
     "tool_output",
     "session",
+    "session_page",
+    "session_view",
+    "event_page",
+    "capacity",
+    "capacity_reset",
     "run_started",
     "run_summary",
     "governor",
     "harness",
+    "scheduling",
     "hello",
     "package_page"
   ],
   "$defs": {
+    "AdmissionPolicy": {
+      "description": "Queue policy chosen by the owner, never by generated agent content.",
+      "oneOf": [
+        {
+          "description": "Preserve the existing session-head ordering.",
+          "type": "string",
+          "const": "fixed"
+        },
+        {
+          "description": "Fill spare capacity while bounding bypass of an older session head.",
+          "type": "string",
+          "const": "automatic"
+        }
+      ]
+    },
+    "CapacityMode": {
+      "description": "Capacity policy belongs to the local owner, never to generated content.",
+      "type": "string",
+      "enum": ["auto", "fixed"]
+    },
+    "CapacityPolicy": {
+      "description": "Optional values are explicit hard ceilings. Omission is not a zero budget.",
+      "type": "object",
+      "properties": {
+        "max_cpu_millis": {
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        },
+        "max_heavy_jobs": {
+          "type": ["integer", "null"],
+          "format": "uint",
+          "default": null,
+          "minimum": 0
+        },
+        "max_jobs": {
+          "type": ["integer", "null"],
+          "format": "uint",
+          "default": null,
+          "minimum": 0
+        },
+        "max_memory_bytes": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "default": null,
+          "minimum": 0
+        },
+        "max_model_requests": {
+          "type": ["integer", "null"],
+          "format": "uint",
+          "default": null,
+          "minimum": 0
+        },
+        "max_output_bytes": {
+          "type": ["integer", "null"],
+          "format": "uint",
+          "default": null,
+          "minimum": 0
+        },
+        "max_processes": {
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        },
+        "max_sessions": {
+          "type": ["integer", "null"],
+          "format": "uint",
+          "default": null,
+          "minimum": 0
+        },
+        "mode": {
+          "$ref": "#/$defs/CapacityMode",
+          "default": "auto"
+        }
+      }
+    },
+    "CapacityResetResult": {
+      "type": "object",
+      "properties": {
+        "profiles_reset": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": ["profiles_reset"]
+    },
+    "CapacitySnapshot": {
+      "description": "A cheap cached snapshot. Reading it performs no probes or control work.",
+      "type": "object",
+      "properties": {
+        "coordinated": {
+          "type": "boolean"
+        },
+        "hard_model_requests": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "hard_resources": {
+          "$ref": "#/$defs/ResourceLimits"
+        },
+        "learning": {
+          "$ref": "#/$defs/LearningStatus"
+        },
+        "mode": {
+          "$ref": "#/$defs/CapacityMode"
+        },
+        "model_running": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "model_target": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "model_waiting": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "models": {
+          "$ref": "#/$defs/LaneSnapshot"
+        },
+        "native": {
+          "$ref": "#/$defs/NativeSnapshot"
+        },
+        "native_helpers": {
+          "$ref": "#/$defs/NativeHelperSnapshot",
+          "default": {
+            "committed": 0,
+            "memory_bytes": 0,
+            "occupied": 0,
+            "pending": 0,
+            "processes": 0
+          }
+        },
+        "observations": {
+          "$ref": "#/$defs/HostObservations"
+        },
+        "operating": {
+          "$ref": "#/$defs/OperatingSnapshot"
+        },
+        "provider": {
+          "$ref": "#/$defs/ProviderSnapshot"
+        },
+        "reason": {
+          "type": ["string", "null"]
+        },
+        "scope": {
+          "type": "string"
+        },
+        "tools": {
+          "$ref": "#/$defs/LaneSnapshot"
+        }
+      },
+      "required": [
+        "mode",
+        "scope",
+        "coordinated",
+        "hard_model_requests",
+        "model_target",
+        "model_running",
+        "model_waiting",
+        "hard_resources",
+        "operating",
+        "observations",
+        "learning",
+        "models",
+        "tools",
+        "provider",
+        "native"
+      ]
+    },
     "CommandExport": {
       "type": "object",
       "properties": {
@@ -82,6 +284,17 @@
         "allow_write": {
           "type": "boolean",
           "default": false
+        },
+        "capacity": {
+          "description": "Omission preserves the original fixed, process-local configuration.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CapacityPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "context_max_bytes": {
           "type": ["integer", "null"],
@@ -140,6 +353,16 @@
             }
           ]
         },
+        "provider_capacity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderQuotaConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "resources": {
           "anyOf": [
             {
@@ -169,6 +392,22 @@
           }
         }
       }
+    },
+    "Duration": {
+      "type": "object",
+      "properties": {
+        "nanos": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "secs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": ["secs", "nanos"]
     },
     "Effect": {
       "type": "string",
@@ -371,6 +610,70 @@
         }
       ],
       "required": ["sequence", "session_id", "timestamp_ms"]
+    },
+    "EventPage": {
+      "description": "Bounded replay through a captured global high-water boundary.",
+      "type": "object",
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "cursor": {
+          "description": "Global boundary represented by this page, or `through` when complete.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Event"
+          }
+        },
+        "omitted": {
+          "description": "The next single event exceeds the byte budget. Take a fresh snapshot.",
+          "type": "boolean"
+        },
+        "selected_cursor": {
+          "description": "Last represented selected-session sequence, if this page returned one.",
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "through": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": ["events", "cursor", "through", "complete", "omitted"]
+    },
+    "EventsPageParams": {
+      "type": "object",
+      "properties": {
+        "after": {
+          "type": "integer",
+          "format": "uint64",
+          "default": 0,
+          "minimum": 0
+        },
+        "bounds": {
+          "$ref": "#/$defs/SessionTailOptions",
+          "default": {
+            "max_bytes": 262144,
+            "max_events": 200
+          }
+        },
+        "session_id": {
+          "type": "string"
+        },
+        "through": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": ["session_id", "through"]
     },
     "EventsParams": {
       "type": "object",
@@ -576,6 +879,120 @@
       "additionalProperties": false,
       "required": ["event", "handler"]
     },
+    "HostObservations": {
+      "type": "object",
+      "properties": {
+        "available_memory_bytes": {
+          "$ref": "#/$defs/Observation3"
+        },
+        "cpu_millis": {
+          "$ref": "#/$defs/Observation"
+        },
+        "cpu_usage_percent": {
+          "$ref": "#/$defs/Observation2"
+        },
+        "descriptor_limit": {
+          "description": "The soft per-process file-descriptor limit, never a shared host budget.",
+          "$ref": "#/$defs/Observation3"
+        },
+        "domain_visibility": {
+          "description": "Unsupported or incomplete ancestor visibility prevents safe growth.",
+          "$ref": "#/$defs/ObservationAvailability"
+        },
+        "domains": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceDomainObservation"
+          }
+        },
+        "memory_bytes": {
+          "$ref": "#/$defs/Observation3"
+        },
+        "process_limit": {
+          "description": "The soft Unix per-user process limit; it is not free process capacity.",
+          "$ref": "#/$defs/Observation3"
+        }
+      },
+      "required": [
+        "cpu_millis",
+        "cpu_usage_percent",
+        "memory_bytes",
+        "available_memory_bytes",
+        "process_limit",
+        "descriptor_limit",
+        "domains",
+        "domain_visibility"
+      ]
+    },
+    "LaneSnapshot": {
+      "type": "object",
+      "properties": {
+        "cancelled": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "preparation": {
+          "$ref": "#/$defs/TimingSummary"
+        },
+        "provider_wait": {
+          "$ref": "#/$defs/TimingSummary"
+        },
+        "queue": {
+          "$ref": "#/$defs/TimingSummary"
+        },
+        "service": {
+          "$ref": "#/$defs/TimingSummary"
+        },
+        "successful": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "successful_per_second": {
+          "type": "number",
+          "format": "double"
+        }
+      },
+      "required": [
+        "successful",
+        "failed",
+        "cancelled",
+        "queue",
+        "preparation",
+        "provider_wait",
+        "service",
+        "successful_per_second"
+      ]
+    },
+    "LearningState": {
+      "type": "string",
+      "enum": ["cold", "learned", "unavailable"]
+    },
+    "LearningStatus": {
+      "type": "object",
+      "properties": {
+        "profile_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "samples": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "state": {
+          "$ref": "#/$defs/LearningState"
+        }
+      },
+      "required": ["state", "samples", "profile_count"]
+    },
     "Manifest": {
       "type": "object",
       "properties": {
@@ -620,39 +1037,6 @@
       "additionalProperties": false,
       "required": ["schema_version", "name", "version", "description"]
     },
-    "ModelResponse": {
-      "type": "object",
-      "properties": {
-        "content": {
-          "type": "string",
-          "default": ""
-        },
-        "continuation": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ProviderContinuation"
-            },
-            {
-              "type": "null"
-            }
-          ]
-        },
-        "tool_calls": {
-          "type": "array",
-          "default": [],
-          "items": {
-            "$ref": "#/$defs/ToolCall"
-          }
-        },
-        "usage": {
-          "$ref": "#/$defs/Usage",
-          "default": {
-            "input_tokens": 0,
-            "output_tokens": 0
-          }
-        }
-      }
-    },
     "NamedExport": {
       "type": "object",
       "properties": {
@@ -665,6 +1049,127 @@
       },
       "additionalProperties": false,
       "required": ["name", "handler"]
+    },
+    "NativeHelperSnapshot": {
+      "description": "Cached coarse helper commitments. Counts include pending and draining owners.",
+      "type": "object",
+      "properties": {
+        "committed": {
+          "type": "integer",
+          "format": "uint",
+          "default": 0,
+          "minimum": 0
+        },
+        "memory_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "default": 0,
+          "minimum": 0
+        },
+        "occupied": {
+          "type": "integer",
+          "format": "uint",
+          "default": 0,
+          "minimum": 0
+        },
+        "pending": {
+          "type": "integer",
+          "format": "uint",
+          "default": 0,
+          "minimum": 0
+        },
+        "processes": {
+          "description": "Process slots, including the helper runtime's threads on Linux.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 0,
+          "minimum": 0
+        }
+      }
+    },
+    "NativeOperation": {
+      "description": "An epoch and monotonic operation number. It never authorizes a replay.",
+      "type": "object",
+      "properties": {
+        "epoch": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": ["epoch", "id"]
+    },
+    "NativeSnapshot": {
+      "description": "A cached view. Reading it never starts a helper or performs I/O.",
+      "type": "object",
+      "properties": {
+        "active_local_scopes": {
+          "type": "integer",
+          "format": "uint",
+          "default": 0,
+          "minimum": 0
+        },
+        "descendant_cleanup": {
+          "$ref": "#/$defs/RestrictionState",
+          "default": "monitored"
+        },
+        "domain_placement": {
+          "$ref": "#/$defs/RestrictionState",
+          "default": "enforced"
+        },
+        "epoch": {
+          "type": ["string", "null"],
+          "default": null
+        },
+        "last_dead_epoch": {
+          "type": ["string", "null"],
+          "default": null
+        },
+        "last_operation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NativeOperation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "owner_death_cleanup": {
+          "$ref": "#/$defs/RestrictionState",
+          "default": "unsupported"
+        },
+        "owner_deaths": {
+          "description": "Confirmed owner deaths observed by this handle. This is not a job ledger.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 0,
+          "minimum": 0
+        },
+        "owner_exclusivity": {
+          "$ref": "#/$defs/RestrictionState",
+          "default": "enforced"
+        },
+        "owner_loss_detection": {
+          "$ref": "#/$defs/RestrictionState",
+          "default": "enforced"
+        },
+        "owner_pid": {
+          "description": "Last authenticated owner PID. This cached value does not establish liveness.",
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "default": null,
+          "minimum": 0
+        },
+        "recovery": {
+          "$ref": "#/$defs/RestrictionState",
+          "default": "monitored"
+        }
+      }
     },
     "Notification": {
       "oneOf": [
@@ -707,6 +1212,187 @@
           },
           "required": ["method", "params"]
         }
+      ]
+    },
+    "Observation": {
+      "description": "Missing values and stale samples remain distinct from a measured zero.",
+      "type": "object",
+      "properties": {
+        "age_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "availability": {
+          "$ref": "#/$defs/ObservationAvailability"
+        },
+        "max_age_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "source": {
+          "$ref": "#/$defs/ObservationSource"
+        },
+        "value": {
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": ["source", "availability", "age_ms", "max_age_ms"]
+    },
+    "Observation2": {
+      "description": "Missing values and stale samples remain distinct from a measured zero.",
+      "type": "object",
+      "properties": {
+        "age_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "availability": {
+          "$ref": "#/$defs/ObservationAvailability"
+        },
+        "max_age_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "source": {
+          "$ref": "#/$defs/ObservationSource"
+        },
+        "value": {
+          "type": ["number", "null"],
+          "format": "float"
+        }
+      },
+      "required": ["source", "availability", "age_ms", "max_age_ms"]
+    },
+    "Observation3": {
+      "description": "Missing values and stale samples remain distinct from a measured zero.",
+      "type": "object",
+      "properties": {
+        "age_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "availability": {
+          "$ref": "#/$defs/ObservationAvailability"
+        },
+        "max_age_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "source": {
+          "$ref": "#/$defs/ObservationSource"
+        },
+        "value": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": ["source", "availability", "age_ms", "max_age_ms"]
+    },
+    "ObservationAvailability": {
+      "type": "string",
+      "enum": ["measured", "estimated", "unavailable", "unsupported"]
+    },
+    "ObservationSource": {
+      "type": "string",
+      "enum": [
+        "native_system",
+        "scheduler_availability",
+        "process_resource_limit",
+        "linux_cgroup_v2"
+      ]
+    },
+    "OperatingSnapshot": {
+      "description": "Bounded local state, separate from the legacy [`GovernorSnapshot`] shape.",
+      "type": "object",
+      "properties": {
+        "contact_remaining": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Duration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "contact_valid": {
+          "description": "False after the cached coordination contact deadline expires.",
+          "type": "boolean"
+        },
+        "debt": {
+          "$ref": "#/$defs/OperatingTarget"
+        },
+        "generation": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "memory_leases": {
+          "description": "Contexts and persistent hosts reserve memory without active job slots.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "policy": {
+          "$ref": "#/$defs/AdmissionPolicy"
+        },
+        "target": {
+          "$ref": "#/$defs/OperatingTarget"
+        }
+      },
+      "required": ["policy", "generation", "target", "debt", "memory_leases", "contact_valid"]
+    },
+    "OperatingTarget": {
+      "description": "Adjustable budgets beneath the governor's immutable hard limits.\n\nZero is valid and parks admission for that resource. Shrinking a target does\nnot revoke running leases or erase reservations that exceed the new target.",
+      "type": "object",
+      "properties": {
+        "cpu_millis": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "max_heavy_jobs": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_jobs": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_output_bytes": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "max_processes": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "memory_bytes": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "max_jobs",
+        "max_heavy_jobs",
+        "cpu_millis",
+        "memory_bytes",
+        "max_processes",
+        "max_output_bytes"
       ]
     },
     "PackageConfig": {
@@ -856,32 +1542,6 @@
         {
           "type": "object",
           "properties": {
-            "kind": {
-              "type": "string",
-              "const": "echo"
-            }
-          },
-          "required": ["kind"]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "kind": {
-              "type": "string",
-              "const": "replay"
-            },
-            "responses": {
-              "type": "array",
-              "items": {
-                "$ref": "#/$defs/ModelResponse"
-              }
-            }
-          },
-          "required": ["kind", "responses"]
-        },
-        {
-          "type": "object",
-          "properties": {
             "api_key": {
               "type": "string"
             },
@@ -951,25 +1611,114 @@
         }
       ]
     },
-    "ProviderContinuation": {
-      "description": "Provider state that must survive a stateless tool exchange and journal replay.",
-      "oneOf": [
-        {
-          "description": "Encrypted reasoning items are passed only to the Responses adapter.",
-          "type": "object",
-          "properties": {
-            "provider": {
-              "type": "string",
-              "const": "open_ai_responses"
+    "ProviderQuotaConfig": {
+      "description": "Owner-supplied quota identity. Never derive this UUID from credentials.",
+      "type": "object",
+      "properties": {
+        "account_uuid": {
+          "type": "string"
+        },
+        "family": {
+          "type": "string",
+          "default": "shared"
+        },
+        "max_in_flight": {
+          "type": ["integer", "null"],
+          "format": "uint",
+          "minimum": 0
+        },
+        "requests": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderRate"
             },
-            "reasoning": {
-              "type": "array",
-              "items": true
+            {
+              "type": "null"
             }
-          },
-          "required": ["provider", "reasoning"]
+          ]
+        },
+        "tokens": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProviderRate"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
-      ]
+      },
+      "required": ["account_uuid"]
+    },
+    "ProviderRate": {
+      "description": "A locally configured sustained rate. Known rate charges are not concurrency\nslots and survive local cancellation until their window expires.",
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "window_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": ["limit", "window_ms"]
+    },
+    "ProviderSnapshot": {
+      "type": "object",
+      "properties": {
+        "blocked": {
+          "type": "boolean"
+        },
+        "cooldown_until_ms": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "coordinated": {
+          "type": "boolean"
+        },
+        "domain": {
+          "type": ["string", "null"]
+        },
+        "in_flight": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "reason": {
+          "type": ["string", "null"]
+        },
+        "request_credits": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "target": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "token_credits": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "token_debt": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "waiting": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": ["coordinated", "target", "in_flight", "waiting", "token_debt", "blocked"]
     },
     "Request": {
       "type": "object",
@@ -1027,6 +1776,45 @@
             },
             "params": {
               "$ref": "#/$defs/EmptyParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "session.page"
+            },
+            "params": {
+              "$ref": "#/$defs/SessionQuery"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "session.resolve"
+            },
+            "params": {
+              "$ref": "#/$defs/SessionResolveParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "session.view"
+            },
+            "params": {
+              "$ref": "#/$defs/SessionViewParams"
             }
           },
           "required": ["method", "params"]
@@ -1101,6 +1889,45 @@
           "properties": {
             "method": {
               "type": "string",
+              "const": "events.page"
+            },
+            "params": {
+              "$ref": "#/$defs/EventsPageParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "capacity.status"
+            },
+            "params": {
+              "$ref": "#/$defs/EmptyParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "capacity.reset"
+            },
+            "params": {
+              "$ref": "#/$defs/EmptyParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
               "const": "governor.status"
             },
             "params": {
@@ -1115,6 +1942,19 @@
             "method": {
               "type": "string",
               "const": "harness.status"
+            },
+            "params": {
+              "$ref": "#/$defs/EmptyParams"
+            }
+          },
+          "required": ["method", "params"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "method": {
+              "type": "string",
+              "const": "scheduling.status"
             },
             "params": {
               "$ref": "#/$defs/EmptyParams"
@@ -1188,6 +2028,44 @@
           "required": ["method", "params"]
         }
       ],
+      "required": ["id"]
+    },
+    "ResourceDomainObservation": {
+      "description": "Visible ancestor constraints. IDs contain native scope identities, not paths.",
+      "type": "object",
+      "properties": {
+        "available_memory_bytes": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "available_processes": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "cpu_millis": {
+          "type": ["integer", "null"],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "id": {
+          "type": "string"
+        },
+        "max_processes": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "memory_bytes": {
+          "type": ["integer", "null"],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "parent": {
+          "type": ["string", "null"]
+        }
+      },
       "required": ["id"]
     },
     "ResourceLimits": {
@@ -1277,6 +2155,11 @@
       ],
       "required": ["id"]
     },
+    "RestrictionState": {
+      "description": "`Monitored` is observation and reactive cleanup, not a hard OS ceiling.",
+      "type": "string",
+      "enum": ["enforced", "monitored", "unsupported"]
+    },
     "RunStarted": {
       "type": "object",
       "properties": {
@@ -1336,6 +2219,84 @@
       "type": "string",
       "enum": ["node", "python"]
     },
+    "SchedulingSnapshot": {
+      "description": "Cached local run counts. Each managed run occupies at most one listed phase.\n\nThese counts describe engine work, not OS CPU use, native child liveness, or\na host-wide total. Reading them performs no journal or host observation I/O.",
+      "type": "object",
+      "properties": {
+        "managed_runs": {
+          "description": "Runs retained by the engine, including waiting and finishing runs.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "model_preparing": {
+          "description": "Runs preparing admitted context, hooks and a provider request.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "model_running": {
+          "description": "Runs inside a provider callback, including streamed-output backpressure.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "model_waiting": {
+          "description": "Runs waiting for a model slot, coordinated model credit or context memory.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "provider_waiting": {
+          "description": "Runs waiting for provider selection or coordinated provider quota.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "runnable_runs": {
+          "description": "Managed runs outside the explicit waiting, preparation and service phases.\nThis includes journal and hook work; it is not an OS runnable-thread count.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "tool_dispatch_waiting": {
+          "description": "Runs waiting to enter the bounded tool-dispatch pool.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "tool_resource_waiting": {
+          "description": "Runs waiting for a tool reservation in the shared governor.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "tool_running": {
+          "description": "Runs inside a tool callback. Self-admitting tools may wait internally.\nCallback completion does not prove that uncertain native work has exited.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "workspace_waiting": {
+          "description": "Runs waiting for their workspace mutation lock.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "managed_runs",
+        "runnable_runs",
+        "model_waiting",
+        "model_preparing",
+        "provider_waiting",
+        "model_running",
+        "tool_dispatch_waiting",
+        "workspace_waiting",
+        "tool_resource_waiting",
+        "tool_running"
+      ]
+    },
     "Session": {
       "type": "object",
       "properties": {
@@ -1359,6 +2320,28 @@
       },
       "required": ["id", "title", "cwd", "created_at_ms", "status"]
     },
+    "SessionCursor": {
+      "description": "Stable continuation for a session query. Keep it with the same query.",
+      "type": "object",
+      "properties": {
+        "created_at_ms": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "id": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string"
+        },
+        "upper_rowid": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": ["created_at_ms", "id", "upper_rowid", "query"]
+    },
     "SessionOptions": {
       "type": "object",
       "properties": {
@@ -1372,6 +2355,29 @@
       },
       "required": ["cwd"]
     },
+    "SessionPage": {
+      "description": "A page in descending creation-time and identity order.",
+      "type": "object",
+      "properties": {
+        "next": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionCursor"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Session"
+          }
+        }
+      },
+      "required": ["sessions"]
+    },
     "SessionParams": {
       "type": "object",
       "properties": {
@@ -1384,9 +2390,152 @@
       },
       "required": ["session_id"]
     },
+    "SessionQuery": {
+      "description": "Case-insensitive title or identity prefix search, with bounded pages.",
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionCursor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "limit": {
+          "type": "integer",
+          "format": "uint",
+          "default": 50,
+          "minimum": 0
+        },
+        "query": {
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    "SessionResolveParams": {
+      "type": "object",
+      "properties": {
+        "prefix": {
+          "type": "string"
+        }
+      },
+      "required": ["prefix"]
+    },
+    "SessionRunTransition": {
+      "description": "The latest committed run transition, independent of the visible tail.",
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RunStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run_id": {
+          "type": ["string", "null"]
+        },
+        "sequence": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "status": {
+          "$ref": "#/$defs/SessionStatus"
+        }
+      },
+      "required": ["sequence", "status"]
+    },
     "SessionStatus": {
       "type": "string",
       "enum": ["idle", "running", "interrupted"]
+    },
+    "SessionTailOptions": {
+      "description": "Hard payload bounds for a presentation tail or replay page.\n\nZero in either field requests an authority-only tail. Replay pages require\npositive bounds.\nAt most 1000 events and 2 MiB of serialized event payload are returned.",
+      "type": "object",
+      "properties": {
+        "max_bytes": {
+          "type": "integer",
+          "format": "uint",
+          "default": 262144,
+          "minimum": 0
+        },
+        "max_events": {
+          "type": "integer",
+          "format": "uint",
+          "default": 200,
+          "minimum": 0
+        }
+      }
+    },
+    "SessionView": {
+      "description": "One consistent journal boundary for authority and bounded presentation.",
+      "type": "object",
+      "properties": {
+        "durable_cursor": {
+          "description": "Global durable high-water sequence at this snapshot.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Event"
+          }
+        },
+        "last_transition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionRunTransition"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "omitted": {
+          "type": "boolean"
+        },
+        "run_id": {
+          "description": "The active run only. Finished identity is in `last_transition`.",
+          "type": ["string", "null"]
+        },
+        "selected_cursor": {
+          "description": "Last selected-session sequence, matching live predecessor tokens.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "session": {
+          "$ref": "#/$defs/Session"
+        }
+      },
+      "required": ["session", "durable_cursor", "selected_cursor", "events", "omitted"]
+    },
+    "SessionViewParams": {
+      "type": "object",
+      "properties": {
+        "bounds": {
+          "$ref": "#/$defs/SessionTailOptions",
+          "default": {
+            "max_bytes": 262144,
+            "max_events": 200
+          }
+        },
+        "session_id": {
+          "type": "string"
+        }
+      },
+      "required": ["session_id"]
     },
     "StartParams": {
       "type": "object",
@@ -1414,6 +2563,27 @@
         }
       },
       "required": ["session_id", "text"]
+    },
+    "TimingSummary": {
+      "type": "object",
+      "properties": {
+        "p50_micros": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "p95_micros": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "samples": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": ["samples", "p50_micros", "p95_micros"]
     },
     "ToolCall": {
       "type": "object",

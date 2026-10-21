@@ -8,7 +8,10 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use super::{HttpObserver, HttpTracePhase, observe::Trace};
+use super::capacity::{Feedback, HeaderFamily, observe_response, observe_usage};
+use super::{
+    HttpObserver, HttpTracePhase, ProviderCapacity, ProviderCapacityObserver, observe::Trace,
+};
 use super::{
     MAX_RESPONSE, PendingCall, Provider, http_client, message_content, next_sse, push_text,
     sse_stream,
@@ -61,6 +64,7 @@ pub struct ResponsesProvider {
     client: reqwest::Client,
     base_url: String,
     observer: Option<Arc<dyn HttpObserver>>,
+    capacity: ProviderCapacity,
 }
 
 impl ResponsesProvider {
@@ -110,6 +114,7 @@ impl ResponsesProvider {
             client: http_client()?,
             base_url,
             observer: None,
+            capacity: ProviderCapacity::default(),
         })
     }
 
@@ -118,6 +123,16 @@ impl ResponsesProvider {
     pub fn with_observer(mut self, observer: Arc<dyn HttpObserver>) -> Self {
         self.observer = Some(observer);
         self
+    }
+
+    /// Attach owner-supplied quota scope and hard provider ceilings.
+    ///
+    /// # Errors
+    /// Rejects an invalid domain, concurrency ceiling, or rate window.
+    pub fn with_capacity(mut self, capacity: ProviderCapacity) -> Result<Self> {
+        capacity.validate()?;
+        self.capacity = capacity;
+        Ok(self)
     }
 
     /// Override model and effort for one request while reusing the pooled client.
@@ -131,12 +146,48 @@ impl ResponsesProvider {
         cancel: CancellationToken,
         deltas: mpsc::Sender<ModelDelta>,
     ) -> Result<ModelResponse> {
+        self.stream_observed(config, request, cancel, deltas, None)
+            .await
+    }
+
+    /// Override model options while forwarding bounded typed capacity feedback.
+    /// The host must preserve the selected account's quota domain.
+    ///
+    /// # Errors
+    /// Returns the same errors as [`Self::stream_with_config`].
+    pub async fn stream_with_config_and_capacity(
+        &self,
+        config: &ResponsesConfig,
+        request: ModelRequest,
+        cancel: CancellationToken,
+        deltas: mpsc::Sender<ModelDelta>,
+        feedback: Arc<dyn ProviderCapacityObserver>,
+    ) -> Result<ModelResponse> {
+        self.stream_observed(config, request, cancel, deltas, Some(feedback))
+            .await
+    }
+
+    async fn stream_observed(
+        &self,
+        config: &ResponsesConfig,
+        request: ModelRequest,
+        cancel: CancellationToken,
+        deltas: mpsc::Sender<ModelDelta>,
+        feedback: Feedback,
+    ) -> Result<ModelResponse> {
         config.validate()?;
         let body = request_body(config, request)?;
         let token = self.credentials.access_token(cancel.child_token()).await?;
         let trace = Trace::new(self.observer.as_ref(), token.expose_secret());
         let result = self
-            .send(body, token.expose_secret(), &cancel, &deltas, &trace)
+            .send(
+                body,
+                token.expose_secret(),
+                &cancel,
+                &deltas,
+                &trace,
+                &feedback,
+            )
             .await;
         let message = if cancel.is_cancelled() {
             "cancelled"
@@ -156,6 +207,7 @@ impl ResponsesProvider {
         cancel: &CancellationToken,
         deltas: &mpsc::Sender<ModelDelta>,
         trace: &Trace<'_>,
+        feedback: &Feedback,
     ) -> Result<ModelResponse> {
         let body = serde_json::to_string(&body)?;
         let request = self
@@ -173,6 +225,7 @@ impl ResponsesProvider {
         };
         let status = response.status();
         trace.response_head(&response);
+        observe_response(feedback, &response, HeaderFamily::OpenAi);
         if !status.is_success() {
             if self.observer.is_some() {
                 trace_http_error(response, cancel, trace).await;
@@ -203,6 +256,7 @@ impl ResponsesProvider {
                         partial.content.is_empty() || partial.content == result.content,
                         "Responses text disagrees with its completion"
                     );
+                    observe_usage(feedback, &result.usage);
                     return Ok(result);
                 }
                 "response.failed" | "response.incomplete" | "error" => {
@@ -242,6 +296,21 @@ impl ResponsesProvider {
 
 #[async_trait]
 impl Provider for ResponsesProvider {
+    fn capacity(&self) -> ProviderCapacity {
+        self.capacity.clone()
+    }
+
+    async fn stream_with_capacity(
+        &self,
+        request: ModelRequest,
+        cancel: CancellationToken,
+        deltas: mpsc::Sender<ModelDelta>,
+        feedback: Arc<dyn ProviderCapacityObserver>,
+    ) -> Result<ModelResponse> {
+        self.stream_with_config_and_capacity(&self.config, request, cancel, deltas, feedback)
+            .await
+    }
+
     async fn stream(
         &self,
         request: ModelRequest,

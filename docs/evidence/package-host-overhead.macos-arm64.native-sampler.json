@@ -1,0 +1,374 @@
+{
+  "schema_version": 1,
+  "kind": "package_host_overhead_native_sampler",
+  "measured_local_date": "2026-10-20",
+  "target_os": "macos",
+  "target_arch": "aarch64",
+  "profile": "release",
+  "elapsed_seconds": 25.0,
+  "elapsed_source": "libtest rounded runtime",
+  "workload_status": "passed",
+  "idle_owner_cpu_target_status": "failed",
+  "idle_owner_cpu_target_percent_of_one_core": {
+    "strictly_below": 1.0,
+    "max_observed": 1.9330179691314697
+  },
+  "sampler": {
+    "package": "libproc",
+    "version": "0.14.11",
+    "interval_ms": 100,
+    "observations": [
+      "process ID",
+      "parent process ID",
+      "native birth time",
+      "resident memory",
+      "zombie status"
+    ],
+    "argument_reads": false,
+    "environment_reads": false,
+    "thread_info_reads": false
+  },
+  "command": [
+    "target/release/deps/runtime-f7334e74febcf0da",
+    "--exact",
+    "lifecycle::measure_coordinated_language_host_overhead",
+    "--ignored",
+    "--nocapture",
+    "--test-threads=1"
+  ],
+  "environment": {
+    "node": "v23.10.0",
+    "python": "3.15.0",
+    "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Homebrew)",
+    "libproc": "0.14.11",
+    "sysinfo": "0.39.6"
+  },
+  "baseline_report": {
+    "path": "docs/evidence/package-host-overhead.macos-arm64.initial.json",
+    "sha256": "31811716788f24b290eb1a58c9d165bd6be9718e9e0a9e7f93dc8ae17d19e6d3"
+  },
+  "provenance": {
+    "binaries": {
+      "fixture": {
+        "path": "target/release/deps/runtime-f7334e74febcf0da",
+        "bytes": 7453696,
+        "sha256": "c55c6672a955f3792a81a792b1b1e233d46f62c955792c7151d3633196970df0"
+      },
+      "native_owner": {
+        "path": "target/release/examples/native_owner_helper",
+        "bytes": 1132464,
+        "sha256": "0537cad778e8a2c7009b5cf5ee995fe5295b64335f643127dd64fbdf000a79de"
+      }
+    },
+    "source_sha256": {
+      "Cargo.lock": "072a52712dd92466e59bd62c31a75bcfdaa430e4e7e66c1d45f33c0854df504a",
+      "Cargo.toml": "40ce94b31b2a3b82c0a503139beacfff1fbf1f4e165c0d0f466809fd67ff2d99",
+      "crates/ejm-harness-exec/Cargo.toml": "af00431b60bdc32f2323f2f94fbc0e9f0d70b014ace606fe39f753bef4f7482f",
+      "crates/ejm-harness-exec/examples/native_owner_helper.rs": "1d00dad2855ec36af3e461841ce56c99d86fbd7e007052ef5fed1759c6d48b1b",
+      "crates/ejm-harness-exec/src/governor.rs": "37db3d6221b34a48e30cc002a5fb679a557449c1944f834a82afc9c5b011a2bc",
+      "crates/ejm-harness-exec/src/monitor.rs": "3fdb535f8bbb5044a3d02475760a568e7eb3f5a0758112d9f81d94b53960aca5",
+      "crates/ejm-harness-exec/src/native.rs": "07387c5a95d12043a29f761070687e6d206ff0a9a5f8d1e79e92fb7dd675b7d5",
+      "crates/ejm-harness-exec/src/native/client.rs": "58dcd9b2d4c080df3ec884698091ff2afb1ccbeb1ad1ef9f633171f4ce5bb005",
+      "crates/ejm-harness-exec/src/native/owner.rs": "a331d99fd1f4395f61c822d1f9da0c477f8e72b9f1ba4bad17845a8fe3132545",
+      "crates/ejm-harness-exec/src/native/placement.rs": "5585fa7f9e19ed49ea3380b389257f2a7331291b1d99ec5b621f019acc88d635",
+      "crates/ejm-harness-exec/src/native/recovery.rs": "1fcea1cfdea943a895663ce543081ccc008921a69a8b88d979ff404b015ddd75",
+      "crates/ejm-harness-exec/src/native/wire.rs": "8c1a085990ae3b39a0a3411c4020cdd3407cb76ce5bbf506d3cc10edfbcced5f",
+      "crates/ejm-harness-exec/src/observations.rs": "7c5a015d7f0aa4d1a4b64bd5e08f8d98060f137c09cee4a3f148436c1ae5d43d",
+      "crates/ejm-harness-exec/src/process.rs": "49eccd29aef316295dd1b92de38e6e11b0b65d225af5fddaaadf3f7cf1bfaad6",
+      "crates/ejm-harness-exec/src/processes.rs": "cd0fb08d1f443181e161238c199693a4b5ab15698b6e94fec144e9e3dbf7444b",
+      "crates/ejm-harness-exec/src/processes/macos.rs": "e61c96826ac807112aa9df35d8fce87fd0fbddc59c5b7574a80a4c00c44edc45",
+      "crates/ejm-harness-packages/src/runtime.rs": "b736ecbb9f4e1840c1be8a70476d024cf93ea152db9b30d830e2a8e2339a4146",
+      "crates/ejm-harness-packages/src/transport.rs": "28f74eb2507df9af1992566c2091a02b99a0f0c84ca543cfccdf9806aa011c1f",
+      "crates/ejm-harness-packages/tests/runtime.rs": "78c8449b9e3b2b13e4b57cac79a18d2bfd5e9bcff40f8ab7ce5f3e739fcc8e3a",
+      "crates/ejm-harness-packages/tests/runtime/lifecycle.rs": "1bd3d38b9689b2a702cc8428facd505148343253c2cf8dd98a9ff123387d48f5"
+    },
+    "unavailable_source_hashes": {
+      "crates/ejm-harness/src/capacity.rs": "Modified after measurement; the pre-run hash snapshot was not persisted."
+    },
+    "raw_log_sha256": "2c5b3c609712bf395f38c589d0d598d5b01b39532fdf48dd107debeb472b25f6",
+    "hash_capture": "after measurement",
+    "verification": "The post-processing parser failed before persisting the pre-run snapshot. Hashes were captured after the run; recorded source and binary modification times preceded the measurement. Sources modified after measurement are listed separately without a run hash. All captured hashes remained unchanged while recording this report."
+  },
+  "measurement": {
+    "limits": [
+      "one host, sequential samples, local interpreters and offline fixture imports",
+      "idle RSS samples are not startup or native-tree peaks",
+      "CPU percentage covers a two-second interval and is noisy near zero",
+      "caller includes the libtest runtime and its capacity coordinator",
+      "startup includes a fresh native owner, language bootstrap and import"
+    ],
+    "profile": "release",
+    "samples": [
+      {
+        "caller": {
+          "cpu_percent_of_one_core": 0.2042323797941208,
+          "pid": 18625,
+          "rss_bytes": 11468800
+        },
+        "cold_owner_and_import_ms": 252.84558299999998,
+        "idle_active_jobs": 0,
+        "idle_interval_ms": 2000,
+        "interpreter": {
+          "cpu_percent_of_one_core": 0.0,
+          "pid": 18631,
+          "rss_bytes": 47677440
+        },
+        "kind": "node",
+        "owner": {
+          "cpu_percent_of_one_core": 1.891017198562622,
+          "pid": 18630,
+          "rss_bytes": 7421952
+        },
+        "preparation_ms": 30.301208,
+        "reserved_memory_bytes_above_baseline": 67108864,
+        "sample": 0,
+        "shutdown_ms": 1.6783329999999999
+      },
+      {
+        "caller": {
+          "cpu_percent_of_one_core": 0.26516541838645935,
+          "pid": 18625,
+          "rss_bytes": 11616256
+        },
+        "cold_owner_and_import_ms": 114.46175,
+        "idle_active_jobs": 0,
+        "idle_interval_ms": 2000,
+        "interpreter": {
+          "cpu_percent_of_one_core": 0.0,
+          "pid": 18719,
+          "rss_bytes": 28721152
+        },
+        "kind": "python",
+        "owner": {
+          "cpu_percent_of_one_core": 1.7204689979553223,
+          "pid": 18718,
+          "rss_bytes": 7618560
+        },
+        "preparation_ms": 28.998416,
+        "reserved_memory_bytes_above_baseline": 67108864,
+        "sample": 0,
+        "shutdown_ms": 1.494167
+      },
+      {
+        "caller": {
+          "cpu_percent_of_one_core": 0.1843731701374054,
+          "pid": 18625,
+          "rss_bytes": 11681792
+        },
+        "cold_owner_and_import_ms": 81.866167,
+        "idle_active_jobs": 0,
+        "idle_interval_ms": 2000,
+        "interpreter": {
+          "cpu_percent_of_one_core": 0.0,
+          "pid": 18729,
+          "rss_bytes": 47874048
+        },
+        "kind": "node",
+        "owner": {
+          "cpu_percent_of_one_core": 1.810066819190979,
+          "pid": 18728,
+          "rss_bytes": 7536640
+        },
+        "preparation_ms": 24.880458,
+        "reserved_memory_bytes_above_baseline": 67108864,
+        "sample": 1,
+        "shutdown_ms": 1.5174159999999999
+      },
+      {
+        "caller": {
+          "cpu_percent_of_one_core": 0.21606315672397614,
+          "pid": 18625,
+          "rss_bytes": 11649024
+        },
+        "cold_owner_and_import_ms": 115.731042,
+        "idle_active_jobs": 0,
+        "idle_interval_ms": 2000,
+        "interpreter": {
+          "cpu_percent_of_one_core": 0.0,
+          "pid": 18737,
+          "rss_bytes": 28540928
+        },
+        "kind": "python",
+        "owner": {
+          "cpu_percent_of_one_core": 1.6255873441696167,
+          "pid": 18736,
+          "rss_bytes": 7520256
+        },
+        "preparation_ms": 30.903541999999998,
+        "reserved_memory_bytes_above_baseline": 67108864,
+        "sample": 1,
+        "shutdown_ms": 1.2652500000000002
+      },
+      {
+        "caller": {
+          "cpu_percent_of_one_core": 0.2052992880344391,
+          "pid": 18625,
+          "rss_bytes": 11894784
+        },
+        "cold_owner_and_import_ms": 81.224458,
+        "idle_active_jobs": 0,
+        "idle_interval_ms": 2000,
+        "interpreter": {
+          "cpu_percent_of_one_core": 0.0,
+          "pid": 18742,
+          "rss_bytes": 47661056
+        },
+        "kind": "node",
+        "owner": {
+          "cpu_percent_of_one_core": 1.9330179691314697,
+          "pid": 18741,
+          "rss_bytes": 7503872
+        },
+        "preparation_ms": 28.577542,
+        "reserved_memory_bytes_above_baseline": 67108864,
+        "sample": 2,
+        "shutdown_ms": 1.804875
+      },
+      {
+        "caller": {
+          "cpu_percent_of_one_core": 0.20041055977344513,
+          "pid": 18625,
+          "rss_bytes": 11943936
+        },
+        "cold_owner_and_import_ms": 109.314333,
+        "idle_active_jobs": 0,
+        "idle_interval_ms": 2000,
+        "interpreter": {
+          "cpu_percent_of_one_core": 0.0,
+          "pid": 18747,
+          "rss_bytes": 28672000
+        },
+        "kind": "python",
+        "owner": {
+          "cpu_percent_of_one_core": 1.66702139377594,
+          "pid": 18746,
+          "rss_bytes": 7602176
+        },
+        "preparation_ms": 23.397875,
+        "reserved_memory_bytes_above_baseline": 67108864,
+        "sample": 2,
+        "shutdown_ms": 1.111792
+      }
+    ],
+    "target_arch": "aarch64",
+    "target_os": "macos"
+  },
+  "summary": {
+    "node": {
+      "preparation_ms": {
+        "median": 28.577542,
+        "min": 24.880458,
+        "max": 30.301208
+      },
+      "cold_owner_and_import_ms": {
+        "median": 81.866167,
+        "min": 81.224458,
+        "max": 252.84558299999998
+      },
+      "shutdown_ms": {
+        "median": 1.6783329999999999,
+        "min": 1.5174159999999999,
+        "max": 1.804875
+      },
+      "caller": {
+        "rss_bytes": {
+          "median": 11681792,
+          "min": 11468800,
+          "max": 11894784
+        },
+        "cpu_percent_of_one_core": {
+          "median": 0.2042323797941208,
+          "min": 0.1843731701374054,
+          "max": 0.2052992880344391
+        }
+      },
+      "owner": {
+        "rss_bytes": {
+          "median": 7503872,
+          "min": 7421952,
+          "max": 7536640
+        },
+        "cpu_percent_of_one_core": {
+          "median": 1.891017198562622,
+          "min": 1.810066819190979,
+          "max": 1.9330179691314697
+        }
+      },
+      "interpreter": {
+        "rss_bytes": {
+          "median": 47677440,
+          "min": 47661056,
+          "max": 47874048
+        },
+        "cpu_percent_of_one_core": {
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        }
+      }
+    },
+    "python": {
+      "preparation_ms": {
+        "median": 28.998416,
+        "min": 23.397875,
+        "max": 30.903541999999998
+      },
+      "cold_owner_and_import_ms": {
+        "median": 114.46175,
+        "min": 109.314333,
+        "max": 115.731042
+      },
+      "shutdown_ms": {
+        "median": 1.2652500000000002,
+        "min": 1.111792,
+        "max": 1.494167
+      },
+      "caller": {
+        "rss_bytes": {
+          "median": 11649024,
+          "min": 11616256,
+          "max": 11943936
+        },
+        "cpu_percent_of_one_core": {
+          "median": 0.21606315672397614,
+          "min": 0.20041055977344513,
+          "max": 0.26516541838645935
+        }
+      },
+      "owner": {
+        "rss_bytes": {
+          "median": 7602176,
+          "min": 7520256,
+          "max": 7618560
+        },
+        "cpu_percent_of_one_core": {
+          "median": 1.66702139377594,
+          "min": 1.6255873441696167,
+          "max": 1.7204689979553223
+        }
+      },
+      "interpreter": {
+        "rss_bytes": {
+          "median": 28672000,
+          "min": 28540928,
+          "max": 28721152
+        },
+        "cpu_percent_of_one_core": {
+          "median": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        }
+      }
+    }
+  },
+  "limits": [
+    "Six sequential samples ran during an owned-workload quiet window; unrelated host activity was not controlled.",
+    "Two-second idle CPU intervals and three samples per language do not establish stable tail latency or whole-system idle acceptance.",
+    "The native monitor still scans host-wide topology and memory every 100 ms while a resident host exists; this version uses one typed native call per observed PID.",
+    "Interpreter RSS is sampled idle resident memory, not a startup peak, complete process-tree peak, memory ceiling or comparison to another engine.",
+    "Caller RSS and CPU include the libtest runtime, coordinator and measurement code; they are not an incremental product-package overhead estimate.",
+    "Each sample includes one fresh native owner and one language host; it does not measure one process per agent or claim Linux/Windows support.",
+    "Every idle host retained one 64 MiB reservation and one process charge, with zero active execution jobs; shutdown and native-owner idle exit were verified.",
+    "Native process sampling is reactive. Exiting or unreadable processes can be omitted, ancestry can change between observations, and a birth-time check followed by a signal is not atomic."
+  ]
+}

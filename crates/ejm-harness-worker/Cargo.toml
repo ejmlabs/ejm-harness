@@ -30,4 +30,6 @@ ejm-harness-packages.workspace = true
 ejm-harness-package-spec.workspace = true
 
 [dev-dependencies]
+ejm-harness = { workspace = true, features = ["test-support"] }
 tempfile.workspace = true
+wiremock.workspace = true

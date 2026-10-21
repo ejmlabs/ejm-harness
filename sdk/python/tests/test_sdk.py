@@ -21,11 +21,20 @@ from ejm_harness import (
     ToolOutput,
     tool_output,
 )
-from ejm_harness.protocol import ConfigureParams, ProviderConfig, ToolDefinition
+from ejm_harness.protocol import (
+    ConfigureParams,
+    ProviderConfig,
+    ProviderQuotaConfig,
+    ToolDefinition,
+)
 
 WORKER = os.environ.get(
     "EJM_HARNESS_WORKER_PATH",
-    str(Path(__file__).resolve().parents[3] / "target/debug/ejm-harness-worker"),
+    str(
+        Path(__file__).resolve().parents[3]
+        / "target/debug"
+        / ("ejm-harness-worker.exe" if os.name == "nt" else "ejm-harness-worker")
+    ),
 )
 DEFINITION: ToolDefinition = {
     "name": "sdk_lookup",
@@ -38,23 +47,70 @@ DEFINITION: ToolDefinition = {
         "required": ["value"],
     },
 }
+IDLE_SCHEDULING = {
+    "managed_runs": 0,
+    "runnable_runs": 0,
+    "model_waiting": 0,
+    "model_preparing": 0,
+    "provider_waiting": 0,
+    "model_running": 0,
+    "tool_dispatch_waiting": 0,
+    "workspace_waiting": 0,
+    "tool_resource_waiting": 0,
+    "tool_running": 0,
+}
 
 
-def replay(state: str) -> ConfigureParams:
+def recorded_responses(calls: int = 1) -> list[dict[str, Any]]:
+    return [
+        {
+            "tool_calls": [
+                {
+                    "id": f"python-call-{index}",
+                    "name": "sdk_lookup",
+                    "arguments": {"value": "hello"},
+                }
+            ]
+        }
+        for index in range(calls)
+    ] + [{"content": "finished"}]
+
+
+def provider_fixture(state: str, responses: list[dict[str, Any]] | None = None) -> ConfigureParams:
+    root = Path(state) / "fixture-provider"
+    root.mkdir(exist_ok=True)
+    (root / "ejm.package.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "name": "@fixture/sdk-recorded",
+                "version": "1.0.0",
+                "description": "Internal SDK provider fixture",
+                "runtime": {"kind": "python", "entry": "entry.py"},
+                "exports": {"providers": [{"name": "model", "handler": "model"}]},
+            }
+        )
+    )
+    (root / "entry.py").write_text(f"""
+import json
+responses = json.loads({json.dumps(responses)!r})
+async def model(request, context):
+    if responses is not None:
+        if not responses:
+            raise RuntimeError("fixture responses exhausted")
+        return responses.pop(0)
+    user = next(message for message in reversed(request["messages"]) if message["role"] == "user")
+    return {{"content": "Fixture: " + user["content"]}}
+""")
     return {
         "state_dir": state,
-        "provider": {
-            "kind": "replay",
-            "responses": [
-                {
-                    "tool_calls": [
-                        {"id": "python-call", "name": "sdk_lookup", "arguments": {"value": "hello"}}
-                    ]
-                },
-                {"content": "finished"},
-            ],
-        },
+        "packages": [{"root": str(root), "grants": {"providers": ["model"]}}],
+        "provider": {"kind": "package", "package": "@fixture/sdk-recorded", "name": "model"},
     }
+
+
+def callback_config(state: str, calls: int = 1) -> ConfigureParams:
+    return provider_fixture(state, recorded_responses(calls))
 
 
 def python_package(root: Path) -> ConfigureParams:
@@ -106,6 +162,212 @@ async def widget(args, ctx):
 
 
 class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
+    async def test_missing_and_removed_providers_fail_before_packages_and_journals(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            state = Path(folder) / "state"
+            with self.assertRaisesRegex(HarnessError, "provider is required"):
+                await AsyncHarness.create(
+                    worker_path=WORKER,
+                    config={
+                        "state_dir": str(state),
+                        "packages": [{"root": "/unused-provider-fixture", "grants": {}}],
+                    },
+                )
+            for kind in ["echo", "replay"]:
+                config = cast(
+                    "ConfigureParams",
+                    {"state_dir": str(state), "provider": {"kind": kind, "responses": []}},
+                )
+                with self.assertRaises(HarnessError) as caught:
+                    await AsyncHarness.create(worker_path=WORKER, config=config)
+                self.assertEqual(caught.exception.code, "invalid_request")
+            self.assertFalse(state.exists())
+
+    async def test_provider_quota_requires_capability_and_coordinated_mode(self) -> None:
+        quota: ProviderQuotaConfig = {"account_uuid": "00000000-0000-4000-8000-000000000001"}
+        request = AsyncHarness._request
+
+        async def without_quota(
+            harness: AsyncHarness, method: str, params: object, *, during_close: bool = False
+        ) -> object:
+            result = await request(harness, method, params, during_close=during_close)
+            if method == "hello":
+                value = cast("dict[str, Any]", result)
+                return {
+                    **value,
+                    "capabilities": [
+                        item for item in value["capabilities"] if item != "provider_capacity"
+                    ],
+                }
+            return result
+
+        with (
+            patch.object(AsyncHarness, "_request", without_quota),
+            self.assertRaisesRegex(HarnessError, "supports provider_capacity"),
+        ):
+            await AsyncHarness.create(
+                worker_path=WORKER,
+                config={"capacity": {"mode": "auto"}, "provider_capacity": quota},
+            )
+        with self.assertRaisesRegex(HarnessError, "explicit capacity mode"):
+            await AsyncHarness.create(worker_path=WORKER, config={"provider_capacity": quota})
+
+    async def test_capacity_opt_in_requires_worker_capability(self) -> None:
+        request = AsyncHarness._request
+
+        async def without_capacity(
+            harness: AsyncHarness, method: str, params: object, *, during_close: bool = False
+        ) -> object:
+            result = await request(harness, method, params, during_close=during_close)
+            if method == "hello":
+                return {**cast("dict[str, object]", result), "capabilities": []}
+            return result
+
+        with (
+            patch.object(AsyncHarness, "_request", without_capacity),
+            self.assertRaisesRegex(HarnessError, "supports capacity"),
+        ):
+            await AsyncHarness.create(worker_path=WORKER, config={"capacity": {"mode": "auto"}})
+
+    async def test_bounded_views_preserve_authority_and_page_the_full_set(self) -> None:
+        with tempfile.TemporaryDirectory() as state:
+            async with AsyncHarness(worker_path=WORKER, config=provider_fixture(state)) as harness:
+                self.assertIsNone(await harness.capacity_status())
+                first = await harness.create_session(title="page first")
+                second = await harness.create_session(title="page second")
+                page = await harness.sessions_page({"limit": 1})
+                self.assertEqual(len(page["sessions"]), 1)
+                self.assertIsNotNone(page["next"])
+                following = await harness.sessions_page({"limit": 1, "cursor": page["next"]})
+                self.assertEqual(len(following["sessions"]), 1)
+                self.assertNotEqual(page["sessions"][0]["id"], following["sessions"][0]["id"])
+                self.assertEqual((await harness.resolve_session(second.id)).id, second.id)
+                with self.assertRaises(HarnessError):
+                    await harness.sessions_page({"query": "different", "cursor": page["next"]})
+                run = await first.start("bounded offline history")
+                summary = await run.wait()
+                view = await first.view(bounds={"max_events": 1})
+                self.assertEqual(len(view["events"]), 1)
+                self.assertTrue(view["omitted"])
+                self.assertIsNone(view["run_id"])
+                transition = view["last_transition"]
+                assert transition is not None
+                self.assertEqual(transition["run_id"], run.id)
+                self.assertEqual(transition["outcome"], summary["status"])
+                authority = await harness.session_view(first.id, bounds={"max_bytes": 0})
+                self.assertEqual(authority["events"], [])
+                after = 0
+                finished = False
+                for _ in range(32):
+                    events = await first.events_page(
+                        view["durable_cursor"], after=after, bounds={"max_events": 1}
+                    )
+                    self.assertLessEqual(len(events["events"]), 1)
+                    finished |= any(event["type"] == "run_finished" for event in events["events"])
+                    if events["complete"]:
+                        break
+                    self.assertGreater(events["cursor"], after)
+                    after = events["cursor"]
+                self.assertTrue(finished)
+
+    async def test_scheduling_status_requires_capability_before_sending_method(self) -> None:
+        request = AsyncHarness._request
+        status_calls = 0
+
+        async def without_scheduling(
+            harness: AsyncHarness, method: str, params: object, *, during_close: bool = False
+        ) -> object:
+            nonlocal status_calls
+            if method == "scheduling.status":
+                status_calls += 1
+            result = await request(harness, method, params, during_close=during_close)
+            if method == "hello":
+                value = cast("dict[str, Any]", result)
+                return {
+                    **value,
+                    "capabilities": [
+                        item for item in value["capabilities"] if item != "scheduling"
+                    ],
+                }
+            return result
+
+        with (
+            tempfile.TemporaryDirectory() as state,
+            patch.object(AsyncHarness, "_request", without_scheduling),
+        ):
+            async with AsyncHarness(worker_path=WORKER, config=provider_fixture(state)) as harness:
+                with self.assertRaisesRegex(HarnessError, "supports scheduling"):
+                    await harness.scheduling_status()
+                self.assertEqual(status_calls, 0)
+                self.assertEqual((await harness.status())["active_agents"], 0)
+
+    async def test_invalid_capacity_fails_before_package_loading(self) -> None:
+        with self.assertRaisesRegex(HarnessError, "model ceiling"):
+            await AsyncHarness.create(
+                worker_path=WORKER,
+                config={
+                    "provider": {
+                        "kind": "responses",
+                        "api_key": "fixture-key-never-sent",
+                        "model": "fixture-model",
+                    },
+                    "capacity": {"mode": "fixed", "max_model_requests": 0},
+                    "packages": [{"root": "/unused-capacity-fixture", "grants": {}}],
+                },
+            )
+
+    async def test_live_hints_evict_old_cursors_and_release_waiters(self) -> None:
+        harness = AsyncHarness()
+        stdout = asyncio.StreamReader()
+        lines = [
+            json.dumps(
+                {
+                    "method": "event",
+                    "params": {
+                        "type": "text_delta",
+                        "session_id": f"historical-{index}",
+                        "run_id": "fixture-run",
+                        "sequence": index + 1,
+                        "at_ms": 0,
+                        "text": "hint",
+                    },
+                }
+            )
+            for index in range(1001)
+        ]
+        lines.append(json.dumps({"id": "after-hints", "result": True}))
+        stdout.feed_data(("\n".join(lines) + "\n").encode())
+        stdout.feed_eof()
+        process = Mock(spec=asyncio.subprocess.Process)
+        process.stdout = stdout
+        process.returncode = 1
+        harness._process = process
+        response: asyncio.Future[object] = asyncio.get_running_loop().create_future()
+        harness._pending["after-hints"] = response
+        try:
+            await harness._read()
+            self.assertTrue(response.result())
+            self.assertNotIn("historical-0", harness._cursors)
+            self.assertEqual(harness._cursors["historical-1000"], 1001)
+            self.assertEqual(len(harness._cursors), 1000)
+        finally:
+            harness._process = None
+            await harness.close()
+
+        with tempfile.TemporaryDirectory() as state:
+            async with AsyncHarness(worker_path=WORKER, config=provider_fixture(state)) as harness:
+                waiting = asyncio.create_task(harness._changed("active"))
+                await asyncio.sleep(0)
+                harness._changes["active"].set()
+                await asyncio.wait_for(waiting, 1)
+                self.assertEqual(harness._changes, {})
+                cancelled = asyncio.create_task(harness._changed("cancelled"))
+                await asyncio.sleep(0)
+                cancelled.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await cancelled
+                self.assertEqual(harness._changes, {})
+
     async def test_package_configuration_requires_worker_capability(self) -> None:
         request = AsyncHarness._request
 
@@ -160,6 +422,82 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(
                     (await (await session.start("again")).wait())["text"], "custom:again|python"
                 )
+
+    @unittest.skipIf(os.name == "nt", "Windows shared native execution remains gated")
+    async def test_coordinated_capacity_composes_package_execution_and_shutdown(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ejm-harness-capacity-sdk-py-") as folder:
+            root = Path(folder)
+            config = python_package(root)
+            config["capacity"] = {
+                "mode": "auto",
+                "max_sessions": 2,
+                "max_model_requests": 1,
+                "max_jobs": 2,
+                "max_memory_bytes": 256 * 1024 * 1024,
+            }
+            async with AsyncHarness(
+                worker_path=WORKER, config=config, request_timeout=10
+            ) as harness:
+                async with asyncio.timeout(30):
+                    capacity = await harness.capacity_status()
+                    assert capacity is not None
+                    self.assertEqual(capacity["mode"], "auto")
+                    self.assertTrue(capacity["coordinated"])
+                    self.assertEqual(capacity["hard_model_requests"], 1)
+                    self.assertEqual(capacity["hard_resources"]["max_jobs"], 2)
+                    self.assertEqual(capacity["hard_resources"]["memory_bytes"], 256 * 1024 * 1024)
+                    async with asyncio.timeout(5):
+                        while True:
+                            resident = await harness.governor()
+                            if resident["running"] == 0:
+                                break
+                            await asyncio.sleep(0.025)
+                    self.assertEqual(resident["running"], 0)
+                    self.assertGreaterEqual(resident["reserved_memory_bytes"], 64 * 1024 * 1024)
+                    self.assertEqual(resident["reserved_processes"], 1)
+
+                    session = await harness.create_session(root)
+                    run = await session.start("coordinated package")
+                    self.assertEqual(
+                        (await run.wait())["text"], "custom:coordinated package|python"
+                    )
+                    first = cast(
+                        "dict[str, Any]",
+                        await session.invoke_package_command("@fixture/sdk-python", "count"),
+                    )
+                    second = cast(
+                        "dict[str, Any]",
+                        await session.invoke_package_command("@fixture/sdk-python", "count"),
+                    )
+                    self.assertEqual((first["calls"], second["calls"]), (1, 2))
+                    self.assertEqual(first["pid"], second["pid"])
+                    self.assertEqual(first["session_id"], session.id)
+                    async with asyncio.timeout(5):
+                        while True:
+                            current = await harness.capacity_status()
+                            assert current is not None
+                            governor = await harness.governor()
+                            # Helper commitments are host aggregates, not private client counts.
+                            helpers = current.get("native_helpers", {})
+                            if (
+                                helpers.get("committed", 0) > 0
+                                and helpers.get("memory_bytes", 0) > 0
+                                and (await harness.status())["active_agents"] == 0
+                                and governor["running"] == 0
+                            ):
+                                self.assertEqual(
+                                    governor["reserved_memory_bytes"],
+                                    resident["reserved_memory_bytes"],
+                                )
+                                self.assertEqual(
+                                    governor["reserved_processes"], resident["reserved_processes"]
+                                )
+                                break
+                            await asyncio.sleep(0.025)
+            await harness.close()
+            with self.assertRaises(HarnessError) as caught:
+                await harness.capacity_status()
+            self.assertIn(caught.exception.code, {"closed", "disconnected"})
 
     async def test_native_api_key_providers_configure_without_model_requests(self) -> None:
         providers: list[ProviderConfig] = [
@@ -244,7 +582,7 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_one_hundred_concurrent_starts_and_waits(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state:
-            async with AsyncHarness(worker_path=WORKER, config={"state_dir": state}) as harness:
+            async with AsyncHarness(worker_path=WORKER, config=provider_fixture(state)) as harness:
                 sessions = await asyncio.gather(
                     *(harness.create_session(state) for _ in range(100))
                 )
@@ -256,7 +594,7 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_request_overflow_keeps_control_capacity(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state:
-            async with AsyncHarness(worker_path=WORKER, config={"state_dir": state}) as harness:
+            async with AsyncHarness(worker_path=WORKER, config=provider_fixture(state)) as harness:
                 run = await (await harness.create_session(state)).start("hello")
                 requests = [asyncio.create_task(harness.status()) for _ in range(400)]
                 await asyncio.sleep(0)
@@ -269,14 +607,14 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_late_wait_and_shared_sessions(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state:
-            async with AsyncHarness(worker_path=WORKER, config={"state_dir": state}) as harness:
+            async with AsyncHarness(worker_path=WORKER, config=provider_fixture(state)) as harness:
                 first = await harness.create_session(state)
                 second = await harness.create_session(state)
                 run = await first.start("hello from Python")
                 await asyncio.sleep(0.05)
                 events = [event async for event in run]
                 self.assertTrue(any(event["type"] == "text_delta" for event in events))
-                self.assertEqual((await run.wait())["text"], "Demo: hello from Python")
+                self.assertEqual((await run.wait())["text"], "Fixture: hello from Python")
                 self.assertEqual(
                     (await (await second.start("second")).wait())["status"], "completed"
                 )
@@ -293,7 +631,7 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state:
             async with AsyncHarness(
-                worker_path=WORKER, config=replay(state), tools=[Tool(DEFINITION, execute)]
+                worker_path=WORKER, config=callback_config(state), tools=[Tool(DEFINITION, execute)]
             ) as harness:
                 run = await (await harness.create_session(state)).start("lookup")
                 events = [event async for event in run]
@@ -321,10 +659,19 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state:
             async with AsyncHarness(
-                worker_path=WORKER, config=replay(state), tools=[Tool(DEFINITION, execute)]
+                worker_path=WORKER, config=callback_config(state), tools=[Tool(DEFINITION, execute)]
             ) as harness:
+                self.assertEqual(await harness.scheduling_status(), IDLE_SCHEDULING)
                 run = await (await harness.create_session(state)).start("wait")
                 await asyncio.wait_for(invoked.wait(), timeout=5)
+                self.assertEqual(
+                    await harness.scheduling_status(),
+                    {**IDLE_SCHEDULING, "managed_runs": 1, "tool_running": 1},
+                )
+                self.assertEqual(
+                    set(await harness.status()),
+                    {"active_agents", "model_requests", "tools", "waiting_model_requests"},
+                )
                 await run.cancel()
                 self.assertEqual((await run.wait())["status"], "cancelled")
                 await asyncio.wait_for(cancelled.wait(), timeout=1)
@@ -333,6 +680,7 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
                         break
                     await asyncio.sleep(0.01)
                 self.assertEqual((await harness.governor())["running"], 0)
+                self.assertEqual(await harness.scheduling_status(), IDLE_SCHEDULING)
 
     async def test_cancelled_sync_write_keeps_workspace_ownership(self) -> None:
         started = threading.Event()
@@ -351,10 +699,7 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
             return "finished"
 
         with tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state:
-            config = replay(state)
-            provider = config["provider"]
-            assert provider["kind"] == "replay"
-            provider["responses"].insert(0, provider["responses"][0])
+            config = callback_config(state, calls=2)
             definition: ToolDefinition = {**DEFINITION, "effect": "write"}
             async with AsyncHarness(
                 worker_path=WORKER, config=config, tools=[Tool(definition, execute)]
@@ -406,10 +751,7 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
                     active -= 1
 
         with tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state:
-            config = replay(state)
-            provider = config["provider"]
-            assert provider["kind"] == "replay"
-            provider["responses"] = [provider["responses"][0]] * 5 + [{"content": "done"}]
+            config = callback_config(state, calls=5)
             async with AsyncHarness(
                 worker_path=WORKER, config=config, tools=[Tool(DEFINITION, execute)]
             ) as harness:
@@ -431,7 +773,8 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_full_journal_fails_wait_and_preserves_recoverable_history(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state:
-            config: ConfigureParams = {"state_dir": state, "max_store_bytes": 1024 * 1024}
+            config = provider_fixture(state)
+            config["max_store_bytes"] = 1024 * 1024
             async with AsyncHarness(worker_path=WORKER, config=config) as harness:
                 session = await harness.create_session(state)
                 with self.assertRaises(HarnessError):
@@ -471,7 +814,7 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state:
             async with AsyncHarness(
-                worker_path=WORKER, config=replay(state), tools=[Tool(DEFINITION, execute)]
+                worker_path=WORKER, config=callback_config(state), tools=[Tool(DEFINITION, execute)]
             ) as harness:
                 run = await (await harness.create_session(state)).start("hold")
                 self.assertTrue(await asyncio.to_thread(started.wait, 2))
@@ -489,6 +832,28 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SyncSdkTests(unittest.TestCase):
+    def test_sync_capacity_and_view_facades(self) -> None:
+        with (
+            tempfile.TemporaryDirectory() as state,
+            Harness(worker_path=WORKER, config=provider_fixture(state)) as harness,
+        ):
+            self.assertIsNone(harness.capacity_status())
+            self.assertEqual(harness.scheduling_status(), IDLE_SCHEDULING)
+            session = harness.create_session(title="sync view")
+            page = harness.sessions_page({"limit": 1})
+            self.assertEqual(page["sessions"][0]["id"], session.id)
+            self.assertEqual(harness.resolve_session(session.id).id, session.id)
+            run = session.start("sync bounded history")
+            run.wait()
+            view = session.view(bounds={"max_events": 0})
+            self.assertEqual(view["events"], [])
+            transition = view["last_transition"]
+            assert transition is not None
+            self.assertEqual(transition["run_id"], run.id)
+            self.assertTrue(harness.session_view(session.id)["events"])
+            self.assertTrue(session.events_page(view["durable_cursor"])["complete"])
+            self.assertTrue(harness.events_page(session.id, view["durable_cursor"])["complete"])
+
     def test_sync_package_command_and_widget_facades(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ejm-harness-package-sdk-sync-py-") as folder:
             root = Path(folder)
@@ -511,7 +876,7 @@ class SyncSdkTests(unittest.TestCase):
         with (
             tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state,
             Harness(
-                worker_path=WORKER, config=replay(state), tools=[Tool(DEFINITION, execute)]
+                worker_path=WORKER, config=callback_config(state), tools=[Tool(DEFINITION, execute)]
             ) as harness,
         ):
             session = harness.create_session(state)

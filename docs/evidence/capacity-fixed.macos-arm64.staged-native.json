@@ -1,0 +1,415 @@
+{
+  "recorded_at": "2026-10-20T17:26:01.206046+00:00",
+  "host": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64",
+    "logical_cpus": 12,
+    "model": "Mac16,8",
+    "physical_memory_bytes": 25769803776
+  },
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Homebrew)",
+  "profile": "release",
+  "binary_sha256": {
+    "ejm_harness_bench": "13e2ee1a05bb03678b61ad52aa893c927626038c6482217f40d780cef76a0b54"
+  },
+  "binary_bytes": {
+    "ejm_harness_bench": 7503456
+  },
+  "capacity_mode": "fixed",
+  "workloads": [
+    {
+      "agents_per_process": 100,
+      "requested_managed_agents": 100,
+      "participating_processes": 1,
+      "mode": "parked",
+      "elapsed_ms": 1128.699,
+      "participants": [
+        {
+          "admission_ms": 23,
+          "agents": 100,
+          "bounded_page_and_tail_us": 261,
+          "capacity": {
+            "coordinated": true,
+            "hard_model_requests": 8,
+            "hard_resources": {
+              "cpu_millis": 2000,
+              "max_artifact_bytes": 67108864,
+              "max_heavy_jobs": 1,
+              "max_job_ms": 120000,
+              "max_jobs": 4,
+              "max_output_bytes": 1048576,
+              "max_processes": 32,
+              "max_queue": 256,
+              "memory_bytes": 536870912
+            },
+            "learning": {
+              "profile_count": 0,
+              "samples": 0,
+              "state": "cold"
+            },
+            "mode": "fixed",
+            "model_running": 0,
+            "model_target": 8,
+            "model_waiting": 0,
+            "models": {
+              "cancelled": 100,
+              "failed": 0,
+              "preparation": {
+                "p50_micros": 0,
+                "p95_micros": 127,
+                "samples": 100
+              },
+              "provider_wait": {
+                "p50_micros": 0,
+                "p95_micros": 63,
+                "samples": 100
+              },
+              "queue": {
+                "p50_micros": 1048575,
+                "p95_micros": 1048575,
+                "samples": 100
+              },
+              "service": {
+                "p50_micros": 0,
+                "p95_micros": 1048575,
+                "samples": 100
+              },
+              "successful": 0,
+              "successful_per_second": 0.0
+            },
+            "native": {
+              "active_local_scopes": 0,
+              "descendant_cleanup": "monitored",
+              "domain_placement": "enforced",
+              "epoch": null,
+              "last_dead_epoch": null,
+              "last_operation": null,
+              "owner_death_cleanup": "unsupported",
+              "owner_deaths": 0,
+              "owner_exclusivity": "enforced",
+              "owner_loss_detection": "enforced",
+              "owner_pid": null,
+              "recovery": "monitored"
+            },
+            "native_helpers": {
+              "committed": 0,
+              "memory_bytes": 0,
+              "occupied": 0,
+              "pending": 0,
+              "processes": 0
+            },
+            "observations": {
+              "available_memory_bytes": {
+                "age_ms": 41,
+                "availability": "measured",
+                "max_age_ms": 5000,
+                "source": "native_system",
+                "value": 10314301440
+              },
+              "cpu_millis": {
+                "age_ms": 41,
+                "availability": "measured",
+                "max_age_ms": 5000,
+                "source": "scheduler_availability",
+                "value": 12000
+              },
+              "cpu_usage_percent": {
+                "age_ms": 41,
+                "availability": "measured",
+                "max_age_ms": 5000,
+                "source": "native_system",
+                "value": 53.381622314453125
+              },
+              "descriptor_limit": {
+                "age_ms": 41,
+                "availability": "measured",
+                "max_age_ms": 5000,
+                "source": "process_resource_limit",
+                "value": 1048575
+              },
+              "domain_visibility": "measured",
+              "domains": [
+                {
+                  "available_memory_bytes": 10314301440,
+                  "available_processes": null,
+                  "cpu_millis": 12000,
+                  "id": "host",
+                  "max_processes": null,
+                  "memory_bytes": 25769803776,
+                  "parent": null
+                }
+              ],
+              "memory_bytes": {
+                "age_ms": 41,
+                "availability": "measured",
+                "max_age_ms": 5000,
+                "source": "native_system",
+                "value": 25769803776
+              },
+              "process_limit": {
+                "age_ms": 41,
+                "availability": "measured",
+                "max_age_ms": 5000,
+                "source": "process_resource_limit",
+                "value": 4000
+              }
+            },
+            "operating": {
+              "contact_remaining": {
+                "nanos": 959056042,
+                "secs": 7
+              },
+              "contact_valid": true,
+              "debt": {
+                "cpu_millis": 0,
+                "max_heavy_jobs": 0,
+                "max_jobs": 0,
+                "max_output_bytes": 0,
+                "max_processes": 0,
+                "memory_bytes": 0
+              },
+              "generation": 3,
+              "memory_leases": 1,
+              "policy": "fixed",
+              "target": {
+                "cpu_millis": 2000,
+                "max_heavy_jobs": 1,
+                "max_jobs": 4,
+                "max_output_bytes": 1048576,
+                "max_processes": 32,
+                "memory_bytes": 536870912
+              }
+            },
+            "provider": {
+              "blocked": false,
+              "cooldown_until_ms": null,
+              "coordinated": false,
+              "domain": null,
+              "in_flight": 0,
+              "reason": null,
+              "request_credits": null,
+              "target": 8,
+              "token_credits": null,
+              "token_debt": 0,
+              "waiting": 0
+            },
+            "reason": null,
+            "scope": "current OS user and visible host/container ancestors",
+            "tools": {
+              "cancelled": 0,
+              "failed": 0,
+              "preparation": {
+                "p50_micros": 0,
+                "p95_micros": 0,
+                "samples": 0
+              },
+              "provider_wait": {
+                "p50_micros": 0,
+                "p95_micros": 0,
+                "samples": 0
+              },
+              "queue": {
+                "p50_micros": 0,
+                "p95_micros": 0,
+                "samples": 0
+              },
+              "service": {
+                "p50_micros": 0,
+                "p95_micros": 0,
+                "samples": 0
+              },
+              "successful": 0,
+              "successful_per_second": 0.0
+            }
+          },
+          "capacity_mode": "fixed",
+          "commands_completed": 0,
+          "deltas_per_response": 0,
+          "durable_events": 206,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 100663296,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "first_session_id": "0b04b078-9d81-4345-abe7-23c4352874db",
+          "journal_after_work": {
+            "append_commits": 206,
+            "calls": 613,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 158, 30, 12, 2, 1, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "commit_ns": 14162580,
+            "max_commit_ns": 564625,
+            "max_queue_wait_ns": 9011333,
+            "max_work_ns": 576750,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 273, 17, 6, 66, 36, 10, 24, 42, 39, 12, 24, 52, 8, 0,
+              0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 528777463,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 81, 109, 10, 6, 274, 104, 23, 3, 3, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 30191884
+          },
+          "journal_at_park": {
+            "append_commits": 106,
+            "calls": 412,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 84, 13, 5, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0
+            ],
+            "commit_ns": 6835710,
+            "max_commit_ns": 521416,
+            "max_queue_wait_ns": 562792,
+            "max_work_ns": 573667,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 272, 17, 6, 65, 36, 9, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 6027797,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 96, 7, 2, 218, 68, 17, 0, 2, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "work_ns": 20662928
+          },
+          "mode": "parked",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 93,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 37,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 13688832,
+            "rss_bytes": 25182208,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 55,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 18722816,
+            "rss_bytes": 25706496,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "retained_state_dir": null,
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 0,
+          "sampling_interval_ms": 2,
+          "scope": "isolated shared fixture registry",
+          "selected_tail_events": 3,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 100,
+          "status": "completed",
+          "work_ms": 9,
+          "command": [
+            "/private/tmp/ejm-capacity-staged-release-20261020/ejm-harness-bench",
+            "--agents",
+            "100",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "fixed",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-fbwz2xas/registry",
+            "--parked"
+          ],
+          "sampled_peak_engine_rss_bytes": 25444352,
+          "sampled_peak_process_tree_rss_bytes": 25444352,
+          "rss_samples": 24,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 1127.166
+        }
+      ]
+    },
+    {
+      "agents_per_process": 100,
+      "requested_managed_agents": 100,
+      "participating_processes": 1,
+      "mode": "mixed",
+      "elapsed_ms": 2991.533,
+      "participants": [
+        {
+          "status": "failed",
+          "requested_agents": 100,
+          "mode": "mixed",
+          "capacity_mode": "fixed",
+          "exit_code": 1,
+          "monitor_timeout": false,
+          "error": "PARKED 100 agents\nError: agent failed: Some(\"native fixture failed: process sampler failed\")\n",
+          "command": [
+            "/private/tmp/ejm-capacity-staged-release-20261020/ejm-harness-bench",
+            "--agents",
+            "100",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "fixed",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-fbwz2xas/registry"
+          ],
+          "sampled_peak_engine_rss_bytes": 27639808,
+          "sampled_peak_process_tree_rss_bytes": 49676288,
+          "rss_samples": 63,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 2989.845
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Deterministic provider fixtures, not hosted API latency or coding quality.",
+    "RSS samples can miss short peaks; summed tree RSS double counts shared pages.",
+    "Benchmark monitor and SDK hosts are excluded from engine RSS.",
+    "A modern host result does not validate the four core, eight GB target machine.",
+    "Each process has a separate journal; groups reuse only shared host capacity state.",
+    "Threaded polling can perturb results; process RSS peaks are sampled separately.",
+    "CPU, I/O, input latency, and full fixed-versus-auto acceptance need separate checks."
+  ],
+  "status": "failed"
+}

@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "date": "2026-10-20",
+  "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "scope": "Local registry commit-boundary correctness; no native Linux/Windows or throughput claim",
+  "commands": [
+    "cargo test -p ejm-harness --lib capacity::registry --offline --locked",
+    "cargo clippy -p ejm-harness --all-targets --offline --locked -- -D warnings"
+  ],
+  "cargo_environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "serialization": "/tmp/ejm-capacity-cargo.lock"
+  },
+  "result": {
+    "registry_tests_passed": 29,
+    "strict_all_target_clippy": "passed",
+    "new_fault_tests": 4,
+    "killed_subprocess_boundaries": 7,
+    "dimensions": ["models", "jobs", "cpu", "memory", "processes", "heavy jobs", "output"],
+    "checks": [
+      "uncommitted increase rollback",
+      "committed increase remains charged before installation",
+      "installed target remains charged",
+      "reduction retains charge through actual governor lease drain",
+      "release commit is the credit transfer boundary",
+      "lost release result reconciles once",
+      "lost removal result keeps retained handles fenced",
+      "duplicate and stale generation rejection",
+      "paused lifetime witness prevents recovery",
+      "SQLite writer contention preserves charges"
+    ]
+  },
+  "source_sha256": {
+    "crates/ejm-harness/src/capacity/registry.rs": "e68f319d0790c22a91a87d86d4712668bcfddcd9d0a83d059cb52cd805ef6ccd",
+    "crates/ejm-harness/src/capacity/registry/faults.rs": "11c6431de8b95870b2c18c17da3d3a5390aaaef93b27f5011d3bf358f04b27d6",
+    "crates/ejm-harness/src/capacity.rs": "aca1b50a78229caed257c992a48a2e023d762af3d8458b57798d1e1e8d36e26b"
+  },
+  "logs": {
+    "ejm-registry-faults-final-01a155dd.log": "187f7bc1ea2dd426aaf0dcfdc3005594aa43b767f72286df5cd1c61341b90ec3",
+    "ejm-registry-fault-clippy-final-01a155dd.log": "b5f95142066c174ba9a50f354471de85368ad10aabf290e2b45d9ac2bf6d88e5"
+  },
+  "limits": [
+    "Actual subprocesses run on macOS only",
+    "Native cgroup moves and 256-process acceptance remain unrun",
+    "No production API, protocol, or dependency added for fault injection"
+  ]
+}

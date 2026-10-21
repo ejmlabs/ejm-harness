@@ -12,10 +12,7 @@ use serde_json::{Value, json};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-use crate::{
-    RuntimeEvent, RuntimePool,
-    runtime::{Callback, callback_reservation},
-};
+use crate::{RuntimeEvent, RuntimePool, runtime::Callback};
 
 #[derive(Clone)]
 struct Binding {
@@ -125,9 +122,14 @@ impl Tool for PackageTool {
             call.name == self.export.name,
             "package tool identity mismatch"
         );
+        self.binding.pool.require_governor(&context.governor)?;
         let lease = context
             .governor
-            .acquire(&context.session_id, callback_reservation(), &context.cancel)
+            .acquire(
+                &context.session_id,
+                self.binding.pool.callback_reservation(),
+                &context.cancel,
+            )
             .await?;
         let mut callback = self.binding.callback(
             self.export.handler.clone(), call.arguments,
@@ -267,9 +269,14 @@ impl PackageHook {
         args: Value,
         context: &HookContext,
     ) -> Result<T> {
+        self.binding.pool.require_governor(&context.governor)?;
         let lease = context
             .governor
-            .acquire(&context.session_id, callback_reservation(), &context.cancel)
+            .acquire(
+                &context.session_id,
+                self.binding.pool.callback_reservation(),
+                &context.cancel,
+            )
             .await?;
         let callback = self.binding.callback(
             handler.into(),

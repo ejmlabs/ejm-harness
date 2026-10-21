@@ -1,0 +1,336 @@
+{
+  "schema": 1,
+  "status": "passed",
+  "scope": "Focused working-source permanent native-lock repair. No full-gate or release claim.",
+  "target": "aarch64-apple-darwin",
+  "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "source": {
+    "head": "e0e914d01afcba01bfe83a8b374139e9ed09d60e",
+    "dirty": true,
+    "tested_owned_files": {
+      "Cargo.toml": "9d61cbe01f91ba6505334414cdfd463bdfe01018a39cdfba762d9093ae16ea0e",
+      "Cargo.lock": "fea2c17b881da01f3f539fa9a7f829dbf33233e5aa42a4ce36bf96ed955b5aba",
+      "crates/ejm-harness-exec/Cargo.toml": "2b9cc2fa1f69bc17f2c18ed3a66a95f0c141a156c90751a7738cd59be03d7dfd",
+      "crates/ejm-harness/Cargo.toml": "95b80f2e6a2eab059973676085ffe7fb1f6d2250177ec8c28bae4d1c1a422d81",
+      "crates/ejm-harness-auth/Cargo.toml": "8cb3389bd7de165a1e4b67d582fb0951c64368c8490ab9f648f5a5faf1a77b79",
+      "crates/ejm-harness-coding/Cargo.toml": "a41c929ed6afe25ba72b42fbc078ac70d3311b1d7df2d23a6ec94e408062ca1e",
+      "crates/ejm-harness-packages/Cargo.toml": "bfb4948d6cc029c4c9baf456e661149482afe52fc20a97f768b367201c4219d2",
+      "crates/ejm-harness-exec/src/native/wire.rs": "ae88c68fab22704914e95d2d3177b0ec6e9578b5b9cb06925352adf1c066de33",
+      "crates/ejm-harness-exec/src/native/tests.rs": "17e7f4c50aa0ea7821f5227e744c2c5ad75b07514707d64a60667c0367da86fa",
+      "crates/ejm-harness-exec/src/native/tests/stable_locks.rs": "578412de090dc27abe58025e6164e0a8c9c6f0e1ab8d33dcdc00fb2b138a4e3a"
+    },
+    "vendor_provenance": "../../vendor/rightkit-fs.provenance.json",
+    "vendor_source_manifest": "../../vendor/rightkit-fs.source.json",
+    "tested_rust_manifest_vendor_inputs_unchanged": true
+  },
+  "ordinary_dependency_graph": {
+    "package": "path+file:///Users/everettmorgan/Desktop/ejm-harness/vendor/rightkit-fs#0.4.4",
+    "manifest_path": "/Users/everettmorgan/Desktop/ejm-harness/vendor/rightkit-fs/Cargo.toml",
+    "features": ["fs"],
+    "dependencies": [
+      "registry+https://github.com/rust-lang/crates.io-index#libc@0.2.191",
+      "registry+https://github.com/rust-lang/crates.io-index#thiserror@2.0.21"
+    ]
+  },
+  "started_utc": "2026-10-21T02:22:29.418049+00:00",
+  "finished_utc": "2026-10-21T02:22:59.670572+00:00",
+  "cases": [
+    {
+      "name": "boundary_contracts",
+      "status": "passed",
+      "passed_tests": 3
+    },
+    {
+      "name": "existing_race",
+      "status": "passed",
+      "passed_tests": 1
+    },
+    {
+      "name": "unsafe_links",
+      "status": "passed",
+      "passed_tests": 1
+    },
+    {
+      "name": "ordinary_release_test",
+      "status": "passed",
+      "passed_tests": 1
+    }
+  ],
+  "commands": [
+    {
+      "name": "toolchain",
+      "command": ["rustc", "--version", "--verbose"],
+      "duration_seconds": 0.20846375002292916,
+      "returncode": 0,
+      "reaped": true,
+      "logs_final": true,
+      "stdout": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/toolchain.stdout",
+        "sha256": "646e2c57dbb7913a825d5a05af4eaa43e0db4267d09e45fb23562baab258c382",
+        "bytes": 203
+      },
+      "stderr": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/toolchain.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    {
+      "name": "offline_resolution",
+      "command": [
+        "cargo",
+        "metadata",
+        "--offline",
+        "--filter-platform",
+        "aarch64-apple-darwin",
+        "--format-version",
+        "1"
+      ],
+      "duration_seconds": 0.4195765409967862,
+      "returncode": 0,
+      "reaped": true,
+      "logs_final": true,
+      "stdout": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/offline_resolution.stdout",
+        "sha256": "627c6cb4a2464dfcc58553274b3b0a0327bd3ec921f7f56d246b4df3b8aba29e",
+        "bytes": 1363528
+      },
+      "stderr": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/offline_resolution.stderr",
+        "sha256": "f3ef3614a47b2a5f8a8ad519c9505b84ec40aed5547f93188e1c0f390d78b1d7",
+        "bytes": 147
+      }
+    },
+    {
+      "name": "rustfmt",
+      "command": [
+        "rustfmt",
+        "--edition",
+        "2024",
+        "--check",
+        "--config",
+        "skip_children=true",
+        "crates/ejm-harness-exec/src/native/wire.rs",
+        "crates/ejm-harness-exec/src/native/tests.rs",
+        "crates/ejm-harness-exec/src/native/tests/stable_locks.rs"
+      ],
+      "duration_seconds": 0.10786916699726135,
+      "returncode": 0,
+      "reaped": true,
+      "logs_final": true,
+      "stdout": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/rustfmt.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "stderr": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/rustfmt.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    {
+      "name": "boundary_contracts",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "ejm-harness-exec",
+        "--lib",
+        "--features",
+        "native-test-seams",
+        "native::tests::stable_locks::",
+        "--",
+        "--nocapture",
+        "--test-threads=1"
+      ],
+      "duration_seconds": 4.95640658296179,
+      "returncode": 0,
+      "reaped": true,
+      "logs_final": true,
+      "stdout": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/boundary_contracts.stdout",
+        "sha256": "d35525d0476f6d0cec54de2a8bbe21cd036aa40e389b7f6abcef95a2a8f2b296",
+        "bytes": 421
+      },
+      "stderr": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/boundary_contracts.stderr",
+        "sha256": "32daffc0ee9e9be184ed1fed186b96c1a882b5d7f25172a182e209af3563dccc",
+        "bytes": 410
+      }
+    },
+    {
+      "name": "existing_race",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "ejm-harness-exec",
+        "--lib",
+        "native::tests::competing_startup_clients_share_one_stable_lock",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "duration_seconds": 3.8357455829973333,
+      "returncode": 0,
+      "reaped": true,
+      "logs_final": true,
+      "stdout": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/existing_race.stdout",
+        "sha256": "a103db97c42c1a250d819b5ec14a013519ac376fed7fc0240b27065374b6e2d1",
+        "bytes": 188
+      },
+      "stderr": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/existing_race.stderr",
+        "sha256": "d7b0e4e21e2b7693c346af2aab184a9f4f752992b75d7655d9d6a471fc4504bf",
+        "bytes": 359
+      }
+    },
+    {
+      "name": "unsafe_links",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "-p",
+        "ejm-harness-exec",
+        "--lib",
+        "native::tests::hard_linked_startup_lock_is_rejected_without_replacement",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "duration_seconds": 0.22357854200527072,
+      "returncode": 0,
+      "reaped": true,
+      "logs_final": true,
+      "stdout": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/unsafe_links.stdout",
+        "sha256": "15fe360ee5cad822d0e48b7ddb548f4addad00c7419f8f1af7fbcd9891542761",
+        "bytes": 197
+      },
+      "stderr": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/unsafe_links.stderr",
+        "sha256": "2fe0359c8231630853c1a141d90831d666f684bb9f857d5da4b5d718e8d8f51f",
+        "bytes": 161
+      }
+    },
+    {
+      "name": "ordinary_release_test",
+      "command": [
+        "cargo",
+        "test",
+        "--offline",
+        "--locked",
+        "--release",
+        "-p",
+        "ejm-harness-exec",
+        "--lib",
+        "native::tests::competing_startup_clients_share_one_stable_lock",
+        "--",
+        "--exact",
+        "--test-threads=1"
+      ],
+      "duration_seconds": 13.781861791037954,
+      "returncode": 0,
+      "reaped": true,
+      "logs_final": true,
+      "stdout": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/ordinary_release_test.stdout",
+        "sha256": "a103db97c42c1a250d819b5ec14a013519ac376fed7fc0240b27065374b6e2d1",
+        "bytes": 188
+      },
+      "stderr": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/ordinary_release_test.stderr",
+        "sha256": "78173d717ac7171462a4b9b7ae1d92a215a0d99573bd02d29ea46e7fc772eb73",
+        "bytes": 351
+      }
+    },
+    {
+      "name": "executor_clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--offline",
+        "--locked",
+        "-p",
+        "ejm-harness-exec",
+        "--all-targets",
+        "--features",
+        "native-test-seams",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "duration_seconds": 2.0806020830059424,
+      "returncode": 0,
+      "reaped": true,
+      "logs_final": true,
+      "stdout": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/executor_clippy.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "stderr": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/executor_clippy.stderr",
+        "sha256": "509c3e6453e22c2602c7de8099f54c9eb3872f3323eed7dcf42003713e84b000",
+        "bytes": 270
+      }
+    },
+    {
+      "name": "worker_contract",
+      "command": ["cargo", "check", "--offline", "--locked", "-p", "ejm-harness-worker"],
+      "duration_seconds": 4.552648000011686,
+      "returncode": 0,
+      "reaped": true,
+      "logs_final": true,
+      "stdout": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/worker_contract.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      },
+      "stderr": {
+        "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/worker_contract.stderr",
+        "sha256": "1325af2f2446ac6268722fe475d65392400e2bdb6fdd07f480284697ddf65358",
+        "bytes": 796
+      }
+    }
+  ],
+  "native_fixture": {
+    "creator_pid": 60043,
+    "killed_at_final_name_visibility": true,
+    "reaped_by_test": true,
+    "peer_shared_same_locked_identity": true,
+    "post_death_identity_retained": true
+  },
+  "minimum_observed_free_bytes": 32330989568,
+  "disk_floor_bytes": 10737418240,
+  "environment": {
+    "PATH": "/opt/homebrew/opt/node@26/bin:/Applications/ChatGPT.app/Contents/Resources/codex-cli/codex-path:/Users/everettmorgan/.codex/tmp/arg0-macos/codex-arg0cNsWKh:/Users/everettmorgan/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override:/Users/everettmorgan/.local/share/fnm/node-versions/v23.10.0/installation/bin:/Users/everettmorgan/.kimi-code/bin:/Users/everettmorgan/.local/share/agent-cli-kit/current/bin:/Users/everettmorgan/.config/tokens/bin:/Users/everettmorgan/.antigravity-ide/antigravity-ide/bin:/Users/everettmorgan/.local/bin:/Users/everettmorgan/google-cloud-sdk/bin:/Users/everettmorgan/.local/state/fnm_multishells/76811_1792321456076/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/Users/everettmorgan/.antigravity/antigravity/bin:/Users/everettmorgan/Library/pnpm:/opt/homebrew/opt/llvm/bin:/Users/everettmorgan/.local/state/fnm_multishells/76784_1792321455910/bin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Library/Apple/usr/bin:/Users/everettmorgan/.cargo/bin:/Users/everettmorgan/Library/Application Support/JetBrains/Toolbox/scripts:/Users/everettmorgan/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/fallback:/Applications/ChatGPT.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS",
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_TARGET_DIR": "/Users/everettmorgan/Desktop/ejm-harness/target",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "TMPDIR": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/fixture-temp"
+  },
+  "raw_report": {
+    "path": "/private/tmp/ejm-capacity-stable-lock-adoption-20261020/focused-20261021T022229Z-3272428e/report.json",
+    "sha256": "d38da11b257725a30f50b6919f1b7e1d8ed1cd59184a3b6278c18e7af374603e",
+    "bytes": 70770
+  },
+  "limits": [
+    "Local macOS arm64 only. Native Windows and Linux remain unverified.",
+    "No arbitrary-descendant cleanup, total native-memory bound, workspace-safety or power-loss claim.",
+    "The new debug seam is selected explicitly; ordinary builds and release tests omit it.",
+    "Worker compilation is checked here. CLI/SDK/IDE, full gate, scale and automatic-default acceptance remain separate.",
+    "Publishing remains gated until maintained upstream replaces the local source pin."
+  ]
+}

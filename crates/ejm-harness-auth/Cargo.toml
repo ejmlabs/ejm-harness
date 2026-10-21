@@ -37,7 +37,7 @@ which = "=8.0.6"
 apple-native-keyring-store = { version = "=1.0.2", default-features = false, features = ["keychain"] }
 
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies]
-rightkit-fs = { version = "=0.4.4", default-features = false, features = ["fs"] }
+rightkit-fs = { workspace = true, features = ["fs"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-native-keyring-store = "=1.1.0"

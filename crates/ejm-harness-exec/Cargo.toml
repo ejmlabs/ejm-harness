@@ -13,13 +13,22 @@ description = "Shared resource admission and bounded native command execution fo
 [lints]
 workspace = true
 
+[features]
+# Debug-only native lock fault injection. Ordinary release tests omit this feature.
+native-test-seams = ["rightkit-fs/testing"]
+
 [dependencies]
 anyhow.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["net"] }
 tokio-util.workspace = true
 serde.workspace = true
 schemars.workspace = true
 uuid.workspace = true
+futures-util.workspace = true
+bytes = "1"
+serde_json.workspace = true
+rightkit-fs = { workspace = true, features = ["fs"] }
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 
 [target.'cfg(unix)'.dependencies]
 rustix = { workspace = true, features = ["process", "param"] }
@@ -29,12 +38,13 @@ processkit = { version = "=3.3.4", default-features = false, features = ["proces
 
 [target.'cfg(target_os = "linux")'.dependencies]
 procfs-core.workspace = true
+rustix = { workspace = true, features = ["thread"] }
 
-[target.'cfg(not(target_os = "linux"))'.dependencies]
-sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+[target.'cfg(target_os = "macos")'.dependencies]
+sysctl = { version = "=0.7.1", default-features = false }
+libproc = "=0.14.11"
 
 [dev-dependencies]
 tempfile.workspace = true
-serde_json.workspace = true
 procfs-core.workspace = true
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }

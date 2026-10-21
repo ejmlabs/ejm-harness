@@ -1,11 +1,17 @@
-use std::{collections::HashMap, process::Stdio, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result, anyhow, ensure};
+use ejm_harness_exec::{
+    Governor, Reservation,
+    native::{
+        self, NativeChild, NativeCleanupState, NativeCommand, NativeOwnerReady, NativeReader,
+        NativeWriter,
+    },
+};
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use tokio::{
-    process::{Child, Command},
     sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot, watch},
     task::JoinHandle,
     time::Instant,
@@ -72,47 +78,59 @@ pub(crate) struct Host {
 }
 
 impl Host {
-    pub(crate) fn spawn(
+    pub(crate) async fn spawn<T: Send + 'static>(
         kind: RuntimeKind,
         config: RuntimeConfig,
+        native_ready: Option<NativeOwnerReady>,
+        governor: Option<Arc<Governor>>,
         closed: CancellationToken,
+        retained: T,
     ) -> Result<Arc<Self>> {
-        let mut command = match kind {
-            RuntimeKind::Node => {
-                let mut command = Command::new(&config.node);
-                command.args([
-                    "--input-type=module",
-                    "--eval",
-                    include_str!("../runtime/node.mjs"),
-                ]);
-                command
-            }
-            RuntimeKind::Python => {
-                let mut command = Command::new(&config.python);
-                command.args(["-I", "-B", "-u", "-c", include_str!("../runtime/python.py")]);
-                command
-            }
+        let command = match kind {
+            RuntimeKind::Node => NativeCommand::new(&config.node)?.args([
+                "--input-type=module",
+                "--eval",
+                include_str!("../runtime/node.mjs"),
+            ]),
+            RuntimeKind::Python => NativeCommand::new(&config.python)?.args([
+                "-I",
+                "-B",
+                "-u",
+                "-c",
+                include_str!("../runtime/python.py"),
+            ]),
         };
-        command
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .kill_on_drop(true);
-        #[cfg(unix)]
-        command.process_group(0);
-        let mut child = command.spawn().context("start package language host")?;
-        let stdin = child
-            .stdin
-            .take()
-            .context("language host stdin unavailable")?;
-        let stdout = child
-            .stdout
-            .take()
-            .context("language host stdout unavailable")?;
-        let stderr = child
-            .stderr
-            .take()
-            .context("language host stderr unavailable")?;
+        // A resident host has an absolute bounded lifetime, including idle time.
+        // Runtime shutdown and client loss normally end it much sooner.
+        let command = command
+            .lifetime(Duration::from_hours(24))
+            .reservation(Reservation {
+                memory_bytes: crate::runtime::HOST_MEMORY_BYTES,
+                processes: 1,
+                ..Reservation::default()
+            });
+        let deaths = native_ready
+            .as_ref()
+            .map(|ready| ready.owner().snapshot().owner_deaths);
+        let result = match &native_ready {
+            Some(ready) => ready.spawn(command).await,
+            None => native::spawn(command, None).await,
+        };
+        if result.is_err()
+            && native_ready
+                .as_ref()
+                .is_some_and(|ready| Some(ready.owner().snapshot().owner_deaths) != deaths)
+            && let Some(governor) = &governor
+        {
+            governor.park_admission();
+        }
+        let mut child = result.context("start package language host")?;
+        let pipes = (child.take_stdin(), child.take_stdout(), child.take_stderr());
+        let (Some(stdin), Some(stdout), Some(stderr)) = pipes else {
+            // Keep admission alive if native cleanup cannot yet prove exit.
+            cleanup(&mut child, governor.as_deref()).await;
+            anyhow::bail!("language host pipes unavailable");
+        };
         let (requests, incoming) = mpsc::channel(config.max_pending);
         let (frames, outgoing) = mpsc::channel(config.max_pending);
         let (done_tx, done) = watch::channel(false);
@@ -133,12 +151,14 @@ impl Host {
             config: config.clone(),
         });
         tokio::spawn(async move {
+            let _retained = retained;
             let actor = Actor {
                 frames,
                 bytes: Arc::new(Semaphore::new(config.max_buffer_bytes)),
                 pending: HashMap::new(),
                 config,
                 closed,
+                governor,
             };
             actor
                 .supervise(child, stdout, incoming, writer, diagnostics)
@@ -231,13 +251,30 @@ struct Actor {
     pending: HashMap<String, Pending>,
     config: RuntimeConfig,
     closed: CancellationToken,
+    governor: Option<Arc<Governor>>,
+}
+
+async fn cleanup(child: &mut NativeChild, governor: Option<&Governor>) {
+    while child.kill().await.is_err() {
+        if child.cleanup_state() == NativeCleanupState::OwnerDied {
+            if let Some(governor) = governor {
+                governor.park_admission();
+            }
+            return;
+        }
+        if child.cleanup_state() == NativeCleanupState::Complete {
+            // Cleanup succeeded but the exit status or reply was lost.
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
 }
 
 impl Actor {
     async fn supervise(
         mut self,
-        mut child: Child,
-        stdout: tokio::process::ChildStdout,
+        mut child: NativeChild,
+        stdout: NativeReader,
         mut requests: mpsc::Receiver<Request>,
         writer: JoinHandle<()>,
         diagnostics: JoinHandle<()>,
@@ -272,10 +309,11 @@ impl Actor {
         requests.close();
         writer.abort();
         let _ = writer.await;
-        kill_group(&child);
-        let _ = child.start_kill();
-        // Retain requests, admission, and effect guards until actual child exit.
-        let _ = child.wait().await;
+        // Retain requests, admission, and effect guards through native cleanup.
+        // Windows confirms that the Job is empty before this can finish.
+        // An error is not proof that the native tree is free. Keep both resident
+        // capacity and pending callback leases until cleanup can complete.
+        cleanup(&mut child, self.governor.as_deref()).await;
         diagnostics.abort();
         let _ = diagnostics.await;
         for (_, pending) in self.pending.drain() {
@@ -406,7 +444,7 @@ impl Actor {
 }
 
 async fn write_frames(
-    stdin: tokio::process::ChildStdin,
+    stdin: NativeWriter,
     mut frames: mpsc::Receiver<Frame>,
     maximum: usize,
     closed: CancellationToken,
@@ -426,16 +464,4 @@ async fn write_frames(
         }
     }
     closed.cancel();
-}
-
-fn kill_group(child: &Child) {
-    #[cfg(unix)]
-    if let Some(pid) = child.id()
-        && let Ok(pid) = i32::try_from(pid)
-        && let Some(pid) = rustix::process::Pid::from_raw(pid)
-    {
-        let _ = rustix::process::kill_process_group(pid, rustix::process::Signal::KILL);
-    }
-    #[cfg(not(unix))]
-    let _ = child;
 }

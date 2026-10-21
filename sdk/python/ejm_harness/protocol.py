@@ -4,11 +4,37 @@ from __future__ import annotations
 
 from typing import Any, Literal, NotRequired, TypeAlias, TypedDict
 
+AdmissionPolicy: TypeAlias = Literal["fixed", "automatic"]
+
+
+CapacityMode: TypeAlias = Literal["auto", "fixed"]
+
+
+class CapacityPolicy(TypedDict):
+    max_cpu_millis: NotRequired[int | None]
+    max_heavy_jobs: NotRequired[int | None]
+    max_jobs: NotRequired[int | None]
+    max_memory_bytes: NotRequired[int | None]
+    max_model_requests: NotRequired[int | None]
+    max_output_bytes: NotRequired[int | None]
+    max_processes: NotRequired[int | None]
+    max_sessions: NotRequired[int | None]
+    mode: NotRequired[CapacityMode]
+
+
+class CapacityResetResult(TypedDict):
+    profiles_reset: int
+
 
 class CommandExport(TypedDict):
     description: str
     handler: str
     name: str
+
+
+class Duration(TypedDict):
+    nanos: int
+    secs: int
 
 
 Effect: TypeAlias = Literal["read", "write", "external"]
@@ -124,9 +150,48 @@ class HookExport(TypedDict):
     handler: str
 
 
+LearningState: TypeAlias = Literal["cold", "learned", "unavailable"]
+
+
+class LearningStatus(TypedDict):
+    profile_count: int
+    samples: int
+    state: LearningState
+
+
 class NamedExport(TypedDict):
     handler: str
     name: str
+
+
+class NativeHelperSnapshot(TypedDict):
+    committed: NotRequired[int]
+    memory_bytes: NotRequired[int]
+    occupied: NotRequired[int]
+    pending: NotRequired[int]
+    processes: NotRequired[int]
+
+
+class NativeOperation(TypedDict):
+    epoch: str
+    id: int
+
+
+ObservationAvailability: TypeAlias = Literal["measured", "estimated", "unavailable", "unsupported"]
+
+
+ObservationSource: TypeAlias = Literal[
+    "native_system", "scheduler_availability", "process_resource_limit", "linux_cgroup_v2"
+]
+
+
+class OperatingTarget(TypedDict):
+    cpu_millis: int
+    max_heavy_jobs: int
+    max_jobs: int
+    max_output_bytes: int
+    max_processes: int
+    memory_bytes: int
 
 
 class PackageGrants(TypedDict):
@@ -159,41 +224,51 @@ class ProtocolError(TypedDict):
 
 
 class ProviderConfig1(TypedDict):
-    kind: Literal["echo"]
-
-
-class ProviderConfig3(TypedDict):
     api_key: str
     base_url: str
     kind: Literal["openai"]
     model: str
 
 
-class ProviderConfig4(TypedDict):
+class ProviderConfig2(TypedDict):
     api_key: str
     kind: Literal["responses"]
     model: str
     reasoning_effort: NotRequired[str | None]
 
 
-class ProviderConfig5(TypedDict):
+class ProviderConfig3(TypedDict):
     api_key: str
     kind: Literal["anthropic"]
     model: str
 
 
-class ProviderConfig6(TypedDict):
+class ProviderConfig4(TypedDict):
     kind: Literal["package"]
     name: str
     package: str
 
 
-class ProviderContinuation1(TypedDict):
-    provider: Literal["open_ai_responses"]
-    reasoning: list[Any]
+ProviderConfig: TypeAlias = ProviderConfig1 | ProviderConfig2 | ProviderConfig3 | ProviderConfig4
 
 
-ProviderContinuation: TypeAlias = ProviderContinuation1
+class ProviderRate(TypedDict):
+    limit: int
+    window_ms: int
+
+
+class ProviderSnapshot(TypedDict):
+    blocked: bool
+    cooldown_until_ms: NotRequired[int | None]
+    coordinated: bool
+    domain: NotRequired[str | None]
+    in_flight: int
+    reason: NotRequired[str | None]
+    request_credits: NotRequired[int | None]
+    target: int
+    token_credits: NotRequired[int | None]
+    token_debt: int
+    waiting: int
 
 
 class Request1(TypedDict):
@@ -208,52 +283,80 @@ class Request4(TypedDict):
     params: EmptyParams
 
 
-class Request9(TypedDict):
+class Request12(TypedDict):
     id: str
     method: Literal["events.list"]
     params: EventsParams
 
 
-class Request10(TypedDict):
+class Request14(TypedDict):
+    id: str
+    method: Literal["capacity.status"]
+    params: EmptyParams
+
+
+class Request15(TypedDict):
+    id: str
+    method: Literal["capacity.reset"]
+    params: EmptyParams
+
+
+class Request16(TypedDict):
     id: str
     method: Literal["governor.status"]
     params: EmptyParams
 
 
-class Request11(TypedDict):
+class Request17(TypedDict):
     id: str
     method: Literal["harness.status"]
     params: EmptyParams
 
 
-class Request12(TypedDict):
+class Request18(TypedDict):
+    id: str
+    method: Literal["scheduling.status"]
+    params: EmptyParams
+
+
+class Request19(TypedDict):
     id: str
     method: Literal["package.list"]
     params: PackageListParams
 
 
-class Request13(TypedDict):
+class Request20(TypedDict):
     id: str
     method: Literal["package.reload"]
     params: PackageParams
 
 
-class Request14(TypedDict):
+class Request21(TypedDict):
     id: str
     method: Literal["package.command"]
     params: PackageInvokeParams
 
 
-class Request15(TypedDict):
+class Request22(TypedDict):
     id: str
     method: Literal["package.widget"]
     params: PackageInvokeParams
 
 
-class Request16(TypedDict):
+class Request23(TypedDict):
     id: str
     method: Literal["shutdown"]
     params: EmptyParams
+
+
+class ResourceDomainObservation(TypedDict):
+    available_memory_bytes: NotRequired[int | None]
+    available_processes: NotRequired[int | None]
+    cpu_millis: NotRequired[int | None]
+    id: str
+    max_processes: NotRequired[int | None]
+    memory_bytes: NotRequired[int | None]
+    parent: NotRequired[str | None]
 
 
 class ResourceLimits(TypedDict):
@@ -281,6 +384,9 @@ class Response2(TypedDict):
 Response: TypeAlias = Response1 | Response2
 
 
+RestrictionState: TypeAlias = Literal["enforced", "monitored", "unsupported"]
+
+
 class RunStarted(TypedDict):
     run_id: str
     session_id: str
@@ -294,6 +400,26 @@ RunStatus: TypeAlias = Literal[
 RuntimeKind: TypeAlias = Literal["node", "python"]
 
 
+class SchedulingSnapshot(TypedDict):
+    managed_runs: int
+    model_preparing: int
+    model_running: int
+    model_waiting: int
+    provider_waiting: int
+    runnable_runs: int
+    tool_dispatch_waiting: int
+    tool_resource_waiting: int
+    tool_running: int
+    workspace_waiting: int
+
+
+class SessionCursor(TypedDict):
+    created_at_ms: int
+    id: str
+    query: str
+    upper_rowid: int
+
+
 class SessionOptions(TypedDict):
     cwd: str
     title: NotRequired[str]
@@ -304,7 +430,27 @@ class SessionParams(TypedDict):
     session_id: str
 
 
+class SessionQuery(TypedDict):
+    cursor: NotRequired[SessionCursor | None]
+    limit: NotRequired[int]
+    query: NotRequired[str]
+
+
+class SessionResolveParams(TypedDict):
+    prefix: str
+
+
 SessionStatus: TypeAlias = Literal["idle", "running", "interrupted"]
+
+
+class SessionTailOptions(TypedDict):
+    max_bytes: NotRequired[int]
+    max_events: NotRequired[int]
+
+
+class SessionViewParams(TypedDict):
+    bounds: NotRequired[SessionTailOptions]
+    session_id: str
 
 
 class StartParams(TypedDict):
@@ -316,6 +462,12 @@ class TextParams(TypedDict):
     run_id: NotRequired[str | None]
     session_id: str
     text: str
+
+
+class TimingSummary(TypedDict):
+    p50_micros: int
+    p95_micros: int
+    samples: int
 
 
 class ToolCall(TypedDict):
@@ -422,6 +574,13 @@ class Event7(TypedDict):
     usage: Usage
 
 
+class EventsPageParams(TypedDict):
+    after: NotRequired[int]
+    bounds: NotRequired[SessionTailOptions]
+    session_id: str
+    through: int
+
+
 class Exports(TypedDict):
     commands: NotRequired[list[CommandExport]]
     hooks: NotRequired[list[HookExport]]
@@ -433,11 +592,30 @@ class Exports(TypedDict):
     widgets: NotRequired[list[NamedExport]]
 
 
-class ModelResponse(TypedDict):
-    content: NotRequired[str]
-    continuation: NotRequired[ProviderContinuation | None]
-    tool_calls: NotRequired[list[ToolCall]]
-    usage: NotRequired[Usage]
+class LaneSnapshot(TypedDict):
+    cancelled: int
+    failed: int
+    preparation: TimingSummary
+    provider_wait: TimingSummary
+    queue: TimingSummary
+    service: TimingSummary
+    successful: int
+    successful_per_second: float
+
+
+class NativeSnapshot(TypedDict):
+    active_local_scopes: NotRequired[int]
+    descendant_cleanup: NotRequired[RestrictionState]
+    domain_placement: NotRequired[RestrictionState]
+    epoch: NotRequired[str | None]
+    last_dead_epoch: NotRequired[str | None]
+    last_operation: NotRequired[NativeOperation | None]
+    owner_death_cleanup: NotRequired[RestrictionState]
+    owner_deaths: NotRequired[int]
+    owner_exclusivity: NotRequired[RestrictionState]
+    owner_loss_detection: NotRequired[RestrictionState]
+    owner_pid: NotRequired[int | None]
+    recovery: NotRequired[RestrictionState]
 
 
 class Notification2(TypedDict):
@@ -450,24 +628,51 @@ class Notification3(TypedDict):
     params: ToolProgress
 
 
+class Observation(TypedDict):
+    age_ms: int
+    availability: ObservationAvailability
+    max_age_ms: int
+    source: ObservationSource
+    value: NotRequired[int | None]
+
+
+class Observation2(TypedDict):
+    age_ms: int
+    availability: ObservationAvailability
+    max_age_ms: int
+    source: ObservationSource
+    value: NotRequired[float | None]
+
+
+class Observation3(TypedDict):
+    age_ms: int
+    availability: ObservationAvailability
+    max_age_ms: int
+    source: ObservationSource
+    value: NotRequired[int | None]
+
+
+class OperatingSnapshot(TypedDict):
+    contact_remaining: NotRequired[Duration | None]
+    contact_valid: bool
+    debt: OperatingTarget
+    generation: int
+    memory_leases: int
+    policy: AdmissionPolicy
+    target: OperatingTarget
+
+
 class PackageConfig(TypedDict):
     grants: PackageGrants
     root: str
 
 
-class ProviderConfig2(TypedDict):
-    kind: Literal["replay"]
-    responses: list[ModelResponse]
-
-
-ProviderConfig: TypeAlias = (
-    ProviderConfig1
-    | ProviderConfig2
-    | ProviderConfig3
-    | ProviderConfig4
-    | ProviderConfig5
-    | ProviderConfig6
-)
+class ProviderQuotaConfig(TypedDict):
+    account_uuid: str
+    family: NotRequired[str]
+    max_in_flight: NotRequired[int | None]
+    requests: NotRequired[ProviderRate | None]
+    tokens: NotRequired[ProviderRate | None]
 
 
 class Request3(TypedDict):
@@ -478,26 +683,50 @@ class Request3(TypedDict):
 
 class Request5(TypedDict):
     id: str
+    method: Literal["session.page"]
+    params: SessionQuery
+
+
+class Request6(TypedDict):
+    id: str
+    method: Literal["session.resolve"]
+    params: SessionResolveParams
+
+
+class Request7(TypedDict):
+    id: str
+    method: Literal["session.view"]
+    params: SessionViewParams
+
+
+class Request8(TypedDict):
+    id: str
     method: Literal["run.start"]
     params: StartParams
 
 
-class Request6(TypedDict):
+class Request9(TypedDict):
     id: str
     method: Literal["run.cancel"]
     params: SessionParams
 
 
-class Request7(TypedDict):
+class Request10(TypedDict):
     id: str
     method: Literal["run.steer"]
     params: TextParams
 
 
-class Request8(TypedDict):
+class Request11(TypedDict):
     id: str
     method: Literal["run.queue"]
     params: TextParams
+
+
+class Request13(TypedDict):
+    id: str
+    method: Literal["events.page"]
+    params: EventsPageParams
 
 
 class RunSummary(TypedDict):
@@ -522,9 +751,22 @@ class Session(TypedDict):
     title: str
 
 
+class SessionPage(TypedDict):
+    next: NotRequired[SessionCursor | None]
+    sessions: list[Session]
+
+
+class SessionRunTransition(TypedDict):
+    outcome: NotRequired[RunStatus | None]
+    run_id: NotRequired[str | None]
+    sequence: int
+    status: SessionStatus
+
+
 class ConfigureParams(TypedDict):
     allow_shell: NotRequired[bool]
     allow_write: NotRequired[bool]
+    capacity: NotRequired[CapacityPolicy | None]
     context_max_bytes: NotRequired[int | None]
     max_input_tokens: NotRequired[int | None]
     max_model_requests: NotRequired[int | None]
@@ -535,6 +777,7 @@ class ConfigureParams(TypedDict):
     max_store_bytes: NotRequired[int | None]
     packages: NotRequired[list[PackageConfig]]
     provider: NotRequired[ProviderConfig | None]
+    provider_capacity: NotRequired[ProviderQuotaConfig | None]
     resources: NotRequired[ResourceLimits | None]
     run_timeout_ms: NotRequired[int | None]
     state_dir: NotRequired[str | None]
@@ -565,6 +808,26 @@ Event: TypeAlias = (
     | Event11
     | Event12
 )
+
+
+class EventPage(TypedDict):
+    complete: bool
+    cursor: int
+    events: list[Event]
+    omitted: bool
+    selected_cursor: NotRequired[int | None]
+    through: int
+
+
+class HostObservations(TypedDict):
+    available_memory_bytes: Observation3
+    cpu_millis: Observation
+    cpu_usage_percent: Observation2
+    descriptor_limit: Observation3
+    domain_visibility: ObservationAvailability
+    domains: list[ResourceDomainObservation]
+    memory_bytes: Observation3
+    process_limit: Observation3
 
 
 class Manifest(TypedDict):
@@ -618,10 +881,50 @@ Request: TypeAlias = (
     | Request14
     | Request15
     | Request16
+    | Request17
+    | Request18
+    | Request19
+    | Request20
+    | Request21
+    | Request22
+    | Request23
 )
 
 
+class SessionView(TypedDict):
+    durable_cursor: int
+    events: list[Event]
+    last_transition: NotRequired[SessionRunTransition | None]
+    omitted: bool
+    run_id: NotRequired[str | None]
+    selected_cursor: int
+    session: Session
+
+
+class CapacitySnapshot(TypedDict):
+    coordinated: bool
+    hard_model_requests: int
+    hard_resources: ResourceLimits
+    learning: LearningStatus
+    mode: CapacityMode
+    model_running: int
+    model_target: int
+    model_waiting: int
+    models: LaneSnapshot
+    native: NativeSnapshot
+    native_helpers: NotRequired[NativeHelperSnapshot]
+    observations: HostObservations
+    operating: OperatingSnapshot
+    provider: ProviderSnapshot
+    reason: NotRequired[str | None]
+    scope: str
+    tools: LaneSnapshot
+
+
 class ProtocolSchema(TypedDict):
+    capacity: CapacitySnapshot
+    capacity_reset: CapacityResetResult
+    event_page: EventPage
     governor: GovernorSnapshot
     harness: HarnessSnapshot
     hello: HelloResult
@@ -631,6 +934,9 @@ class ProtocolSchema(TypedDict):
     response: Response
     run_started: RunStarted
     run_summary: RunSummary
+    scheduling: SchedulingSnapshot
     session: Session
+    session_page: SessionPage
+    session_view: SessionView
     tool_output: ToolOutput
     tool_request: ToolRequest

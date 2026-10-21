@@ -4,6 +4,8 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ## [Unreleased]
 
+- Add explicit host-wide automatic capacity, bounded session views, native helper accounting and local learning. Keep automatic defaults gated on acceptance. Use the exact-commit maintained filesystem fork for source builds; Cargo registry publication remains separate.
+
 ### Changed
 
 - **Breaking:** packages require `ejm.package.json` with no legacy alias. Rename

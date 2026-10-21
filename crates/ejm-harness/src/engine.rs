@@ -1,8 +1,15 @@
 mod driver;
 mod hooks;
+mod scheduling;
 mod tool;
+pub(crate) mod views;
 
+pub use scheduling::SchedulingSnapshot;
 pub use tool::{Tool, ToolContext};
+pub use views::{
+    EventPage, JournalSnapshot, SessionCursor, SessionEvent, SessionPage, SessionQuery,
+    SessionRunTransition, SessionSubscription, SessionTailOptions, SessionView,
+};
 
 use std::{
     collections::{BTreeMap, HashMap, VecDeque},
@@ -52,6 +59,9 @@ struct Inner {
     // Effects in one working directory are serialized across sessions. Dormant directories use no lock.
     writes: std::sync::Mutex<HashMap<PathBuf, std::sync::Weak<Mutex<()>>>>,
     model_waiters: AtomicUsize,
+    capacity: Option<crate::CapacityContext>,
+    tool_dispatch: Arc<Semaphore>,
+    scheduling: scheduling::Scheduling,
 }
 
 struct ActiveRun {
@@ -60,6 +70,7 @@ struct ActiveRun {
     done: watch::Receiver<Option<RunCompletion>>,
     steering: mpsc::Sender<String>,
     queued: VecDeque<String>,
+    _managed: scheduling::Activity,
 }
 
 struct ProviderSelection {
@@ -118,6 +129,12 @@ impl RunHandle {
                 .context("run driver stopped without a summary")?;
         }
     }
+}
+
+struct RegisteredTools {
+    registry: BTreeMap<String, Arc<dyn Tool>>,
+    definitions: Vec<ToolDefinition>,
+    validators: HashMap<String, jsonschema::Validator>,
 }
 
 impl Harness {
@@ -222,14 +239,111 @@ impl Harness {
         strategy: Arc<dyn RunStrategy>,
         hooks: Vec<Arc<dyn Hook>>,
     ) -> Result<Self> {
-        ensure!(hooks.len() <= 32, "at most 32 hooks may be registered");
+        Self::build_with_capacity(config, provider, tools, context, strategy, hooks, None)
+    }
+
+    /// Reuse capacity prepared before package/provider initialization.
+    ///
+    /// # Errors
+    /// Rejects invalid configuration, a mismatched prepared envelope, or journal failure.
+    pub fn with_capacity(
+        config: HarnessConfig,
+        provider: Option<Arc<dyn Provider>>,
+        tools: Vec<Arc<dyn Tool>>,
+        hooks: Vec<Arc<dyn Hook>>,
+        capacity: crate::CapacityContext,
+    ) -> Result<Self> {
+        Self::build_with_capacity(
+            config,
+            provider,
+            tools,
+            Arc::new(RecentContext),
+            Arc::new(ToolLoop),
+            hooks,
+            Some(capacity),
+        )
+    }
+
+    fn build_with_capacity(
+        config: HarnessConfig,
+        provider: Option<Arc<dyn Provider>>,
+        tools: Vec<Arc<dyn Tool>>,
+        context: Arc<dyn ContextPolicy>,
+        strategy: Arc<dyn RunStrategy>,
+        hooks: Vec<Arc<dyn Hook>>,
+        capacity: Option<crate::CapacityContext>,
+    ) -> Result<Self> {
+        Self::validate_composition(&config, capacity.is_some(), hooks.len())?;
+        if let Some(prepared) = &capacity {
+            prepared.validate_config(&config)?;
+        }
+        let RegisteredTools {
+            registry,
+            definitions,
+            validators,
+        } = Self::register_tools(tools)?;
+        let governor = match &capacity {
+            Some(prepared) => {
+                prepared.configure_provider(
+                    provider
+                        .as_ref()
+                        .map_or_else(crate::ProviderCapacity::default, |provider| {
+                            provider.capacity()
+                        }),
+                )?;
+                prepared.governor()
+            }
+            None => Arc::new(Governor::new(config.resources.clone())?),
+        };
+        let store = Store::open(&config.state_dir, config.max_store_bytes)?;
+        let (events, _) = broadcast::channel(128);
+        let slots = config.max_model_requests;
+        let dispatch = capacity.as_ref().map_or_else(
+            || config.resources.max_queue.saturating_sub(32).max(1),
+            crate::CapacityContext::dispatch_slots,
+        );
+        Ok(Self {
+            inner: Arc::new(Inner {
+                config,
+                provider: Mutex::new(ProviderSelection {
+                    provider,
+                    binding_initialized: false,
+                }),
+                tools: registry,
+                definitions,
+                validators,
+                context,
+                strategy,
+                hooks,
+                store,
+                governor,
+                model_slots: Arc::new(Semaphore::new(slots)),
+                events,
+                active: Arc::new(Mutex::new(HashMap::new())),
+                stopped: CancellationToken::new(),
+                changed: Notify::new(),
+                writes: std::sync::Mutex::new(HashMap::new()),
+                model_waiters: AtomicUsize::new(0),
+                capacity,
+                tool_dispatch: Arc::new(Semaphore::new(dispatch)),
+                scheduling: scheduling::Scheduling::default(),
+            }),
+        })
+    }
+
+    fn validate_composition(
+        config: &HarnessConfig,
+        coordinated: bool,
+        hook_count: usize,
+    ) -> Result<()> {
+        ensure!(hook_count <= 32, "at most 32 hooks may be registered");
         ensure!(
-            (1..=1000).contains(&config.max_sessions),
-            "max_sessions must be between 1 and 1000"
+            (1..=if coordinated { 4096 } else { 1000 }).contains(&config.max_sessions),
+            "max_sessions exceeds the selected capacity envelope"
         );
         ensure!(
-            (1..=128).contains(&config.max_model_requests),
-            "max_model_requests must be between 1 and 128"
+            (1..=if coordinated { 256 } else { 128 }).contains(&config.max_model_requests),
+            "max_model_requests exceeds the selected capacity envelope"
         );
         ensure!(
             (4096..=1024 * 1024).contains(&config.context_max_bytes),
@@ -249,6 +363,10 @@ impl Harness {
                 && config.max_output_tokens > 0,
             "invalid system prompt or token budget"
         );
+        Ok(())
+    }
+
+    fn register_tools(tools: Vec<Arc<dyn Tool>>) -> Result<RegisteredTools> {
         ensure!(tools.len() <= 64, "at most 64 tools may be registered");
         let mut registry = BTreeMap::new();
         let mut definitions = vec![];
@@ -287,33 +405,10 @@ impl Harness {
             serde_json::to_vec(&definitions)?.len() <= 64 * 1024,
             "tool definitions exceed 64 KiB"
         );
-        let governor = Arc::new(Governor::new(config.resources.clone())?);
-        let store = Store::open(&config.state_dir, config.max_store_bytes)?;
-        let (events, _) = broadcast::channel(128);
-        let slots = config.max_model_requests;
-        Ok(Self {
-            inner: Arc::new(Inner {
-                config,
-                provider: Mutex::new(ProviderSelection {
-                    provider,
-                    binding_initialized: false,
-                }),
-                tools: registry,
-                definitions,
-                validators,
-                context,
-                strategy,
-                hooks,
-                store,
-                governor,
-                model_slots: Arc::new(Semaphore::new(slots)),
-                events,
-                active: Arc::new(Mutex::new(HashMap::new())),
-                stopped: CancellationToken::new(),
-                changed: Notify::new(),
-                writes: std::sync::Mutex::new(HashMap::new()),
-                model_waiters: AtomicUsize::new(0),
-            }),
+        Ok(RegisteredTools {
+            registry,
+            definitions,
+            validators,
         })
     }
 
@@ -350,6 +445,18 @@ impl Harness {
         );
         let harness = self.clone();
         let binding = binding.to_owned();
+        let provider_capacity = provider
+            .as_ref()
+            .map_or_else(crate::ProviderCapacity::default, |provider| {
+                provider.capacity()
+            });
+        provider_capacity.validate()?;
+        let prepared = self
+            .inner
+            .capacity
+            .as_ref()
+            .map(|capacity| capacity.prepare_provider(provider_capacity))
+            .transpose()?;
         tokio::spawn(async move {
             let _admission = admission;
             harness
@@ -357,6 +464,9 @@ impl Harness {
                 .store
                 .configure_provider_binding(Some(binding))
                 .await?;
+            if let Some(prepared) = prepared {
+                prepared.commit();
+            }
             *harness.inner.provider.lock().await = ProviderSelection {
                 provider,
                 binding_initialized: true,
@@ -383,6 +493,37 @@ impl Harness {
     pub fn governor(&self) -> Arc<Governor> {
         self.inner.governor.clone()
     }
+    /// Share the lazy native owner prepared for coordinated execution.
+    ///
+    /// Attach this handle to host executors that share [`Self::governor`].
+    /// Legacy constructors return `None`. Reading it starts no helper.
+    #[must_use]
+    pub fn native_owner(&self) -> Option<ejm_harness_exec::native::NativeOwner> {
+        self.inner
+            .capacity
+            .as_ref()
+            .map(crate::CapacityContext::native_owner)
+    }
+    /// Cached host capacity state, absent for unchanged legacy constructors.
+    #[must_use]
+    pub fn capacity_snapshot(&self) -> Option<crate::CapacitySnapshot> {
+        self.inner
+            .capacity
+            .as_ref()
+            .map(crate::CapacityContext::snapshot)
+    }
+
+    /// Inspect local run ownership without reading the journal. A host can use
+    /// this bounded live hint to evict an inactive presentation cache. Mutations
+    /// must still use the exact-run methods, which revalidate under the lock.
+    pub async fn active_run_id(&self, session_id: &str) -> Option<String> {
+        self.inner
+            .active
+            .lock()
+            .await
+            .get(session_id)
+            .map(|run| run.id.clone())
+    }
     pub async fn status(&self) -> crate::HarnessSnapshot {
         crate::HarnessSnapshot {
             active_agents: self.inner.active.lock().await.len(),
@@ -391,6 +532,12 @@ impl Harness {
             waiting_model_requests: self.inner.model_waiters.load(Ordering::Relaxed),
             tools: self.inner.governor.snapshot(),
         }
+    }
+    /// Read coherent cached local scheduling counts without journal reads,
+    /// host sampling, or a scan of managed runs. Legacy [`Self::status`] is unchanged.
+    #[must_use]
+    pub fn scheduling_snapshot(&self) -> SchedulingSnapshot {
+        self.inner.scheduling.snapshot()
     }
     /// List up to 1000 recent sessions.
     ///
@@ -448,7 +595,7 @@ impl Harness {
     pub async fn start(&self, session_id: &str, prompt: String) -> Result<RunHandle> {
         validate_prompt(&prompt)?;
         let session = self.inner.store.session(session_id).await?;
-        let mut active = self.inner.active.lock().await;
+        let mut active = self.inner.active.clone().lock_owned().await;
         ensure!(!self.inner.stopped.is_cancelled(), "harness is shut down");
         let mut selection = self.inner.provider.lock().await;
         ensure!(
@@ -472,36 +619,54 @@ impl Harness {
         let cancel = self.inner.stopped.child_token();
         let (steering, receiver) = mpsc::channel(MAX_CONTROLS);
         let (done, result) = watch::channel(None);
-        active.insert(
-            session_id.into(),
-            ActiveRun {
-                id: id.clone(),
-                cancel: cancel.clone(),
-                done: result.clone(),
-                steering,
-                queued: VecDeque::new(),
-            },
-        );
         let harness = self.clone();
-        let run_id = id.clone();
-        let task_cancel = cancel.clone();
+        let session_id = session_id.to_owned();
+        // Once admission is transferred, caller cancellation cannot interrupt
+        // the durable start between commit and driver ownership.
         tokio::spawn(async move {
             harness
-                .session_driver(session, run_id, prompt, task_cancel, receiver, done)
-                .await;
-        });
-        Ok(RunHandle {
-            id,
-            session_id: session_id.into(),
-            cancel,
-            done: result,
+                .emit(
+                    &session_id,
+                    Some(&id),
+                    EventKind::RunStarted {
+                        prompt: prompt.clone(),
+                    },
+                )
+                .await?;
+            active.insert(
+                session_id.clone(),
+                ActiveRun {
+                    id: id.clone(),
+                    cancel: cancel.clone(),
+                    done: result.clone(),
+                    steering,
+                    queued: VecDeque::new(),
+                    _managed: harness.inner.scheduling.enter(scheduling::Phase::Managed),
+                },
+            );
+            let driver = harness.clone();
+            let run_id = id.clone();
+            let task_cancel = cancel.clone();
+            tokio::spawn(async move {
+                driver
+                    .session_driver(session, run_id, prompt, task_cancel, receiver, done)
+                    .await;
+            });
+            Ok(RunHandle {
+                id,
+                session_id,
+                cancel,
+                done: result,
+            })
         })
+        .await
+        .context("run admission task stopped")?
     }
 
     /// Subscribe to the exact current run, including its bounded run-end cleanup.
     ///
     /// Returns `None` when the named session and run are not the current pair.
-    /// This is not evidence of success. Use durable replay to inspect old results.
+    /// This is not evidence of success. Inspect durable events for old results.
     /// Waiting includes run-end observers; journaled completion alone does not.
     pub async fn subscribe_run(&self, session_id: &str, run_id: &str) -> Option<RunHandle> {
         let active = self.inner.active.lock().await;
@@ -660,7 +825,7 @@ impl Harness {
             }
             changed.await;
         }
-        self.inner.governor.wait_idle().await;
+        self.inner.governor.wait_jobs_idle().await;
         Ok(())
     }
 
@@ -689,9 +854,12 @@ fn validate_prompt(prompt: &str) -> Result<()> {
     Ok(())
 }
 
-struct ModelWaiter<'a>(&'a AtomicUsize);
+struct ModelWaiter<'a> {
+    count: &'a AtomicUsize,
+    _activity: scheduling::Activity,
+}
 impl Drop for ModelWaiter<'_> {
     fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::Relaxed);
+        self.count.fetch_sub(1, Ordering::Relaxed);
     }
 }

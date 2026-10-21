@@ -14,12 +14,17 @@ use ejm_harness_packages::{
     InstalledPackage, PackageContext, PackageGrants, RuntimeConfig, RuntimeKind, RuntimePool,
 };
 use serde_json::{Value, json};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System};
 use tempfile::TempDir;
 use tokio::{sync::mpsc, task::JoinSet, time::timeout};
 use tokio_util::sync::CancellationToken;
 
 const BOUND: Duration = Duration::from_secs(10);
 const LANGUAGES: [RuntimeKind; 2] = [RuntimeKind::Node, RuntimeKind::Python];
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[path = "runtime/lifecycle.rs"]
+mod lifecycle;
 
 #[cfg(unix)]
 #[tokio::test]
@@ -70,6 +75,7 @@ async fn python_bootstrap_excludes_untrusted_repository_imports() -> Result<()> 
 }
 
 const NODE_SOURCE: &str = r"
+import { spawn } from 'node:child_process';
 import { existsSync, writeFileSync } from 'node:fs';
 import { value } from './helper.mjs';
 let active = 0;
@@ -92,8 +98,9 @@ export async function hold(args, ctx) {
   return {pid: process.pid};
 }
 export async function stubborn(args, ctx) {
+  const descendant = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {stdio: 'inherit'});
   ctx.signal.addEventListener('abort', () => writeFileSync(args.cancelled, 'seen'), {once: true});
-  writeFileSync(args.started, String(process.pid));
+  writeFileSync(args.started, `${process.pid} ${descendant.pid}`);
   await new Promise(() => {});
 }
 export async function forbidden(args, ctx) { writeFileSync(args.marker, 'called'); return null; }
@@ -108,6 +115,8 @@ const PYTHON_SOURCE: &str = r"
 import asyncio
 import os
 from pathlib import Path
+import subprocess
+import sys
 from .helper import VALUE
 
 active = 0
@@ -133,7 +142,8 @@ async def hold(args, ctx):
     return {'pid': os.getpid()}
 
 async def stubborn(args, ctx):
-    Path(args['started']).write_text(str(os.getpid()))
+    descendant = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])
+    Path(args['started']).write_text(f'{os.getpid()} {descendant.pid}')
     while not ctx.is_cancelled():
         await asyncio.sleep(0.005)
     Path(args['cancelled']).write_text('seen')
@@ -221,7 +231,7 @@ fn pool() -> Result<RuntimePool> {
             .unwrap_or_else(|| "node".into())
             .into(),
         python: std::env::var_os("EJM_HARNESS_TEST_PYTHON")
-            .unwrap_or_else(|| "python3".into())
+            .unwrap_or_else(|| RuntimeConfig::default().python.into_os_string())
             .into(),
         call_timeout: BOUND,
         cleanup_timeout: Duration::from_secs(1),
@@ -280,6 +290,19 @@ async fn wait_file(path: &Path) -> Result<String> {
     })
     .await
     .context("fixture callback did not reach its gate")
+}
+
+fn live(pid: u32) -> bool {
+    let mut system = System::new();
+    let pids = [Pid::from_u32(pid)];
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&pids),
+        true,
+        ProcessRefreshKind::nothing(),
+    );
+    system
+        .process(pids[0])
+        .is_some_and(|process| process.status() != ProcessStatus::Zombie)
 }
 
 #[tokio::test]
@@ -432,28 +455,22 @@ async fn stubborn_cancellation_retains_admission_until_host_exit() -> Result<()>
                 )
                 .await
         });
-        let pid: i32 = wait_file(&started).await?.parse()?;
+        let pids: Vec<u32> = wait_file(&started)
+            .await?
+            .split_whitespace()
+            .map(str::parse)
+            .collect::<std::result::Result<_, _>>()?;
+        assert_eq!(pids.len(), 2);
         cancel.cancel();
         wait_file(&cancelled).await?;
         assert!(!task.is_finished());
         assert_eq!(governor.snapshot().running, 1);
         assert_eq!(governor.snapshot().reserved_processes, 0);
-        #[cfg(unix)]
-        rustix::process::test_kill_process(
-            rustix::process::Pid::from_raw(pid).context("invalid fixture pid")?,
-        )?;
+        assert!(pids.iter().all(|pid| live(*pid)));
         assert!(timeout(BOUND, task).await??.is_err());
         timeout(BOUND, governor.wait_idle()).await?;
         assert_eq!(governor.snapshot(), GovernorSnapshot::default());
-        #[cfg(unix)]
-        assert_eq!(
-            rustix::process::test_kill_process(
-                rustix::process::Pid::from_raw(pid).context("invalid fixture pid")?
-            ),
-            Err(rustix::io::Errno::SRCH)
-        );
-        #[cfg(not(unix))]
-        let _ = pid;
+        assert!(pids.iter().all(|pid| !live(*pid)));
         assert!(status(&pool, &fixture, governor).await.is_err());
         timeout(BOUND, pool.shutdown()).await??;
     }
@@ -579,7 +596,12 @@ async fn dropping_invocation_retains_admission_and_blocks_reload_until_host_exit
                 .invoke_command(&package, "stubborn", args, context)
                 .await
         });
-        let pid: i32 = wait_file(&started).await?.parse()?;
+        let pids: Vec<u32> = wait_file(&started)
+            .await?
+            .split_whitespace()
+            .map(str::parse)
+            .collect::<std::result::Result<_, _>>()?;
+        assert_eq!(pids.len(), 2);
         task.abort();
         let dropped = timeout(BOUND, task)
             .await?
@@ -591,21 +613,10 @@ async fn dropping_invocation_retains_admission_and_blocks_reload_until_host_exit
             .await?
             .expect_err("reload discarded a callback whose caller was dropped");
         assert!(error.to_string().contains("active callbacks"));
-        #[cfg(unix)]
-        rustix::process::test_kill_process(
-            rustix::process::Pid::from_raw(pid).context("invalid fixture pid")?,
-        )?;
+        assert!(pids.iter().all(|pid| live(*pid)));
         timeout(BOUND, governor.wait_idle()).await?;
         assert_eq!(governor.snapshot(), GovernorSnapshot::default());
-        #[cfg(unix)]
-        assert_eq!(
-            rustix::process::test_kill_process(
-                rustix::process::Pid::from_raw(pid).context("invalid fixture pid")?
-            ),
-            Err(rustix::io::Errno::SRCH)
-        );
-        #[cfg(not(unix))]
-        let _ = pid;
+        assert!(pids.iter().all(|pid| !live(*pid)));
         timeout(BOUND, pool.shutdown()).await??;
     }
     Ok(())
@@ -654,5 +665,214 @@ async fn provider_adapter_cannot_cross_installation_revisions() -> Result<()> {
         assert_eq!(deltas, ["hello ", "world"]);
         timeout(BOUND, pool.shutdown()).await??;
     }
+    Ok(())
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn coordinated_pool(
+    config: RuntimeConfig,
+    max_jobs: usize,
+) -> Result<(TempDir, RuntimePool, ejm_harness::CapacityContext)> {
+    let directory = tempfile::tempdir()?;
+    let context =
+        coordinated_capacity(&directory.path().canonicalize()?.join("capacity"), max_jobs)?;
+    let pool = RuntimePool::with_capacity(config, context.clone())?;
+    Ok((directory, pool, context))
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+fn coordinated_capacity(root: &Path, max_jobs: usize) -> Result<ejm_harness::CapacityContext> {
+    let mut harness = ejm_harness::HarnessConfig::default();
+    let executable = std::env::current_exe()?;
+    let helper = executable
+        .parent()
+        .and_then(Path::parent)
+        .context("resolve native fixture target directory")?
+        .join("examples")
+        .join(format!(
+            "native_owner_helper{}",
+            std::env::consts::EXE_SUFFIX
+        ));
+    anyhow::ensure!(
+        helper.is_file(),
+        "build native fixture first: cargo build -p ejm-harness-exec --example native_owner_helper"
+    );
+    ejm_harness::CapacityContext::prepare_isolated_with_native_helper(
+        &mut harness,
+        ejm_harness::CapacityPolicy {
+            mode: ejm_harness::CapacityMode::Fixed,
+            max_jobs: Some(max_jobs),
+            ..ejm_harness::CapacityPolicy::default()
+        },
+        root,
+        &helper,
+    )
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn coordinated_hosts_keep_resident_memory_without_holding_execution_slots() -> Result<()> {
+    let (_directory, pool, capacity) = coordinated_pool(RuntimeConfig::default(), 2)?;
+    let governor = capacity.governor();
+    let baseline = governor.snapshot().reserved_memory_bytes;
+    assert_eq!(governor.operating_snapshot().memory_leases, 1);
+    let first = Fixture::new(RuntimeKind::Node, "coordinated-node")?;
+    let second = Fixture::new(RuntimeKind::Python, "coordinated-python")?;
+    load(&pool, &first).await?;
+    timeout(BOUND, governor.wait_jobs_idle()).await?;
+    let resident = governor.snapshot().reserved_memory_bytes;
+    assert_eq!(resident, baseline + 64 * 1024 * 1024);
+    assert_eq!(governor.snapshot().running, 0);
+    assert_eq!(governor.snapshot().reserved_processes, 1);
+    assert_eq!(governor.operating_snapshot().memory_leases, 2);
+    status(&pool, &first, governor.clone()).await?;
+    timeout(BOUND, governor.wait_jobs_idle()).await?;
+    assert_eq!(governor.snapshot().reserved_memory_bytes, resident);
+    load(&pool, &second).await?;
+    timeout(BOUND, governor.wait_jobs_idle()).await?;
+    assert_eq!(
+        governor.snapshot().reserved_memory_bytes,
+        resident + 64 * 1024 * 1024
+    );
+    assert_eq!(governor.snapshot().reserved_processes, 2);
+    let wrong = self::governor()?;
+    assert!(status(&pool, &first, wrong).await.is_err());
+    timeout(BOUND, pool.shutdown()).await??;
+    assert_eq!(governor.snapshot().reserved_memory_bytes, baseline);
+    assert_eq!(governor.snapshot().running, 0);
+    assert_eq!(governor.snapshot().reserved_processes, 0);
+    Ok(())
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn coordinated_launch_waits_before_starting_an_interpreter_and_cancels_cleanly() -> Result<()>
+{
+    let (_directory, pool, capacity) = coordinated_pool(
+        RuntimeConfig {
+            node: "missing-capacity-fixture-interpreter".into(),
+            python: "missing-capacity-fixture-interpreter".into(),
+            ..RuntimeConfig::default()
+        },
+        1,
+    )?;
+    let governor = capacity.governor();
+    let baseline = governor.snapshot().reserved_memory_bytes;
+    let busy = governor
+        .acquire(
+            "occupied",
+            ejm_harness_exec::Reservation {
+                memory_bytes: 16 * 1024 * 1024,
+                processes: 0,
+                ..ejm_harness_exec::Reservation::default()
+            },
+            &CancellationToken::new(),
+        )
+        .await?;
+    let fixture = Fixture::new(RuntimeKind::Python, "waiting-launch")?;
+    let cancel = CancellationToken::new();
+    let loading = {
+        let pool = pool.clone();
+        let cancel = cancel.clone();
+        tokio::spawn(async move { pool.load(fixture.installed, grants(), cancel).await })
+    };
+    timeout(BOUND, async {
+        while governor.snapshot().queued == 0 && !loading.is_finished() {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await?;
+    assert!(
+        !loading.is_finished(),
+        "interpreter launch bypassed capacity admission"
+    );
+    cancel.cancel();
+    assert!(timeout(BOUND, loading).await??.is_err());
+    drop(busy);
+    timeout(BOUND, governor.wait_jobs_idle()).await?;
+    timeout(BOUND, pool.shutdown()).await??;
+    assert_eq!(governor.snapshot().reserved_memory_bytes, baseline);
+    Ok(())
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tokio::test]
+async fn coordinated_owner_death_fails_busy_callback_then_explicit_reload_progresses() -> Result<()>
+{
+    use rustix::process::{Signal, kill_process};
+
+    let (_directory, pool, capacity) = coordinated_pool(RuntimeConfig::default(), 2)?;
+    let governor = capacity.governor();
+    let baseline = governor.snapshot().reserved_memory_bytes;
+    let fixture = Fixture::new(RuntimeKind::Python, "owner-death")?;
+    load(&pool, &fixture).await?;
+    let started = fixture.root.path().join("started");
+    let release = fixture.root.path().join("release");
+    let task = {
+        let pool = pool.clone();
+        let package = fixture.id().to_owned();
+        let args = json!({"started":started,"release":release});
+        let context = fixture.context(governor.clone(), "owner-death");
+        tokio::spawn(async move { pool.invoke_command(&package, "hold", args, context).await })
+    };
+    let original_host: u32 = wait_file(&started).await?.parse()?;
+    let before = capacity.snapshot();
+    let owner = before.native.owner_pid.context("authenticated owner PID")?;
+    let owner = rustix::process::Pid::from_raw(i32::try_from(owner)?)
+        .context("positive native owner PID")?;
+    assert_eq!(before.operating.target.max_jobs, 2);
+    assert_eq!(governor.snapshot().running, 1);
+    kill_process(owner, Signal::KILL)?;
+
+    let callback = timeout(BOUND, task).await;
+    // A surviving fixture host may finish its already-started callback. Opening
+    // its gate avoids leaving test work behind without claiming owner cleanup.
+    std::fs::write(&release, "finish the original fixture callback")?;
+    assert!(callback??.is_err(), "owner loss reported callback success");
+    timeout(BOUND, async {
+        loop {
+            let native = capacity.native_owner().snapshot();
+            let usage = governor.snapshot();
+            if native.owner_deaths == 1
+                && native.active_local_scopes == 0
+                && usage.running == 0
+                && usage.reserved_processes == 0
+                && usage.reserved_memory_bytes == baseline
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+    })
+    .await
+    .context("dead owner retained package capacity")?;
+    let lost = capacity.native_owner().snapshot();
+    assert_eq!(lost.last_dead_epoch, before.native.epoch);
+    assert_eq!(lost.last_operation, before.native.last_operation);
+    assert!(status(&pool, &fixture, governor.clone()).await.is_err());
+
+    timeout(BOUND, async {
+        loop {
+            let current = capacity.snapshot();
+            if current.operating.generation > before.operating.generation
+                && current.operating.contact_valid
+                && current.operating.target.max_jobs > 0
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+    })
+    .await
+    .context("fresh host sample did not restore admission")?;
+    timeout(BOUND, pool.reload(fixture.id(), CancellationToken::new())).await??;
+    let current = status(&pool, &fixture, governor.clone()).await?;
+    assert_ne!(current["pid"].as_u64(), Some(u64::from(original_host)));
+    assert_ne!(
+        capacity.native_owner().snapshot().epoch,
+        before.native.epoch
+    );
+    timeout(BOUND, pool.shutdown()).await??;
+    assert_eq!(governor.snapshot().reserved_memory_bytes, baseline);
     Ok(())
 }

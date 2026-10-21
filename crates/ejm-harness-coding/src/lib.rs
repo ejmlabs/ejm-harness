@@ -169,13 +169,30 @@ fn relative_path(arguments: &Value, key: &str, default: Option<&str>) -> Result<
             )),
         "path must stay inside the workspace"
     );
+    #[cfg(windows)]
+    validate_windows_components(&path)?;
     Ok(path)
+}
+
+#[cfg(windows)]
+fn validate_windows_components(path: &Path) -> Result<()> {
+    for component in path.components() {
+        if let Component::Normal(name) = component {
+            ensure!(
+                !rightkit_fs::names::is_unsafe_windows_component(&name.to_string_lossy()),
+                "path contains a Windows device, stream, or ambiguous component"
+            );
+        }
+    }
+    Ok(())
 }
 
 fn load(root: &Dir, path: &Path) -> Result<Vec<u8>> {
     let file = root
         .open(path)
         .with_context(|| format!("cannot open {}", path.display()))?;
+    #[cfg(windows)]
+    validate_windows_handle(root, &file.try_clone()?.into_std())?;
     ensure!(file.metadata()?.is_file(), "path is not a regular file");
     ensure!(
         file.metadata()?.len() <= MAX_FILE_BYTES,
@@ -233,6 +250,8 @@ fn read_file(root: &Dir, arguments: &Value) -> Result<ToolOutput> {
 fn list_files(root: &Dir, arguments: &Value) -> Result<ToolOutput> {
     let path = relative_path(arguments, "path", Some("."))?;
     let directory = root.open_dir(resolve_read_path(root, &path)?)?;
+    #[cfg(windows)]
+    validate_windows_handle(root, &directory.try_clone()?.into_std_file())?;
     let mut entries = vec![];
     let mut output_bytes = 0;
     let mut limit_reached = None;
@@ -420,7 +439,31 @@ fn resolve_read_path(root: &Dir, path: &Path) -> Result<PathBuf> {
         !protected_path(&resolved),
         "resolved path is protected metadata"
     );
+    #[cfg(windows)]
+    {
+        let file = if root.metadata(&resolved)?.is_dir() {
+            root.open_dir(&resolved)?.into_std_file()
+        } else {
+            root.open(&resolved)?.into_std()
+        };
+        validate_windows_handle(root, &file)?;
+    }
     Ok(resolved)
+}
+
+#[cfg(windows)]
+fn validate_windows_handle(root: &Dir, file: &std::fs::File) -> Result<()> {
+    let base = rightkit_fs::handle::final_path(&root.try_clone()?.into_std_file())?;
+    let target = rightkit_fs::handle::final_path(file)?;
+    let relative = target
+        .strip_prefix(&base)
+        .context("resolved path must stay inside the workspace")?;
+    validate_windows_components(relative)?;
+    ensure!(
+        !protected_path(relative),
+        "resolved native path is protected metadata"
+    );
+    Ok(())
 }
 
 fn validate_edit_path(root: &Dir, path: &Path) -> Result<()> {
@@ -437,14 +480,26 @@ fn validate_edit_path(root: &Dir, path: &Path) -> Result<()> {
         !protected_path(&parent),
         "resolved parent is protected metadata"
     );
+    #[cfg(windows)]
+    validate_windows_handle(root, &root.open_dir(&parent)?.into_std_file())?;
     let mut prefix = PathBuf::new();
     for component in path.components() {
         prefix.push(component);
         match root.symlink_metadata(&prefix) {
-            Ok(metadata) => ensure!(
-                !metadata.file_type().is_symlink(),
-                "write paths cannot contain symbolic links"
-            ),
+            Ok(metadata) => {
+                ensure!(
+                    !metadata.file_type().is_symlink(),
+                    "write paths cannot contain symbolic links"
+                );
+                #[cfg(windows)]
+                {
+                    use cap_std::fs::MetadataExt;
+                    ensure!(
+                        metadata.file_attributes() & 0x400 == 0,
+                        "write paths cannot contain Windows reparse points"
+                    );
+                }
+            }
             Err(error) if error.kind() == std::io::ErrorKind::NotFound && prefix == path => {}
             Err(error) => return Err(error.into()),
         }
@@ -600,7 +655,13 @@ impl Tool for ShellTool {
             ],
         );
         let retained = context.retain_execution();
+        let native_owner = context.native_owner();
         let executor = Executor::new(context.governor, self.artifact_dir.clone())?;
+        let executor = if let Some(owner) = native_owner {
+            executor.with_native_owner(owner)
+        } else {
+            executor
+        };
         let output = executor
             .run_with_retained(
                 CommandRequest {
@@ -686,6 +747,96 @@ mod tests {
                 })
             }
         }
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[tokio::test]
+    async fn coordinated_shell_uses_the_prepared_native_owner() -> Result<()> {
+        use ejm_harness::{CapacityContext, CapacityMode, CapacityPolicy, ReplayProvider};
+
+        let root = tempfile::tempdir()?;
+        let executable = std::env::current_exe()?;
+        let helper = executable
+            .parent()
+            .and_then(Path::parent)
+            .context("resolve native fixture target directory")?
+            .join("examples/native_owner_helper");
+        anyhow::ensure!(
+            helper.is_file(),
+            "build native fixture first: cargo build -p ejm-harness-exec --example native_owner_helper"
+        );
+        let mut config = HarnessConfig {
+            state_dir: root.path().join("state"),
+            run_timeout_ms: 10_000,
+            ..Default::default()
+        };
+        let capacity = CapacityContext::prepare_isolated_with_native_helper(
+            &mut config,
+            CapacityPolicy {
+                mode: CapacityMode::Fixed,
+                ..Default::default()
+            },
+            &root.path().canonicalize()?.join("capacity"),
+            &helper,
+        )?;
+        let owner = capacity.native_owner();
+        assert!(owner.snapshot().epoch.is_none());
+        let provider = ReplayProvider::new(vec![
+            ModelResponse {
+                tool_calls: vec![ToolCall {
+                    id: "owned-shell".into(),
+                    name: "shell".into(),
+                    arguments: json!({"command": "printf 'owned-shell'"}),
+                }],
+                ..Default::default()
+            },
+            ModelResponse {
+                content: "Finished.".into(),
+                ..Default::default()
+            },
+        ]);
+        let harness = Harness::with_capacity(
+            config,
+            Some(Arc::new(provider)),
+            tools(CodingConfig {
+                allow_shell: true,
+                artifact_dir: root.path().join("artifacts"),
+                ..Default::default()
+            })?,
+            vec![],
+            capacity,
+        )?;
+        let session = harness
+            .create_session(SessionOptions {
+                cwd: root.path().into(),
+                title: "coordinated shell".into(),
+            })
+            .await?;
+        let result = harness
+            .start(&session.id, "Check.".into())
+            .await?
+            .wait()
+            .await?;
+        harness.shutdown().await?;
+        assert_eq!(result.status, RunStatus::Completed, "{:?}", result.error);
+        let snapshot = owner.snapshot();
+        assert!(
+            snapshot.epoch.is_some(),
+            "shell bypassed shared native ownership"
+        );
+        assert!(snapshot.last_operation.is_some());
+        assert_eq!(snapshot.active_local_scopes, 0);
+        assert!(
+            harness
+                .events(&session.id, 0, 100)
+                .await?
+                .iter()
+                .any(|event| {
+                    matches!(&event.kind, EventKind::ToolFinished { output, .. }
+                if !output.is_error && output.content.contains("owned-shell"))
+                })
+        );
+        Ok(())
     }
 
     #[tokio::test]
@@ -999,6 +1150,120 @@ mod tests {
             );
             assert!(!outside.path().join("new").exists());
         }
+        Ok(())
+    }
+
+    #[test]
+    fn native_file_workflow_accepts_spaces_and_unicode() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let cwd = temp.path().canonicalize()?;
+        std::fs::create_dir(cwd.join("folder with space 雪"))?;
+        let path = "folder with space 雪/file 🦀.txt";
+        let root = Dir::open_ambient_dir(&cwd, ambient_authority())?;
+        let cancel = tokio_util::sync::CancellationToken::new();
+        edit(
+            &root,
+            &json!({"path":path,"content":"needle original\n"}),
+            false,
+            &cancel,
+        )?;
+        assert!(
+            read_file(&root, &json!({"path":path}))?
+                .content
+                .contains("needle original")
+        );
+        assert!(
+            list_files(&root, &json!({"path":"folder with space 雪"}))?
+                .content
+                .contains("file 🦀.txt")
+        );
+        assert!(
+            search(&root, &cwd, &json!({"pattern":"needle"}), &cancel)?
+                .content
+                .contains(path)
+        );
+        edit(
+            &root,
+            &json!({"path":path,"old":"original","new":"patched","expected_hash":hash(b"needle original\n")}),
+            true,
+            &cancel,
+        )?;
+        assert_eq!(std::fs::read_to_string(cwd.join(path))?, "needle patched\n");
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_windows_paths_reject_devices_streams_and_ambiguous_components() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let cwd = temp.path().canonicalize()?;
+        let root = Dir::open_ambient_dir(&cwd, ambient_authority())?;
+        let cancel = tokio_util::sync::CancellationToken::new();
+        for path in [
+            r"C:\outside",
+            r"C:outside",
+            r"\\server\share\file",
+            r"\\?\C:\outside",
+            "file:stream",
+            ".git./config",
+            ".ejm-harness /state",
+            "NUL.txt",
+            "COM¹.log",
+            "CON .txt",
+        ] {
+            let arguments = json!({"path":path,"pattern":"needle","content":"bad"});
+            assert!(read_file(&root, &arguments).is_err(), "read {path}");
+            assert!(list_files(&root, &arguments).is_err(), "listed {path}");
+            assert!(
+                search(&root, &cwd, &arguments, &cancel).is_err(),
+                "searched {path}"
+            );
+            assert!(
+                edit(&root, &arguments, false, &cancel).is_err(),
+                "wrote {path}"
+            );
+        }
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn native_windows_links_cannot_escape_or_alias_protected_state() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let outside = tempfile::tempdir()?;
+        let cwd = temp.path().canonicalize()?;
+        std::fs::write(outside.path().join("private"), "outside needle")?;
+        std::fs::create_dir(cwd.join(".ejm-harness"))?;
+        std::fs::write(cwd.join(".ejm-harness/state"), "private needle")?;
+        std::os::windows::fs::symlink_dir(outside.path(), cwd.join("escape"))?;
+        std::os::windows::fs::symlink_dir(cwd.join(".ejm-harness"), cwd.join("alias"))?;
+        let root = Dir::open_ambient_dir(&cwd, ambient_authority())?;
+        let cancel = tokio_util::sync::CancellationToken::new();
+        for (directory, file) in [("escape", "private"), ("alias", "state")] {
+            let path = format!("{directory}/{file}");
+            assert!(read_file(&root, &json!({"path":path})).is_err());
+            assert!(list_files(&root, &json!({"path":directory})).is_err());
+            assert!(
+                search(
+                    &root,
+                    &cwd,
+                    &json!({"path":directory,"pattern":"needle"}),
+                    &cancel
+                )
+                .is_err()
+            );
+            assert!(
+                edit(
+                    &root,
+                    &json!({"path":format!("{directory}/new"),"content":"bad"}),
+                    false,
+                    &cancel
+                )
+                .is_err()
+            );
+        }
+        assert!(!outside.path().join("new").exists());
+        assert!(!cwd.join(".ejm-harness/new").exists());
         Ok(())
     }
 

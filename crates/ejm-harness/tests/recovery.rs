@@ -64,7 +64,6 @@ async fn close_harness(harness: Harness, state_dir: &Path) -> Result<()> {
     // The journal writer releases ownership after draining its closed channel.
     let lock = OpenOptions::new()
         .read(true)
-        .write(true)
         .open(state_dir.join("owner.lock"))?;
     tokio::time::timeout(Duration::from_secs(2), async {
         loop {

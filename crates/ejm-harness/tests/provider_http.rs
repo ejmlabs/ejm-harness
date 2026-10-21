@@ -1,10 +1,14 @@
-use std::time::Duration;
+use std::{
+    sync::{Arc, Mutex},
+    time::{Duration, SystemTime},
+};
 
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use ejm_harness::{
     AnthropicConfig, AnthropicProvider, Effect, Message, ModelDelta, ModelRequest, ModelResponse,
-    OpenAiConfig, OpenAiProvider, Provider, ProviderContinuation, ResponsesConfig,
-    ResponsesProvider, ToolCall, ToolDefinition, ToolOutput,
+    OpenAiConfig, OpenAiProvider, Provider, ProviderCapacity, ProviderCapacityObserver,
+    ProviderContinuation, ProviderObservation, ProviderRate, ProviderRetry, QuotaDomain,
+    ResponsesConfig, ResponsesProvider, ToolCall, ToolDefinition, ToolOutput,
 };
 use ejm_harness_auth::{SecretString, StaticCredential};
 use serde_json::{Value, json};
@@ -25,9 +29,17 @@ impl Fixture {
     }
 
     async fn with_status(body: String, status: u16) -> Self {
+        Self::with_headers(body, status, &[]).await
+    }
+
+    async fn with_headers(body: String, status: u16, headers: &[(&str, &str)]) -> Self {
         let server = MockServer::start().await;
+        let mut template = ResponseTemplate::new(status).set_body_raw(body, "text/event-stream");
+        for (name, value) in headers {
+            template = template.insert_header(*name, *value);
+        }
         Mock::given(any())
-            .respond_with(ResponseTemplate::new(status).set_body_raw(body, "text/event-stream"))
+            .respond_with(template)
             .expect(1)
             .mount(&server)
             .await;
@@ -48,6 +60,28 @@ impl Fixture {
             .into_iter()
             .next()
             .context("missing provider request")
+    }
+}
+
+#[derive(Default)]
+struct CapacityFeedback(Mutex<Vec<ProviderObservation>>);
+
+impl CapacityFeedback {
+    fn entries(&self) -> Result<Vec<ProviderObservation>> {
+        self.0
+            .lock()
+            .map(|events| events.clone())
+            .map_err(|_| anyhow!("feedback fixture lock poisoned"))
+    }
+}
+
+impl ProviderCapacityObserver for CapacityFeedback {
+    fn observe(&self, observation: ProviderObservation) {
+        if let Ok(mut events) = self.0.lock()
+            && events.len() < 8
+        {
+            events.push(observation);
+        }
     }
 }
 
@@ -336,6 +370,159 @@ async fn responses_observer_captures_request_and_http_failure_with_credentials_r
             .iter()
             .all(|record| record.request_id == records[0].request_id)
     );
+    Ok(())
+}
+
+fn capacity_provider(
+    family: &str,
+    base: &str,
+    capacity: ProviderCapacity,
+) -> Result<Box<dyn Provider>> {
+    match family {
+        "openai" => Ok(Box::new(openai(base)?.with_capacity(capacity)?)),
+        "anthropic" => Ok(Box::new(anthropic(base)?.with_capacity(capacity)?)),
+        "responses" => Ok(Box::new(responses(base)?.with_capacity(capacity)?)),
+        _ => bail!("unknown fixture family"),
+    }
+}
+
+#[tokio::test]
+async fn typed_capacity_feedback_works_without_debug_capture() -> Result<()> {
+    for family in ["openai", "anthropic", "responses"] {
+        let body = match family {
+            "openai" => format!(
+                "{}data: [DONE]\r\n\r\n",
+                sse(&[json!({"choices":[],"usage":{"prompt_tokens":12,"completion_tokens":4}}),])
+            ),
+            "anthropic" => sse(&[
+                json!({"type":"message_start","message":{"usage":{"input_tokens":8,"cache_creation_input_tokens":2,"cache_read_input_tokens":2}}}),
+                json!({"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":4}}),
+                json!({"type":"message_stop"}),
+            ]),
+            _ => sse(&[
+                json!({"type":"response.completed","response":{"status":"completed","output":[],"usage":{"input_tokens":12,"output_tokens":4}}}),
+            ]),
+        };
+        let now = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)?
+            .as_secs();
+        let reset = (now + 60).to_string();
+        let names = if family == "anthropic" {
+            [
+                "anthropic-ratelimit-requests-limit",
+                "anthropic-ratelimit-requests-remaining",
+                "anthropic-ratelimit-requests-reset",
+            ]
+        } else {
+            [
+                "x-ratelimit-limit-requests",
+                "x-ratelimit-remaining-requests",
+                "x-ratelimit-reset-requests",
+            ]
+        };
+        let fixture = Fixture::with_headers(
+            body,
+            200,
+            &[(names[0], "20"), (names[1], "7"), (names[2], &reset)],
+        )
+        .await;
+        let domain = QuotaDomain::new(
+            &fixture.base_url,
+            "598b68e9-ea5c-427a-b8bc-44bbbfbe7278",
+            "shared",
+        )?;
+        let provider = capacity_provider(
+            family,
+            &fixture.base_url,
+            ProviderCapacity {
+                domain: Some(domain.clone()),
+                max_in_flight: Some(2),
+                requests: Some(ProviderRate {
+                    limit: 10,
+                    window_ms: 60_000,
+                }),
+                ..Default::default()
+            },
+        )?;
+        assert_eq!(provider.capacity().domain, Some(domain));
+        assert_eq!(provider.capacity().max_in_flight, Some(2));
+        let feedback = Arc::new(CapacityFeedback::default());
+        let (send, _receive) = mpsc::channel(8);
+        provider
+            .stream_with_capacity(request(), CancellationToken::new(), send, feedback.clone())
+            .await?;
+        let entries = feedback.entries()?;
+        assert!(matches!(&entries[..], [
+            ProviderObservation::Limits { requests: Some(window), tokens: None },
+            ProviderObservation::Usage(usage),
+        ] if window.limit == 20 && window.remaining == 7 && window.reset_at_ms == (now + 60) * 1000 && usage.input_tokens == 12 && usage.output_tokens == 4));
+        fixture.request().await?;
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn typed_throttle_feedback_keeps_long_and_unknown_hints_distinct_without_retry() -> Result<()>
+{
+    for family in ["openai", "anthropic", "responses"] {
+        for (status, hint, kind) in [
+            (429, "2", "delay"),
+            (503, "901", "long"),
+            (429, "invalid", "unknown"),
+        ] {
+            let fixture = Fixture::with_headers(
+                "private error details".into(),
+                status,
+                &[("retry-after", hint)],
+            )
+            .await;
+            let provider =
+                capacity_provider(family, &fixture.base_url, ProviderCapacity::default())?;
+            let feedback = Arc::new(CapacityFeedback::default());
+            let (send, _receive) = mpsc::channel(8);
+            let error = provider
+                .stream_with_capacity(request(), CancellationToken::new(), send, feedback.clone())
+                .await
+                .err()
+                .context("throttle response succeeded")?;
+            assert!(!format!("{error:#}").contains("private error details"));
+            let entries = feedback.entries()?;
+            assert!(
+                matches!(&entries[..], [ProviderObservation::Throttled { retry }]
+                if matches!((kind, retry), ("delay", ProviderRetry::Delay { millis: 2000 })
+                    | ("long", ProviderRetry::BeyondHorizon { retry_at_ms: Some(_) })
+                    | ("unknown", ProviderRetry::Unknown)))
+            );
+            fixture.request().await?;
+        }
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn incomplete_or_malformed_usage_cannot_refund_a_provider_charge() -> Result<()> {
+    for (usage, completed) in [
+        (json!({"prompt_tokens":12,"completion_tokens":4}), false),
+        (
+            json!({"prompt_tokens":12,"completion_tokens":4,"prompt_tokens_details":{"cached_tokens":13}}),
+            true,
+        ),
+    ] {
+        let mut body = sse(&[json!({"choices":[], "usage":usage})]);
+        if completed {
+            body.push_str("data: [DONE]\r\n\r\n");
+        }
+        let fixture = Fixture::start(body).await;
+        let provider = openai(&fixture.base_url)?;
+        let feedback = Arc::new(CapacityFeedback::default());
+        let (send, _receive) = mpsc::channel(8);
+        let result = provider
+            .stream_with_capacity(request(), CancellationToken::new(), send, feedback.clone())
+            .await;
+        assert_eq!(result.is_ok(), completed);
+        assert!(feedback.entries()?.is_empty());
+        fixture.request().await?;
+    }
     Ok(())
 }
 

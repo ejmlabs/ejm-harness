@@ -1,0 +1,19 @@
+{
+  "status": "failed",
+  "record_type": "observed failure retained after the original runner aborted before writing its partial fixed report",
+  "recorded_at": "2026-10-19",
+  "profile": "release",
+  "binary_sha256": "724840f1801fc9398775905b65d2c6fa4b0492bb5532c9ee2830192643a10754",
+  "capacity_mode": "fixed",
+  "requested_agents": 1000,
+  "observed_progress": "PARKED 1000 agents",
+  "failure": "benchmark completion exceeded its 180 second deadline",
+  "remote_api_calls": 0,
+  "limits": [
+    "The original runner discarded partial fixed samples after this failure.",
+    "No full raw fixed report or RSS samples survive for this attempt.",
+    "This binary predates later core coordinator and pending-response changes.",
+    "The paired legacy and local admission reports retain their full raw samples.",
+    "A newer passing result must not erase this observed miss."
+  ]
+}
