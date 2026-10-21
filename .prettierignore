@@ -13,5 +13,8 @@ registry/.wrangler/
 registry/auth/.wrangler/
 registry/Cargo.lock
 site/.wrangler/
+site/dist/
+site/.ejm-ssg/
 site/public/design-kit/
 /.github/review-context/
+registry/.web-assets/

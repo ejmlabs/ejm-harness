@@ -1,7 +1,7 @@
-# Gerry extension registry
+# ejm extension registry
 
-The registry serves immutable Gerry extension packages at
-`https://harness.meetgerry.ai`. The Rust Worker owns publication and catalog
+The registry source implements immutable ejm extension packages for
+`https://registry.ejmlabs.com`. The Rust Worker owns publication and catalog
 policy. A separate Better Auth Worker handles GitHub sign-in and first-party CLI
 device authorization through a private service binding. D1 stores metadata and
 auth in separate databases. A private R2 bucket stores `.tar.gz` archives.
@@ -15,10 +15,13 @@ check.
 
 Use Node 24 or later and the repository's pinned Rust toolchain through Rustup.
 The check selects that toolchain so its compiler and installed Wasm target agree.
-Keep Cargo jobs at most two. Install maintained tooling without running package
+Clone `ejmlabs/ejm-ui` beside this repository and check out the exact revision
+in `.github/ui-source.json`. Its root dependencies supply the shared build tools.
+Keep Cargo jobs at most two. Install locked dependencies without package
 lifecycle scripts:
 
 ```sh
+npm --prefix ../ejm-ui ci --ignore-scripts
 npm --prefix registry ci --ignore-scripts
 cargo install --locked --jobs 2 --version 0.8.7 worker-build
 rustup target add wasm32-unknown-unknown
@@ -50,6 +53,31 @@ Secure cookies and the fixed HTTPS auth origin are intentional. A local browser
 sign-in needs an explicit local HTTPS origin and a matching test OAuth
 registration. Automated fixtures supply their own test identities and require
 neither.
+
+## Shared presentation
+
+The public catalog, account and device pages use the pinned ejm-ui native
+profile. `npm --prefix registry run build:web` checks the authored markup and
+copies shared CSS, fonts and project artwork into ignored `.web-assets`.
+Wrangler builds this output before its Rust bundle. There is no React runtime,
+local design system, analytics or stored theme choice in these pages.
+
+Keep meaningful form labels, permanent publisher-name consequences, server-checked
+device details, full session authority and recovery steps. Rendering package
+content with text nodes preserves the browser boundary. Do not replace API or
+auth errors with an HTML fallback.
+
+The unchanged frontend budgets are 14 KiB gzip CSS, 70 KiB fonts, 8 KiB gzip
+scripts and 30 KiB gzip per HTML document. The build enforces them. The native
+profile follows the system theme; product and application behavior still belong
+to their existing server, auth and policy owners.
+
+Current ejm-cli source has a fixed registry origin and no override. These pages
+therefore show no CLI install, login or publish commands for the new address.
+Rust hosts can select it through
+[`RegistryClient::new`](../docs/packages.md#registry-client-origin). Advertising
+CLI workflows needs a separate client/default release with origin-scoped
+credential migration. That release is not part of this presentation change.
 
 ## HTTP contract
 
@@ -236,29 +264,58 @@ arguments, source, fixture files, or logs.
 
 ## Deployment prerequisites and acceptance
 
-Remote changes require explicit owner authorization. Before a deployment:
+The owner selected `registry.ejmlabs.com`. Both workers use that exact public
+origin. Only the Rust Worker has a custom domain; the Better Auth Worker is
+reached through its private binding. This configuration prepares a new service,
+not a static-site upload. It has not been provisioned or deployed.
 
-1. Create separate `gerry-registry` and `gerry-registry-auth` D1 databases and
+Both configurations select the existing ejmlabs Cloudflare account, matching the
+Harness site's account. After protected source acceptance, complete the
+following sequence. UUIDs remain deliberate placeholders until the
+matching resources have been created and their IDs reviewed. Default quotas,
+private storage, consent rules and the empty operator allowlist are unchanged.
+
+Before a deployment:
+
+1. Create separate `ejm-registry` and `ejm-registry-auth` D1 databases and
    replace placeholder UUIDs in their Wrangler files. Apply the reviewed registry
    and generated auth migrations to the matching databases.
-2. Create `gerry-registry-packages` as a private R2 bucket. Disable public bucket
+2. Create `ejm-registry-packages` as a private R2 bucket. Disable public bucket
    access and public custom domains. Restrict deployment and storage credentials
    to the required Workers, D1 databases, and bucket.
-3. Register a GitHub OAuth application with callback
-   `https://harness.meetgerry.ai/api/auth/callback/github`. Store
+3. A GitHub owner must register an OAuth app named `ejm extensions`, with
+   homepage `https://registry.ejmlabs.com` and callback
+   `https://registry.ejmlabs.com/api/auth/callback/github`. Store
    `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and a fresh high-entropy
    `BETTER_AUTH_SECRET` through Wrangler's hidden secret prompt or the Cloudflare
-   UI. The auth Worker alone receives these secrets.
+   UI. The auth Worker alone receives these secrets. Use interactive prompts:
+
+    ```sh
+    npm exec -- wrangler secret put GITHUB_CLIENT_ID --config auth/wrangler.jsonc
+    npm exec -- wrangler secret put GITHUB_CLIENT_SECRET --config auth/wrangler.jsonc
+    npm exec -- wrangler secret put BETTER_AUTH_SECRET --config auth/wrangler.jsonc
+    ```
+
+    Run those commands from `registry/`. Do not pass
+    credentials as arguments, print them or commit a local secret file. The
+    maintainer must supply the OAuth app credentials and a fresh secret through
+    the hidden prompts; source preparation cannot create those owner inputs.
+
 4. Deploy the private auth Worker with no public route, workers.dev, or preview
    URL. Bind it only to the Rust registry Worker. Set the approved operator
    subject allowlist, or keep it empty until an operator is verified.
 5. Build the Rust Worker with worker-build 0.8.7 and review the dry-run bundle.
-   Add the authorized custom domain `harness.meetgerry.ai` to the public Worker
-   only during the approved deployment. No domain route is preconfigured here.
+   The public Worker config targets the approved custom domain
+   `registry.ejmlabs.com`. The auth Worker has no public route. Keep the
+   placeholders until provisioning is accepted; do not deploy fixtures.
 6. Confirm exact origin, TLS, private binding isolation, database migration
    status, private bucket access, billing alerts, and response/log redaction.
-7. With owner authorization, test real GitHub login, publisher claim, CLI device
-   approval and denial, upload, interrupted upload retry, public download hash,
+7. Before advertising CLI workflows, release the coordinated client/default
+   update for this origin. Preserve per-origin credentials, old-writer exclusion,
+   explicit trust and grants. A host configured through `RegistryClient::new`
+   can exercise the API before CLI support is available.
+8. With owner authorization, test real GitHub login, publisher claim, configured
+   client device approval and denial, upload, interrupted upload retry, public download hash,
    session revocation, quarantine, and suspension. Record these separately from
    local fixture evidence. Confirm cookie flags and CSP in a real browser.
 

@@ -9,7 +9,7 @@ interface Bindings {
   REGISTRY_MIGRATIONS: { name: string; queries: string[] }[];
 }
 const bindings = env as unknown as Bindings;
-const origin = "https://harness.meetgerry.ai";
+const origin = "https://registry.example.invalid";
 const versionPath = "/v1/packages/alice/test/versions/1.0.0";
 const archive = Uint8Array.from(atob(fixture.base64), (character) => character.charCodeAt(0));
 const registry = exports as unknown as {
@@ -298,5 +298,27 @@ describe("registry publication boundary", () => {
       next_cursor: null,
       versions: [{ manifest: { version: "1.0.3" } }],
     });
+  });
+});
+
+describe("shared browser asset boundary", () => {
+  it("serves same-origin presentation assets without masking protected API errors", async () => {
+    const css = await call("/shared/ui.css");
+    expect(css.status).toBe(200);
+    expect(css.headers.get("content-type")).toContain("text/css");
+    expect(css.headers.get("content-security-policy")).toContain("style-src 'self'");
+    const font = await call("/shared/fonts/manrope-latin.woff2");
+    expect(font.status).toBe(200);
+    expect(new TextDecoder().decode((await font.arrayBuffer()).slice(0, 4))).toBe("wOF2");
+    for (const path of ["/account", "/device"]) {
+      const page = await call(path);
+      expect(page.status).toBe(200);
+      expect(page.headers.get("content-type")).toContain("text/html");
+      expect(await page.text()).toContain('href="/shared/ui.css"');
+    }
+    const privateAccount = await call("/v1/me");
+    expect(privateAccount.status).toBe(401);
+    expect(privateAccount.headers.get("content-type")).toContain("application/json");
+    expect((await call("/api/not-found")).status).toBe(404);
   });
 });

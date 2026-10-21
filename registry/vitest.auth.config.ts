@@ -7,7 +7,10 @@ export default defineConfig(async () => ({
       wrangler: { configPath: "./auth/wrangler.jsonc" },
       miniflare: {
         d1Databases: ["DB", "AUTH_DB"],
-        bindings: { AUTH_MIGRATIONS: await readD1Migrations("./auth/migrations") },
+        bindings: {
+          REGISTRY_ORIGIN: "https://registry.example.invalid",
+          AUTH_MIGRATIONS: await readD1Migrations("./auth/migrations"),
+        },
       },
     }),
   ],

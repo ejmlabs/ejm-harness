@@ -10,6 +10,7 @@ export default tseslint.config(
       "target/**",
       "registry/target/**",
       "registry/build/**",
+      "registry/.web-assets/**",
       "registry/.wrangler/**",
       "registry/auth/.wrangler/**",
       "sdk/typescript/src/protocol.ts",

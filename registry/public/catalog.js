@@ -20,28 +20,23 @@ async function load(reset) {
         if (reset) packages.replaceChildren();
         for (const item of result.packages) {
             const row = document.createElement("article");
-            row.className = "package";
+            row.setAttribute("data-ejm", "row");
             const details = document.createElement("div");
+            details.setAttribute("data-ejm", "group");
             const title = document.createElement("h2");
             title.textContent = item.name;
             const description = document.createElement("p");
             description.textContent = item.description;
             const version = document.createElement("span");
-            version.className = "version";
-            version.textContent = `Last published: ${item.latest_version}`;
-            const install = document.createElement("code");
-            install.textContent = `ejm-cli package install ${item.name}@${item.latest_version}`;
+            version.setAttribute("data-ejm", "muted");
+            version.textContent = `Version ${item.latest_version}`;
             details.append(title, description, version);
-            row.append(details, install);
+            row.append(details);
             packages.append(row);
         }
         cursor = result.next_cursor;
         more.hidden = !cursor;
-        status(
-            packages.children.length
-                ? ""
-                : "No extensions found. Try another name or publish the first one.",
-        );
+        status(packages.children.length ? "" : "No extensions found. Try another search.");
     } catch (error) {
         if (currentGeneration === generation) status(error.message, true);
     } finally {

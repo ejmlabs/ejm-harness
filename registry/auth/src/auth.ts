@@ -18,7 +18,7 @@ export function authOptions(
 ): BetterAuthOptions {
   return {
     database,
-    appName: "Gerry Registry",
+    appName: "ejm extensions",
     baseURL: env.REGISTRY_ORIGIN,
     basePath: "/api/auth",
     secret: env.BETTER_AUTH_SECRET,

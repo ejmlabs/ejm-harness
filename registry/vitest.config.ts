@@ -10,6 +10,7 @@ export default defineConfig(async () => ({
       miniflare: {
         d1Databases: ["DB", "AUTH_DB"],
         bindings: {
+          REGISTRY_ORIGIN: "https://registry.example.invalid",
           REGISTRY_MIGRATIONS: await readD1Migrations("./migrations"),
           AUTH_MIGRATIONS: await readD1Migrations("./auth/migrations"),
         },

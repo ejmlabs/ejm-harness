@@ -85,7 +85,9 @@ to substitute behavior at the engine boundaries.
 - [Authentication](docs/auth.md)
 - [Shared credential vault](docs/credential-vault.md)
 - [Official Claude Code provider](docs/claude-code.md)
-- [Host authentication guide](site/public/docs/host-auth/index.html)
+- [User guide](site/content/user-guide.md)
+- [Developer guide](site/content/developer-guide.md)
+- [Host authentication guide](site/content/host-auth.md)
 - [Host authentication verification](docs/host-auth-verification.md)
 - [Extension packages and trust](docs/packages.md)
 

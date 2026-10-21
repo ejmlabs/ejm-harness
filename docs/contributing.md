@@ -73,10 +73,11 @@ admission rules are unchanged. Runtime sources, manifests, locks and public
 SDK contracts do not change.
 
 The target also supports CLI harness selection and an optional UI source pin.
-This harness profile selects no sibling harness. It has no
-`.github/ui-source.json`, so the optional UI checkout, source archive and
-locked npm install stay inactive. Adding such a pin later needs its own
-review; this update adds no UI dependency or package installation.
+This harness profile selects no sibling harness. The public site and native
+registry presentation use the exact sibling UI revision in `.github/ui-source.json`.
+The optional shared-workflow UI checkout and locked install therefore apply.
+Keep that pin reviewed and build consumers against the same source. Rust runtime
+crates and SDKs do not depend on frontend packages.
 
 ### Review source context
 
@@ -136,9 +137,11 @@ Do not rerun the failed attempt, move a tag or replace assets. Installing these
 callers creates no tag, draft, installer, package or deployment. Product release
 writes and publication require separate authorization.
 
-This contributor and release guidance changes no product API, public product
-page or generated site output, so the public site needs no content or build
-change. No public site publication or native platform certification is claimed.
+The public site now has authored React and Markdown sources under `site/`.
+The normal gate builds and checks its routes and unchanged transfer budgets.
+See the [site developer guide](../site/content/developer-guide.md)
+for its pinned UI setup. Source checks do not establish site publication or
+native platform certification.
 
 ## Plan changes
 
