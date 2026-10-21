@@ -4,6 +4,13 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ## [Unreleased]
 
+### Security
+
+- Update the locked TLS dependencies to rustls-webpki 0.103.16 and
+  webpki-root-certs 1.0.10 for RUSTSEC-2026-0382 and RUSTSEC-2026-0383.
+  Source builds use the corrected certificate trust data. Public APIs and the
+  existing install workflow are unchanged; no package or binary is published.
+
 ## [0.1.0] - 2026-10-19
 
 Prepared development source for the first `0.1.0` release. These notes do not
