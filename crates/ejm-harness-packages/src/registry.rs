@@ -18,7 +18,6 @@ pub use credentials::{
     delete_registry_token, load_registry_token, migrate_registry_token, save_registry_token,
 };
 
-pub const DEFAULT_REGISTRY: &str = "https://harness.meetgerry.ai";
 const MAX_JSON_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

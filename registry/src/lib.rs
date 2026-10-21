@@ -1,4 +1,4 @@
-//! Cloudflare registry for immutable Gerry extension packages.
+//! Cloudflare registry for immutable ejm extension packages.
 
 pub mod policy;
 

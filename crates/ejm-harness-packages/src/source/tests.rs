@@ -81,7 +81,6 @@ async fn remote_references_cannot_be_shadowed_by_repository_files() -> Result<()
     }
     let directory = tempfile::tempdir()?;
     let manager = PackageManager::new(directory.path().join("store"))?;
-    let registry = RegistryClient::new("https://harness.meetgerry.ai")?;
     let governor = Arc::new(Governor::new(ResourceLimits::default())?);
     for source in [
         "npm:fixture@latest",
@@ -90,28 +89,42 @@ async fn remote_references_cannot_be_shadowed_by_repository_files() -> Result<()
         "@example/test@latest",
     ] {
         assert!(
-            install_source(
-                &manager,
-                source,
-                &registry,
-                &governor,
-                CancellationToken::new()
-            )
-            .await
-            .is_err()
+            install_source(&manager, source, None, &governor, CancellationToken::new())
+                .await
+                .is_err()
         );
     }
     assert!(manager.list()?.is_empty());
     let record = install_source(
         &manager,
         "local:npm:fixture@latest",
-        &registry,
+        None,
         &governor,
         CancellationToken::new(),
     )
     .await?;
     assert_eq!(record.name, "@example/test");
     assert!(!record.enabled);
+    assert_eq!(governor.snapshot().running, 0);
+    Ok(())
+}
+
+#[tokio::test]
+async fn registry_source_requires_configuration_before_installing() -> Result<()> {
+    let directory = tempfile::tempdir()?;
+    let manager = PackageManager::new(directory.path().join("store"))?;
+    let governor = Arc::new(Governor::new(ResourceLimits::default())?);
+    let error = install_source(
+        &manager,
+        "@example/test@1.0.0",
+        None,
+        &governor,
+        CancellationToken::new(),
+    )
+    .await;
+    assert!(error.is_err_and(|error| error.to_string().contains("configured registry")));
+    assert!(manager.list()?.is_empty());
+    tokio::time::timeout(std::time::Duration::from_secs(2), governor.wait_idle()).await?;
     assert_eq!(governor.snapshot().running, 0);
     Ok(())
 }
@@ -133,7 +146,7 @@ async fn install_deadline_releases_admission_without_persisting() -> Result<()> 
     let error = install_source(
         &manager,
         "@example/test@1.0.0",
-        &registry,
+        Some(&registry),
         &governor,
         CancellationToken::new(),
     )
@@ -150,7 +163,7 @@ async fn install_deadline_releases_admission_without_persisting() -> Result<()> 
 async fn npm_checks_metadata_integrity_and_download_origin() -> Result<()> {
     let server = MockServer::start().await;
     let downloads = fixture_downloads(&server.uri())?;
-    let bytes = tar_files(&[("package/gerry.package.json", &manifest())])?;
+    let bytes = tar_files(&[("package/ejm.package.json", &manifest())])?;
     for (name, integrity, url, success) in [
         (
             "fixture",
@@ -221,7 +234,7 @@ async fn source_http_rejects_redirects_oversized_bodies_and_cancellation() -> Re
         );
         server.reset().await;
     }
-    let bytes = tar_files(&[("package/gerry.package.json", &manifest())])?;
+    let bytes = tar_files(&[("package/ejm.package.json", &manifest())])?;
     Mock::given(wiremock::matchers::path("/fixture/1.0.0"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "name":"fixture","version":"1.0.0","dist":{"tarball":format!("{}/archive", server.uri()),"integrity":format!("sha512-{}",STANDARD.encode(Sha512::digest(&bytes)))}
@@ -247,7 +260,7 @@ async fn pypi_checks_portable_wheel_identity_size_and_hash() -> Result<()> {
     let server = MockServer::start().await;
     let downloads = fixture_downloads(&server.uri())?;
     let bytes = wheel_files(&[
-        ("fixture/gerry.package.json", &manifest()),
+        ("fixture/ejm.package.json", &manifest()),
         ("fixture/__init__.py", b""),
     ])?;
     for (name, version, filename, size, hash, success) in [
@@ -327,14 +340,11 @@ fn wheel_rejects_traversal_hooks_relocation_links_and_expansion() -> Result<()> 
         "startup.pth",
         "fixture-1.0.0.data/purelib/escape",
     ] {
-        let bytes = wheel_files(&[
-            ("fixture/gerry.package.json", &manifest()),
-            (path, b"unsafe"),
-        ])?;
+        let bytes = wheel_files(&[("fixture/ejm.package.json", &manifest()), (path, b"unsafe")])?;
         assert!(archives::wheel(&bytes).is_err());
     }
     let bytes = wheel_files(&[
-        ("fixture/gerry.package.json", &manifest()),
+        ("fixture/ejm.package.json", &manifest()),
         ("huge", &vec![0; MAX_EXPANDED_BYTES + 1]),
     ])?;
     assert!(archives::wheel(&bytes).is_err());
@@ -353,7 +363,7 @@ fn tar_rejects_wrong_roots_links_duplicates_and_expansion() -> Result<()> {
     let manifest = manifest();
     assert!(
         archives::tar(
-            &tar_files(&[("other/gerry.package.json", &manifest)])?,
+            &tar_files(&[("other/ejm.package.json", &manifest)])?,
             Some("package"),
             false
         )
@@ -362,8 +372,8 @@ fn tar_rejects_wrong_roots_links_duplicates_and_expansion() -> Result<()> {
     assert!(
         archives::tar(
             &tar_files(&[
-                ("package/gerry.package.json", &manifest),
-                ("package/gerry.package.json", &manifest)
+                ("package/ejm.package.json", &manifest),
+                ("package/ejm.package.json", &manifest)
             ])?,
             Some("package"),
             false
@@ -388,7 +398,7 @@ async fn git_uses_only_exact_public_github_archives() -> Result<()> {
     let server = MockServer::start().await;
     let downloads = fixture_downloads(&server.uri())?;
     let bytes = tar_files(&[
-        ("repo-commit/gerry.package.json", &manifest()),
+        ("repo-commit/ejm.package.json", &manifest()),
         ("repo-commit/.github/ignored", b"ignored"),
     ])?;
     Mock::given(wiremock::matchers::path(format!(
