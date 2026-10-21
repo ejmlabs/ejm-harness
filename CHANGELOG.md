@@ -29,7 +29,8 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
   provider readiness, and idle provider replacement with durable continuation
   binding.
 - Uniform repository guidance, explicit human admission, protected merge gates,
-  two complete Codex reviews, and independent SemVer source-draft preparation.
+  two complete automated review steps, and independent SemVer source-draft
+  preparation.
 
 ### Fixed
 
@@ -47,8 +48,9 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
 
 - The installed shared caller passed Linux, macOS, Windows, registry and standards
   checks in [PR #16](https://github.com/ejmlabs/ejm-harness/pull/16), with two
-  complete Codex Sol 6.1 medium reviews. This establishes the checked source and
-  caller path; it does not certify native key services, live sign-in or inference.
+  complete automated review steps at medium effort. This establishes the checked
+  source and caller path; it does not certify native key services, live sign-in
+  or inference.
 - Host-auth API and process cleanup verification still has open work in the
   [verification record](docs/host-auth-verification.md). Native platform and host
   acceptance remain separate from fixture and hosted caller results.
