@@ -1,0 +1,28 @@
+{
+  "ThemeToggle": [
+    "default"
+  ],
+  "Header": [
+    "default"
+  ],
+  "Footer": [
+    "default"
+  ],
+  "ExternalLink": [
+    "default"
+  ],
+  "SiteLayout": [
+    "default"
+  ],
+  "DocsLayout": [
+    "default"
+  ],
+  "AppShell": [
+    "default"
+  ],
+  "Brand": [
+    "navigation",
+    "project",
+    "footer"
+  ]
+}
