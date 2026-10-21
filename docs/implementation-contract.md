@@ -81,7 +81,7 @@ Provider exports:
 - `ModelResponse`: `content: String`, `tool_calls: Vec<ToolCall>`, `usage: Usage`, `continuation: Option<ProviderContinuation>`.
 - `Usage: Default`: `input_tokens: u64`, `output_tokens: u64`, `cached_input_tokens: Option<u64>`, `reasoning_output_tokens: Option<u64>`. Optional counts are reported subsets, not extra tokens. Aggregation sums only reported detail.
 - `ReplayProvider::new(responses: Vec<ModelResponse>) -> Self`; deterministic runs, no model charge. `ReplayProvider::echo()` for smoke usage.
-- `OpenAiProvider::new(config: OpenAiConfig) -> Result<Self>`; config `base_url: String`, `api_key: String`, `model: String`. Chat Completions SSE, compatible with hosted DeepSeek and other compatible endpoints. `AnthropicProvider` is also included.
+- `OpenAiProvider::new(config: OpenAiConfig) -> Result<Self>`; config `base_url: String`, `api_key: String`, `model: String`. Chat Completions SSE, compatible with hosted DeepSeek and other compatible endpoints. `AnthropicProvider` is also included. A base URL must use `https`, or `http` on exact `localhost`, an address in `127.0.0.0/8`, or `::1`. Construction rejects every other scheme and every non-loopback `http` URL, including `0.0.0.0` and LAN or private addresses, before a connection or API key is sent. There is no insecure override. Plain `http` does not use `HTTP_PROXY` or `ALL_PROXY`. `https` still uses the process proxy. Worker protocol 1 and the generated schema are unchanged.
 - `ResponsesProvider::new(ResponsesConfig, Arc<dyn CredentialSource>) -> Result<Self>` uses the public OpenAI Responses API, per-request model/effort, encrypted stateless continuation, and optional redacted HTTP capture. See [the host integration contract](ide-integration.md).
 - `ClaudeCodeProvider::new(ClaudeCodeConfig, Executor) -> Result<Self>` delegates structured inference to an installed official Claude Code client. Use an executor from the harness's shared governor and `ejm_harness_auth::ClaudeCodeClient` for subscription status/sign-in. Read [the official-client contract](claude-code.md) before composing it. This Rust adapter is not a worker provider descriptor.
 
@@ -111,7 +111,7 @@ Handshake first: `hello {protocol: 1}` -> `{protocol: 1, version: "0.1.0", capab
 
 - `{kind: "echo"}` for offline smoke use.
 - `{kind: "replay", responses: ModelResponse[]}` for deterministic fixtures.
-- `{kind: "openai", base_url, api_key, model}` for compatible Chat Completions APIs, including DeepSeek.
+- `{kind: "openai", base_url, api_key, model}` for compatible Chat Completions APIs, including DeepSeek. `base_url` must use `https`, or `http` on exact `localhost`, `127.0.0.0/8`, or `::1`.
 - `{kind: "responses", api_key, model, reasoning_effort?}` for the public OpenAI Responses API.
 - `{kind: "anthropic", api_key, model}` for Anthropic's public Messages API.
 
