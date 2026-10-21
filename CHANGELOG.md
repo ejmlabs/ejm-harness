@@ -14,6 +14,8 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
   registry origins explicitly. Credentials remain isolated by exact origin.
 - Give registry source its own identity and resource placeholders. No registry,
   package, worker binary or site is published by this source change.
+- Retain immutable UI install metadata for static dependency review. This
+  preparation selects no UI dependency and changes no product behavior.
 
 ### Security
 
