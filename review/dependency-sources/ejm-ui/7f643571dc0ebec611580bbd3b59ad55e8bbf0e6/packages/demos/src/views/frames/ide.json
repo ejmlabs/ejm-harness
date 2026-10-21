@@ -1,0 +1,114 @@
+{
+ "agent": "Edi",
+ "chatTitle": "Fix the flaky retry test",
+ "model": "Sample model 1",
+ "openFiles": [
+  "src/retry.rs"
+ ],
+ "active": "src/retry.rs",
+ "tree": [
+  {
+   "key": "README.md",
+   "dir": false,
+   "level": 0
+  },
+  {
+   "key": "src",
+   "dir": true,
+   "level": 0
+  },
+  {
+   "key": "src/lib.rs",
+   "dir": false,
+   "level": 1
+  },
+  {
+   "key": "src/main.rs",
+   "dir": false,
+   "level": 1
+  },
+  {
+   "key": "src/retry.rs",
+   "dir": false,
+   "level": 1
+  },
+  {
+   "key": "web",
+   "dir": true,
+   "level": 0
+  },
+  {
+   "key": "web/config.ts",
+   "dir": false,
+   "level": 1
+  }
+ ],
+ "file": {
+  "path": "src/retry.rs",
+  "lang": "rust",
+  "text": "use std::time::{Duration, Instant};\n\n/// Wait before the next attempt, doubling each time.\npub fn retry_backoff(attempt: u32) -> Duration {\n    Duration::from_millis(100 << attempt.min(6))\n}\n\n/// True while the retry window is still open.\npub fn window_open(started: Instant, now: Instant, budget: Duration) -> bool {\n    now.duration_since(started) < budget\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n\n    #[test]\n    fn window_is_open_at_start() {\n        let started = Instant::now();\n        let now = started + Duration::from_millis(1);\n        assert!(window_open(started, now, Duration::from_millis(5)));\n    }\n}\n"
+ },
+ "changed": [
+  8,
+  19,
+  20
+ ],
+ "chat": [
+  {
+   "kind": "tool",
+   "name": "workbench_read_file",
+   "arg": "src/retry.rs",
+   "state": "ok",
+   "word": "ok",
+   "review": false,
+   "id": 3,
+   "detail": "23 lines"
+  },
+  {
+   "kind": "tool",
+   "name": "workbench_search_code",
+   "arg": "Instant::now",
+   "state": "ok",
+   "word": "ok",
+   "review": false,
+   "id": 4,
+   "detail": "2 matches"
+  },
+  {
+   "kind": "tool",
+   "name": "workbench_write_file",
+   "arg": "src/retry.rs",
+   "state": "ok",
+   "word": "applied",
+   "review": false,
+   "id": 6,
+   "diff": [
+    {
+     "text": " /// True while the retry window is still open.",
+     "kind": "ctx"
+    },
+    {
+     "text": "-pub fn window_open(started: Instant, budget: Duration) -> bool {",
+     "kind": "del"
+    },
+    {
+     "text": "-    let now = Instant::now();",
+     "kind": "del"
+    },
+    {
+     "text": "+pub fn window_open(started: Instant, now: Instant, budget: Duration) -> bool {",
+     "kind": "add"
+    },
+    {
+     "text": "     now.duration_since(started) < budget",
+     "kind": "ctx"
+    }
+   ]
+  },
+  {
+   "kind": "agent",
+   "text": "Applied. window_open now takes the time as an argument.",
+   "id": 7
+  }
+ ]
+}
