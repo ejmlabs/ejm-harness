@@ -51,7 +51,7 @@ rustix = { workspace = true, features = ["process", "fs"] }
 
 [dev-dependencies]
 wiremock.workspace = true
-sha2 = "0.10"
+sha2 = "0.11"
 tokio = { workspace = true, features = ["test-util"] }
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 
