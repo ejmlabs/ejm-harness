@@ -1,0 +1,182 @@
+{
+  "repository": "ejmlabs/ejm-ui",
+  "owner_commit": "79a1aa8b1075f834717bc0c0299dc2c41a22b966",
+  "owner_tree": "c18c74fd336dbad9515bff8ecf22ca980b889a51",
+  "base_commit": null,
+  "base_tree": null,
+  "status": "inert immutable owner snapshots; not an active pin or accepted consumer",
+  "part": 1,
+  "parts": 1,
+  "purpose": "Complete read-only source bytes for static review. Never import, execute, install or package these fixtures.",
+  "files": [
+    {
+      "path": "LICENSE",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "5ccebb45cc1283299b5d8f0585de8f55c92cd5ae",
+        "size": 1678,
+        "sha256": "5cc41f9d34bcfbf8dd3b2120b50dab803eb90b5e8aae31563bd5e61d79c10825"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/LICENSE",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "apps/gallery/package.json",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "6cd09d7efc2ca95cd71de2efc091683e730a090c",
+        "size": 504,
+        "sha256": "757320dbc0624ae1e96fe983851aab15438adb95e499da0372d242ba74b6fe57"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/apps/gallery/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "examples/starter/package.json",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "a520268a6d1ca2b6089f63a976363bcd71dfdb65",
+        "size": 505,
+        "sha256": "1698651191cf44ee1209404c901fe106c6d56e3cce247e6e0b50fbf17e2af16f"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/examples/starter/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "package-lock.json",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "7dd8180c9b6fe17e017de0777d8a4dfb3a22aca1",
+        "size": 175163,
+        "sha256": "46a31174e1cc531fcd3f57d9b80c879281b944339a9815e1f270d9f19d11d725"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/package-lock.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "package.json",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "3a1bd53cd855984968de79846f3fadbb874a1c4b",
+        "size": 1510,
+        "sha256": "f5a4b0e1f36181a3f5c63cedb9f54899bfc98341eb4746fda65c62805bf7ffae"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/core/package.json",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "15ab9abd876afa6d10ce75c0a892b7a1fd987c61",
+        "size": 653,
+        "sha256": "e206127fc1ea1b5f86630c9b45a0e1d4285a8996a13ea68b81ca740fcd024e9e"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/packages/core/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/demos/package.json",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "8f844b0e5181cd25a4bdd121f649f2e3e3947c6c",
+        "size": 1357,
+        "sha256": "d705731bfde57babf073f9d20398301455ad091f813a92ab479e5e447e5f319d"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/packages/demos/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ink/package.json",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "897255d484ed0657c35ab31d33f856b1c38187a2",
+        "size": 840,
+        "sha256": "c158cf4ea464f1718f19bae6abb445a6643f2a6b301a3a5e57297cb565f0a4d5"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/packages/ink/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/shots/package.json",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "35a8e45c2bacec00667f024b2a39b1a189fe885f",
+        "size": 930,
+        "sha256": "b6b2493b34e2c16f562a6df6c5a12454748c7a82b5ea7a36b1c9a3368196da9c"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/packages/shots/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/site/package.json",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "8ede860b0195eb4cbb54672832d6f433f5c036a1",
+        "size": 1069,
+        "sha256": "45fa0cbfd5cff0175ac22058bca08f6d933340b8c6d3d39c5fbba4053966920f"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/packages/site/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ssg/package.json",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "fcc9070ef2aa693ad717285bad05a052f69d288a",
+        "size": 1046,
+        "sha256": "40aaac9b27c713db25828cd5a0915522939e0ce5174da2a62331a8d3caba6f27"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/packages/ssg/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/tokens/package.json",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "0123fedc3c1251bc103bb046624a2ba18cd998f3",
+        "size": 1302,
+        "sha256": "0366109061b0ae21bedca6a448018224566cf6cd4014c91c14315b27a27e3718"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/packages/tokens/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ui/package.json",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "dd806fdff7acfb77c6a18410012cac08abac77f8",
+        "size": 3610,
+        "sha256": "01636d5f88f96217627193f9c412f84ed30dcaa68cba069579cafaae4eeca0e0"
+      },
+      "fixture": "79a1aa8b1075f834717bc0c0299dc2c41a22b966/packages/ui/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    }
+  ]
+}

@@ -84,6 +84,15 @@ This harness profile selects no sibling harness. It has no
 locked npm install stay inactive. Adding such a pin later needs its own
 review; this update adds no UI dependency or package installation.
 
+The planned UI adoption retains exact install metadata from protected owner
+revision `79a1aa8b1075f834717bc0c0299dc2c41a22b966` under
+`review/dependency-sources/ejm-ui/`. Its chunk manifest records each original
+mode, blob, size and SHA-256. These 13 complete files are inert review data,
+with ordinary nonexecutable fixture modes. Never import, execute, install or
+package them. Narrow formatter and lint exclusions preserve their exact bytes;
+first-party checks remain active. This preparation selects no UI pin and
+does not establish a complete source supplement for a later owner revision.
+
 ### Review source context
 
 The [canonical source manifest](../.github/review-context/manifest.json) binds
