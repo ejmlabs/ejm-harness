@@ -112,7 +112,7 @@ mod tests {
 
     #[test]
     fn mutation_auth_rejects_csrf_and_invalid_bearer_cookie_fallback() {
-        let origin = "https://harness.meetgerry.ai";
+        let origin = "https://registry.ejmlabs.com";
         assert!(!mutation_credentials_allowed(
             None,
             Some("session=secret"),

@@ -1,7 +1,7 @@
 # Gerry extension registry
 
 The registry serves immutable Gerry extension packages at
-`https://harness.meetgerry.ai`. The Rust Worker owns publication and catalog
+`https://registry.ejmlabs.com`. The Rust Worker owns publication and catalog
 policy. A separate Better Auth Worker handles GitHub sign-in and first-party CLI
 device authorization through a private service binding. D1 stores metadata and
 auth in separate databases. A private R2 bucket stores `.tar.gz` archives.
@@ -238,14 +238,14 @@ arguments, source, fixture files, or logs.
 
 Remote changes require explicit owner authorization. Before a deployment:
 
-1. Create separate `gerry-registry` and `gerry-registry-auth` D1 databases and
+1. Create separate `ejm-registry` and `ejm-registry-auth` D1 databases and
    replace placeholder UUIDs in their Wrangler files. Apply the reviewed registry
    and generated auth migrations to the matching databases.
-2. Create `gerry-registry-packages` as a private R2 bucket. Disable public bucket
+2. Create `ejm-registry-packages` as a private R2 bucket. Disable public bucket
    access and public custom domains. Restrict deployment and storage credentials
    to the required Workers, D1 databases, and bucket.
 3. Register a GitHub OAuth application with callback
-   `https://harness.meetgerry.ai/api/auth/callback/github`. Store
+   `https://registry.ejmlabs.com/api/auth/callback/github`. Store
    `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and a fresh high-entropy
    `BETTER_AUTH_SECRET` through Wrangler's hidden secret prompt or the Cloudflare
    UI. The auth Worker alone receives these secrets.
@@ -253,8 +253,11 @@ Remote changes require explicit owner authorization. Before a deployment:
    URL. Bind it only to the Rust registry Worker. Set the approved operator
    subject allowlist, or keep it empty until an operator is verified.
 5. Build the Rust Worker with worker-build 0.8.7 and review the dry-run bundle.
-   Add the authorized custom domain `harness.meetgerry.ai` to the public Worker
-   only during the approved deployment. No domain route is preconfigured here.
+   `registry/wrangler.jsonc` names the custom domain `registry.ejmlabs.com` for
+   the public Worker. That route is applied only by an authorized deploy. The
+   auth Worker has no route, workers.dev hostname, or preview URL. Do not point
+   `harness.meetgerry.ai` at this service and do not redirect it. Clients reject
+   that host and do not follow redirects.
 6. Confirm exact origin, TLS, private binding isolation, database migration
    status, private bucket access, billing alerts, and response/log redaction.
 7. With owner authorization, test real GitHub login, publisher claim, CLI device

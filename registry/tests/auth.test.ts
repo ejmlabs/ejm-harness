@@ -9,7 +9,7 @@ interface Bindings {
   AUTH_MIGRATIONS: { name: string; queries: string[] }[];
 }
 const bindings = env as unknown as Bindings;
-const origin = "https://harness.meetgerry.ai";
+const origin = "https://registry.ejmlabs.com";
 const authEnv: Env = {
   DB: bindings.AUTH_DB,
   REGISTRY_ORIGIN: origin,

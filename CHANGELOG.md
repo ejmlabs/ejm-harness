@@ -31,8 +31,25 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
 - Uniform repository guidance, explicit human admission, protected merge gates,
   two complete Codex reviews, and independent SemVer source-draft preparation.
 
+### Changed
+
+- The default package registry is `https://registry.ejmlabs.com`. The client,
+  both Workers' `REGISTRY_ORIGIN`, and the GitHub OAuth callback use that origin.
+  `meetgerry.ai` and its subdomains are rejected, redirects are not followed, and
+  sessions saved for the retired origin are not sent or reused. Discard a leftover
+  session with `ejm-cli package discard-retired-session` and sign in again. These
+  notes do not deploy a registry, and they do not create or replace a tag or
+  GitHub release. Builds from the earlier v0.1.0 tag (commit 8d3dc39) default
+  to a retired registry domain and must not be used for registry commands.
+  Upgrade to the reissued v0.1.0.
+
 ### Fixed
 
+- Check authenticated HTTP loopback registry requests against the direct-route
+  proxy fixture, with a synthetic bearer and bounded child cleanup. The
+  harness-owned client disables proxies for these origins; HTTPS keeps proxy
+  support. Older host pins need a temporary configuration guard until they
+  adopt and verify this transport contract.
 - Align registry device login with the registered `ejm-cli` client. Deny protected
   repository and harness-state reads through file-tool paths and symlink aliases.
 - Include the MIT license in both SDK distributions and keep owned Rust, registry

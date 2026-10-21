@@ -81,7 +81,7 @@ async fn remote_references_cannot_be_shadowed_by_repository_files() -> Result<()
     }
     let directory = tempfile::tempdir()?;
     let manager = PackageManager::new(directory.path().join("store"))?;
-    let registry = RegistryClient::new("https://harness.meetgerry.ai")?;
+    let registry = RegistryClient::new("https://registry.ejmlabs.com")?;
     let governor = Arc::new(Governor::new(ResourceLimits::default())?);
     for source in [
         "npm:fixture@latest",

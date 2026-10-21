@@ -15,10 +15,14 @@ use tokio_util::sync::CancellationToken;
 
 mod credentials;
 pub use credentials::{
-    delete_registry_token, load_registry_token, migrate_registry_token, save_registry_token,
+    RetiredRegistrySession, delete_registry_token, discard_retired_registry_sessions,
+    force_discard_legacy_registry_session, load_registry_token, locate_retired_registry_sessions,
+    migrate_registry_token, retired_registry_session_notice, save_registry_token,
 };
 
-pub const DEFAULT_REGISTRY: &str = "https://harness.meetgerry.ai";
+pub const DEFAULT_REGISTRY: &str = "https://registry.ejmlabs.com";
+/// Command the CLI implements for a leftover `meetgerry.ai` session. This crate does not run it.
+pub const DISCARD_RETIRED_REGISTRY_COMMAND: &str = "ejm-cli package discard-retired-session";
 const MAX_JSON_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -68,13 +72,18 @@ impl RegistryClient {
     /// # Errors
     /// Rejects unsafe origins, credentials in URLs, and HTTP client setup errors.
     pub fn new(origin: &str) -> Result<Self> {
-        let origin = parse_origin(origin)?;
-        let http = Client::builder()
+        let origin = validate_registry_origin(origin)?;
+        let mut builder = Client::builder()
             .redirect(Policy::none())
             .connect_timeout(Duration::from_secs(10))
             .timeout(Duration::from_secs(30))
-            .user_agent(concat!("ejm-harness/", env!("CARGO_PKG_VERSION")))
-            .build()?;
+            .user_agent(concat!("ejm-harness/", env!("CARGO_PKG_VERSION")));
+        // Plain HTTP is loopback only. Leave system proxies off so a bearer cannot
+        // travel to an HTTP proxy in cleartext. HTTPS keeps the process proxy environment.
+        if origin.scheme() != "https" {
+            builder = builder.no_proxy();
+        }
+        let http = builder.build()?;
         Ok(Self { origin, http })
     }
 
@@ -320,7 +329,43 @@ impl RegistryClient {
     }
 }
 
-fn parse_origin(value: &str) -> Result<Url> {
+/// Normalize a registry origin and reject `meetgerry.ai`.
+///
+/// The returned URL uses a root path. Loopback HTTP is accepted for local development.
+/// There is no fallback host.
+///
+/// # Errors
+/// Rejects credentials, a query, a fragment, a non-root path, public HTTP, and a retired host.
+pub fn validate_registry_origin(value: &str) -> Result<Url> {
+    // A retired host is reported before generic path, userinfo, or scheme errors.
+    let parsed = Url::parse(value)?;
+    if parsed.host_str().is_some_and(retired_registry_host) {
+        bail!("{}", retired_registry_message());
+    }
+    normalize_origin(value)
+}
+
+/// Whether a validated origin is [`DEFAULT_REGISTRY`].
+///
+/// # Errors
+/// Returns the same errors as [`validate_registry_origin`].
+pub fn registry_origin_is_default(value: &str) -> Result<bool> {
+    Ok(validate_registry_origin(value)? == validate_registry_origin(DEFAULT_REGISTRY)?)
+}
+
+pub(crate) fn retired_registry_message() -> String {
+    format!(
+        "the meetgerry.ai registry is retired; the default registry is {DEFAULT_REGISTRY}. The old session is not sent or reused. Discard it with `{DISCARD_RETIRED_REGISTRY_COMMAND}` and sign in again"
+    )
+}
+
+pub(crate) fn retired_registry_host(host: &str) -> bool {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    host == "meetgerry.ai" || host.ends_with(".meetgerry.ai")
+}
+
+/// Origin form stored in the vault. Retired hosts stay addressable so they can be deleted.
+pub(crate) fn normalize_origin(value: &str) -> Result<Url> {
     let mut origin = Url::parse(value)?;
     ensure!(
         origin.username().is_empty()
