@@ -4,6 +4,17 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** packages require `ejm.package.json` with no legacy alias. Rename
+  earlier manifests and repack archives; their sizes and hashes change.
+- **Breaking:** remove the default registry export. `install_source` now accepts
+  `Option<&RegistryClient>`: registry sources need `Some`, while local, npm, PyPI
+  and Git sources accept `None`. Hosts must coordinate the API update and select
+  registry origins explicitly. Credentials remain isolated by exact origin.
+- Give registry source its own identity and resource placeholders. No registry,
+  package, worker binary or site is published by this source change.
+
 ### Security
 
 - Update the locked TLS dependencies to rustls-webpki 0.103.16 and

@@ -41,7 +41,8 @@ pub fn valid_handle(value: &str) -> bool {
         && ![
             "admin",
             "api",
-            "gerry",
+            "ejm",
+            "ejmlabs",
             "harness",
             "help",
             "moderator",
@@ -112,7 +113,7 @@ mod tests {
 
     #[test]
     fn mutation_auth_rejects_csrf_and_invalid_bearer_cookie_fallback() {
-        let origin = "https://harness.meetgerry.ai";
+        let origin = "https://registry.example.invalid";
         assert!(!mutation_credentials_allowed(
             None,
             Some("session=secret"),
@@ -166,7 +167,8 @@ mod tests {
     #[test]
     fn identifiers_cannot_escape_keys_or_claim_reserved_names() {
         for handle in [
-            "gerry",
+            "ejm",
+            "ejmlabs",
             "admin",
             "a",
             "Evil",

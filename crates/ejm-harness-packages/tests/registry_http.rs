@@ -51,7 +51,7 @@ async fn pinned_download_checks_identity_hash_and_does_not_follow_redirects() ->
     let source = tempfile::tempdir()?;
     let manifest = json!({"schema_version":1,"name":"@example/theme","version":"1.0.0","description":"Fixture","exports":{}});
     std::fs::write(
-        source.path().join("gerry.package.json"),
+        source.path().join("ejm.package.json"),
         serde_json::to_vec(&manifest)?,
     )?;
     let archive = pack_directory(source.path())?;

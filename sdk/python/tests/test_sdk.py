@@ -73,7 +73,7 @@ def python_package(root: Path) -> ConfigureParams:
             "widgets": [{"name": "status", "handler": "widget"}],
         },
     }
-    (root / "gerry.package.json").write_text(json.dumps(manifest))
+    (root / "ejm.package.json").write_text(json.dumps(manifest))
     (root / "entry.py").write_text("""
 import os
 calls = 0

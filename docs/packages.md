@@ -2,8 +2,8 @@
 
 ejm-cli demonstrates the package system. Other Rust, TypeScript, and Python
 hosts can use the same public contracts without terminal dependencies or a
-Gerry Workspace account. The registry is designed for self-service publishing
-at `https://harness.meetgerry.ai`.
+hosted workspace account. Registry source supports self-service publishing,
+but no public registry endpoint is configured or verified as deployed.
 
 ## Contracts and ownership
 
@@ -24,7 +24,12 @@ packages export named functions. All languages use the same run loop.
 
 ## Author a package
 
-Put `gerry.package.json` at the package root:
+Put `ejm.package.json` at the package root. This name is required across local
+directories, archives, npm packages, and portable Python wheels. There is no
+legacy alias. Rename earlier manifests and repack archives before installing
+them; the new bytes need new sizes and hashes.
+
+For example:
 
 ```json
 {
@@ -97,7 +102,6 @@ one-second bound after durable completion and cannot change the outcome.
 ```sh
 ejm-cli package install ./my-package
 ejm-cli package install ./my-package.tgz
-ejm-cli package install @publisher/package@1.2.3
 ejm-cli package install npm:@publisher/package@1.2.3
 ejm-cli package install pypi:distribution==1.2.3
 ejm-cli package install 'git:https://github.com/publisher/package.git#FULL_COMMIT_HASH'
@@ -114,6 +118,19 @@ grants for that version. Updating clears them. There is no automatic startup
 download, project-file activation, or dependency execution. Remote references
 take precedence over repository filenames. Use `local:` or `./` to install a
 local file whose name resembles a remote reference.
+
+Registry sources require an explicitly configured client. Rust hosts pass
+`Some(&client)` to `install_source` for an exact registry source, or `None` for
+local, npm, PyPI, and Git sources. There is no default origin. Create the client
+with `RegistryClient::new(origin)`. HTTPS or loopback HTTP, fixed origins,
+redirect refusal, bounded responses, and exact-origin credentials remain
+enforced. Selecting a new origin does not transfer tokens or authenticate it.
+
+Current protected ejm-cli source needs a coordinated API and configuration update
+before using this contract. Do not infer a registry endpoint from its older
+compiled default. Check the CLI revision and configuration before registry
+login, installation, publication, or credential migration. Local and exact
+third-party sources need no registry configuration in the harness API.
 
 Resolution uses maintained HTTP and archive libraries. No Git, npm, uv, Python,
 package lifecycle script, or build backend runs during installation. Metadata is
@@ -194,10 +211,11 @@ boundaries; call them on a blocking worker when the host has a UI or async loop.
 They require the current user's OS key service. They never create a plaintext
 `registry-session.json` or fall back to one when vault access fails.
 
-For an existing private legacy session, stop older clients and run
-`ejm-cli package migrate-credentials --old-clients-stopped` for the same registry
-origin. Rust hosts use `migrate_registry_token(root, origin, true)` after the
-same confirmation. An unconfirmed handoff refuses before key access or source
+For an existing private legacy session, stop older clients and confirm the exact
+registry origin. Rust hosts use `migrate_registry_token(root, origin, true)`
+after that confirmation. CLI users must first check that their revision selects
+that same origin; the older compiled default is not configuration for a new
+service. Never copy a session to another origin. An unconfirmed handoff refuses before key access or source
 changes. Migration validates the source's privacy and origin, commits its
 encrypted record and permanent marker, reopens the authenticated state, then
 retires the source. Interrupted cleanup can be retried. A marker survives

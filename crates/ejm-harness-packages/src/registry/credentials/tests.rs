@@ -27,7 +27,7 @@ impl VaultKeyStore for Keys {
     }
 }
 
-const ORIGIN: &str = "https://harness.meetgerry.ai/";
+const ORIGIN: &str = "https://registry.example.invalid/";
 
 struct Fixture {
     _directory: tempfile::TempDir,
