@@ -1,53 +1,60 @@
 ---
 name: harness-site
-description: Change or deploy the static harness.ejmlabs.com site in site/, including the ejmlabs design kit copy, shared headers, honest release claims, and Cloudflare publishing.
+description: Change the Harness public site, its source guides, shared ejm-ui composition, headers, demos and Cloudflare publication.
 ---
 
-# harness.ejmlabs.com site
+# Harness public site
 
-The site is a static, assets-only Cloudflare Worker named `ejmlabs-harness` on the custom
-domain `harness.ejmlabs.com`. Its config is `site/wrangler.jsonc`. It is separate from the
-`registry/` Workers and has no backend, database, or secrets.
+The static site is the assets-only Cloudflare Worker `ejmlabs-harness` at
+`harness.ejmlabs.com`. `site/wrangler.jsonc` serves the prerendered `site/dist`.
+The separate registry Workers do not share its deployment, databases or secrets.
 
-## Follow the kit
+## Shared owner
 
-The ejmlabs design kit at `../ejmlabs/design-kit` is canonical and its rules change. Read
-its current docs before editing the page instead of relying on this summary: `SITES.md`,
-`CATALOG.md`, `web/PATTERNS.md`, and `UI.md`.
+Use public ejm-ui packages for tokens, layout, navigation, motion, docs,
+prerendering, demos, assets and headers. Read its `AGENTS.md`, `QUALITY.md` and
+site guidance. Check out the exact `.github/ui-source.json` revision beside this
+repository. Do not import private sibling files, add local visual rules or
+restore copied design-kit output. Extend the shared owner when a contract is
+missing; keep product copy and composition here.
 
-- Run `scripts/sync-design-kit.sh` to copy the kit files the site needs into
-  `site/public/design-kit`. Never hand-edit that copy. It is excluded from Prettier.
-- Build the page from the kit's patterns and components. Do not write page CSS or inline
-  styles. A missing pattern is added to the kit, not to this site.
-- Validate the page with the kit's checker, `node ../ejmlabs/design-kit/scripts/check-site.mjs`
-  on the built HTML, and follow the kit's rules for shared header, theme toggle, motion,
-  analytics, and project demos.
-- The kit's color balance applies: Sage leads, Paper and Mist carry the page, Forest is a rare
-  accent. The ejmlabs wordmark is vector artwork and is never retyped. Sage is not text color.
-- Headers come from the kit (`web/_headers`), not from harness-specific choices. Keep a
-  strict policy and loosen a directive only for a concrete need the kit approves.
-- Another session adopts the kit across the ejmlabs project sites and may be editing `site/`.
-  Check `git status`, coordinate with it, and commit only your own paths.
+Legacy `site/public/design-kit` assets remain unchanged source history. Vite
+sets `publicDir: false`, so they are not part of the new site or its design
+authority. Do not sync or import that copy.
 
-## Claims and copy
+Use the fewest words that preserve meaning. Prefer a clear visual or no added
+content when context already explains the task. Keep meaningful labels,
+accessible names, honest state, security facts and recovery steps. Reveal
+supporting detail when needed; operational guides remain complete.
 
-- State availability honestly. This is a source release, not published or packaged, until the
-  user says otherwise. Do not show install commands for packages that do not exist.
-- Cite benchmark numbers only with their caveats from [the benchmark notes](../../../docs/benchmarks.md):
-  one local run, the host, and that the four-core target is not proven.
-- Describe native execution as not a sandbox. No em dashes. Use plain, direct prose.
-- Code samples use the real public API names. Do not invent a repository URL or email.
+## Content and playback
 
-## Check
+Edit guides in `site/content`. The shared compiler and docs components render
+them. Keep published routes, heading anchors and README links working, including
+`/docs/host-auth/`. Describe public hosted source rather than unfinished local
+runtime. Keep package and native acceptance limits explicit.
 
-Run Prettier on changed files. Check the page at 375 px and desktop widths, in light and dark,
-and confirm `scrollWidth` equals `clientWidth` at 375 px. Check the console for policy errors,
-for example through `wrangler dev -c site/wrangler.jsonc`.
+Use one shared autoplay player in the hero. Pause, Resume and Restart sit
+outside the inert native surface. Keep useful final output in server HTML.
+The recorded offline worker output is historical playback, not a live model or
+proof of an exact source build. Its CPU and memory figures are reservations.
+Do not add terminal input, a harness dashboard or another playback engine.
 
-## Deploy
+Cite performance numbers with the host, workload and limits in
+[the benchmark guide](../../../docs/benchmarks.md). Native execution is not a
+sandbox. Code examples must use real public APIs. Never invent an installable
+package, source URL or availability claim.
 
-Publishing needs explicit user authorization each time. Run
-`wrangler deploy -c site/wrangler.jsonc` from the repository root, then confirm the live
-response over the edge. A freshly created custom domain can be unreachable from a machine that
-cached a miss, so test with `curl --resolve` against another ejmlabs.com edge address before
-assuming a failure. Do not touch the other ejmlabs Workers.
+## Checks and publication
+
+After installing pinned sibling UI and site dependencies, run
+`npm --prefix site run check` and `npm --prefix site run budget`, then the normal
+repository gate. Keep existing transfer limits. Check narrow and desktop widths,
+light and dark themes, console errors and horizontal overflow. A changed shared
+contract also needs its owner and affected consumer checks.
+
+Publication needs user authorization and protected source acceptance. Run
+`wrangler deploy -c site/wrangler.jsonc` from the accepted tree and verify public
+routes, legacy anchors, assets and headers over the edge. A local build alone is
+not publication. Do not touch the registry or another Worker as part of this
+static upload.

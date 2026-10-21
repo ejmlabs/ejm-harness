@@ -5,3 +5,4 @@
 /.dev.vars
 /auth/.dev.vars
 /auth/.wrangler/
+/.web-assets/

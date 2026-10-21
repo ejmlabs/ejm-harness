@@ -36,7 +36,7 @@ async function verify() {
             (result.scope !== undefined && result.scope !== null && result.scope !== "registry")
         ) {
             throw new Error(
-                "This request could not be verified. Start ejm-cli package login again.",
+                "This request could not be verified. Start a new sign-in request in your client.",
             );
         }
         verified = Object.freeze({ user_code: result.user_code });

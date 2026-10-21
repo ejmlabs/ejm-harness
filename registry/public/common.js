@@ -36,7 +36,7 @@ export function post(path, data) {
 export function status(message, error = false) {
     const element = document.getElementById("status");
     element.textContent = message;
-    element.toggleAttribute("data-error", error);
+    element.setAttribute("data-tone", error ? "danger" : "muted");
 }
 
 export async function signIn() {

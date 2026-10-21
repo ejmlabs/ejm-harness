@@ -3,65 +3,151 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Publisher account | Gerry</title>
-        <link rel="stylesheet" href="/styles.css" />
+        <meta name="color-scheme" content="light dark" />
+        <title>Publisher account | ejm extensions</title>
+        <link rel="icon" href="/shared/favicon.svg" type="image/svg+xml" />
+        <link
+            rel="preload"
+            as="font"
+            type="font/woff2"
+            href="/shared/fonts/manrope-latin.woff2"
+            crossorigin
+        />
+        <link
+            rel="preload"
+            as="font"
+            type="font/woff2"
+            href="/shared/fonts/ibm-plex-mono-500-latin.woff2"
+            crossorigin
+        />
+        <link rel="stylesheet" href="/shared/ui.css" />
         <script type="module" src="/account.js"></script>
     </head>
     <body>
-        <header>
-            <a class="brand" href="/">Gerry <span>extensions</span></a>
-            <nav aria-label="Main"><a href="/">Browse extensions</a></nav>
+        <a href="#content" data-ejm="skip">Skip to content</a>
+        <header data-ejm="header">
+            <div data-ejm="header-inner">
+                <a href="/" data-ejm="brand" aria-label="ejm extensions home"
+                    ><span data-ejm="brand-artwork"
+                        ><img src="/shared/harness-mark.svg" width="256" height="256" alt="" /><span
+                            >ejm extensions</span
+                        ></span
+                    ></a
+                >
+                <nav data-ejm="nav" aria-label="Main">
+                    <ul data-ejm="nav-list">
+                        <li><a href="/">Extensions</a></li>
+                        <li><a href="/account" aria-current="page">Publisher account</a></li>
+                    </ul>
+                    <details data-ejm="menu">
+                        <summary>Menu</summary>
+                        <ul data-ejm="menu-list">
+                            <li><a href="/">Extensions</a></li>
+                            <li><a href="/account" aria-current="page">Publisher account</a></li>
+                        </ul>
+                    </details>
+                </nav>
+            </div>
         </header>
-        <main class="narrow">
-            <h1>Your publisher account</h1>
-            <p id="status" role="status" aria-live="polite">Loading your account.</p>
-            <button id="sign-in" hidden>Sign in with GitHub</button>
-            <section id="account" hidden>
-                <p id="identity"></p>
-                <p id="publisher"></p>
-                <form id="claim" hidden>
-                    <h2>Choose your publisher name</h2>
-                    <p>
-                        This permanent name appears in every package you publish. Each account has
-                        one publisher name.
+        <main id="content" tabindex="-1" data-ejm="page" data-motion="page">
+            <div data-ejm="setup">
+                <header data-ejm="heading"><h1>Publisher account</h1></header>
+                <noscript
+                    ><p data-ejm="status">Enable JavaScript to manage your account.</p></noscript
+                >
+                <div data-ejm="stack">
+                    <p id="status" role="status" aria-live="polite" data-ejm="status">
+                        Loading your account…
                     </p>
-                    <label for="handle">Publisher name</label>
-                    <input
-                        id="handle"
-                        name="handle"
-                        required
-                        minlength="3"
-                        maxlength="39"
-                        pattern="[a-z][a-z0-9-]{1,37}[a-z0-9]"
-                        autocomplete="off"
-                        placeholder="your-name"
-                    />
-                    <label for="display-name">Display name</label>
-                    <input
-                        id="display-name"
-                        name="display_name"
-                        required
-                        maxlength="80"
-                        autocomplete="name"
-                    />
-                    <button>Claim publisher name</button>
-                </form>
-                <section id="publish-help" hidden>
-                    <h2>Publish from your terminal</h2>
-                    <pre><code>ejm-cli package login
-ejm-cli package publish .</code></pre>
-                    <p>
-                        Package code stays inactive until someone chooses to enable it. Publication
-                        reserves a permanent version.
-                    </p>
-                </section>
-                <button class="secondary" id="sign-out">Sign out of this browser</button>
-                <h2>Signed-in devices</h2>
-                <p>
-                    Sign out every other browser and terminal session. Keep this browser signed in.
-                </p>
-                <button class="secondary" id="revoke-devices">Sign out other devices</button>
-            </section>
+                    <div data-ejm="actions">
+                        <button data-ejm="button" id="sign-in" type="button" hidden>
+                            Sign in with GitHub
+                        </button>
+                    </div>
+                    <section id="account" data-ejm="stack" hidden>
+                        <div data-ejm="stack">
+                            <p id="identity"></p>
+                            <p id="publisher"></p>
+                        </div>
+                        <form id="claim" data-ejm="stack" hidden>
+                            <header data-ejm="heading">
+                                <h2>Choose a publisher name</h2>
+                                <p>
+                                    One permanent name per account. It appears in every package you
+                                    publish.
+                                </p>
+                            </header>
+                            <div data-ejm="form-field">
+                                <label for="handle">Publisher name</label
+                                ><input
+                                    data-ejm="field"
+                                    id="handle"
+                                    name="handle"
+                                    required
+                                    minlength="3"
+                                    maxlength="39"
+                                    pattern="[a-z][a-z0-9-]{1,37}[a-z0-9]"
+                                    autocomplete="off"
+                                    placeholder="your-name"
+                                />
+                            </div>
+                            <div data-ejm="form-field">
+                                <label for="display-name">Display name</label
+                                ><input
+                                    data-ejm="field"
+                                    id="display-name"
+                                    name="display_name"
+                                    required
+                                    maxlength="80"
+                                    autocomplete="name"
+                                />
+                            </div>
+                            <div data-ejm="actions">
+                                <button data-ejm="button" type="submit">
+                                    Claim publisher name
+                                </button>
+                            </div>
+                        </form>
+                        <section id="publish-help" data-ejm="stack" hidden>
+                            <h2>Publishing</h2>
+                            <p>
+                                Publish through the registry API. Current ejm-cli releases use a
+                                different origin.
+                            </p>
+                            <a
+                                href="https://github.com/ejmlabs/ejm-harness/blob/main/registry/README.md#publication-and-archive-isolation"
+                                rel="external"
+                                >Publishing guide</a
+                            >
+                        </section>
+                        <section data-ejm="stack">
+                            <h2>Signed-in devices</h2>
+                            <p>Sign out every other browser and terminal. Keep this session.</p>
+                            <div data-ejm="actions">
+                                <button
+                                    data-ejm="button"
+                                    type="button"
+                                    data-variant="secondary"
+                                    id="revoke-devices"
+                                >
+                                    Sign out other devices
+                                </button>
+                            </div>
+                        </section>
+                        <div data-ejm="actions">
+                            <button
+                                data-ejm="button"
+                                type="button"
+                                data-variant="ghost"
+                                id="sign-out"
+                            >
+                                Sign out
+                            </button>
+                        </div>
+                    </section>
+                </div>
+            </div>
         </main>
+        <footer data-ejm="footer">Community packages. Review code before enabling it.</footer>
     </body>
 </html>

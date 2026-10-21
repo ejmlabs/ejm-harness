@@ -1,5 +1,5 @@
 {
-  "name": "@gerry/registry-development",
+  "name": "@ejm/registry-development",
   "private": true,
   "type": "module",
   "engines": {
@@ -14,7 +14,8 @@
     "test:schema": "python3 -m unittest discover -s tests -p 'test_*.py'",
     "dev": "wrangler dev -c wrangler.jsonc -c auth/wrangler.jsonc",
     "build:auth": "wrangler deploy --dry-run -c auth/wrangler.jsonc",
-    "build": "wrangler deploy --dry-run"
+    "build": "wrangler deploy --dry-run",
+    "build:web": "node scripts/build-web.mjs"
   },
   "dependencies": {
     "better-auth": "1.7.10"
@@ -26,6 +27,9 @@
     "tsx": "4.23.15",
     "typescript": "7.0.2",
     "vitest": "5.0.5",
-    "wrangler": "4.151.1"
+    "wrangler": "4.151.1",
+    "@ejm/site": "file:../../ejm-ui/packages/site",
+    "@ejm/ui": "file:../../ejm-ui/packages/ui",
+    "@ejm/tokens": "file:../../ejm-ui/packages/tokens"
   }
 }

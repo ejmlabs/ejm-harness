@@ -3,45 +3,105 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Gerry extensions</title>
-        <link rel="stylesheet" href="/styles.css" />
+        <meta name="color-scheme" content="light dark" />
+        <title>Extensions | ejm extensions</title>
+        <link rel="icon" href="/shared/favicon.svg" type="image/svg+xml" />
+        <link
+            rel="preload"
+            as="font"
+            type="font/woff2"
+            href="/shared/fonts/manrope-latin.woff2"
+            crossorigin
+        />
+        <link
+            rel="preload"
+            as="font"
+            type="font/woff2"
+            href="/shared/fonts/ibm-plex-mono-500-latin.woff2"
+            crossorigin
+        />
+        <link rel="stylesheet" href="/shared/ui.css" />
         <script type="module" src="/catalog.js"></script>
     </head>
     <body>
-        <header>
-            <a class="brand" href="/">Gerry <span>extensions</span></a>
-            <nav aria-label="Main"><a href="/account">Publisher account</a></nav>
+        <a href="#content" data-ejm="skip">Skip to content</a>
+        <header data-ejm="header">
+            <div data-ejm="header-inner">
+                <a href="/" data-ejm="brand" aria-label="ejm extensions home"
+                    ><span data-ejm="brand-artwork"
+                        ><img src="/shared/harness-mark.svg" width="256" height="256" alt="" /><span
+                            >ejm extensions</span
+                        ></span
+                    ></a
+                >
+                <nav data-ejm="nav" aria-label="Main">
+                    <ul data-ejm="nav-list">
+                        <li><a href="/" aria-current="page">Extensions</a></li>
+                        <li><a href="/account">Publisher account</a></li>
+                    </ul>
+                    <details data-ejm="menu">
+                        <summary>Menu</summary>
+                        <ul data-ejm="menu-list">
+                            <li><a href="/" aria-current="page">Extensions</a></li>
+                            <li><a href="/account">Publisher account</a></li>
+                        </ul>
+                    </details>
+                </nav>
+            </div>
         </header>
-        <main>
-            <section class="intro">
-                <div>
-                    <h1>Make Gerry your own.</h1>
-                    <p>Find tools, skills, themes, and more from independent publishers.</p>
+        <main id="content" tabindex="-1" data-ejm="page" data-motion="page">
+            <header data-ejm="heading">
+                <h1>Extensions</h1>
+                <p>Tools, skills and themes from the community.</p>
+            </header>
+            <noscript><p data-ejm="status">Enable JavaScript to load extensions.</p></noscript>
+            <div data-ejm="stack">
+                <form id="search" role="search" data-ejm="section">
+                    <div data-ejm="form-field">
+                        <label for="query">Find extensions</label>
+                        <div data-ejm="actions">
+                            <input
+                                data-ejm="field"
+                                id="query"
+                                name="q"
+                                maxlength="128"
+                                type="search"
+                                placeholder="Name, publisher or description"
+                            /><button data-ejm="button" type="submit">Search</button>
+                        </div>
+                    </div>
+                </form>
+                <p id="status" role="status" aria-live="polite" data-ejm="status">
+                    Loading extensions…
+                </p>
+                <section id="packages" aria-label="Extensions" data-ejm="list"></section>
+                <div data-ejm="actions">
+                    <button
+                        data-ejm="button"
+                        id="more"
+                        type="button"
+                        data-variant="secondary"
+                        hidden
+                    >
+                        Load more
+                    </button>
                 </div>
-                <aside>
-                    <span>Install an extension</span
-                    ><code>ejm-cli package install @publisher/package@1.0.0</code>
-                    <p>Review the publisher and package before you enable code.</p>
-                </aside>
-            </section>
-            <form id="search" role="search">
-                <label for="query">Find extensions</label>
-                <div class="form-row">
-                    <input
-                        id="query"
-                        name="q"
-                        maxlength="128"
-                        type="search"
-                        placeholder="Name, publisher, or description"
-                    /><button>Search</button>
-                </div>
-            </form>
-            <p id="status" role="status" aria-live="polite">Loading extensions.</p>
-            <section id="packages" aria-label="Extensions"></section>
-            <button id="more" hidden>Load more</button>
+                <details>
+                    <summary>Use an extension</summary>
+                    <div data-ejm="stack">
+                        <p>
+                            Choose a host configured for this registry. Current ejm-cli releases use
+                            a different origin.
+                        </p>
+                        <a
+                            href="https://github.com/ejmlabs/ejm-harness/blob/main/docs/packages.md#registry-client-origin"
+                            rel="external"
+                            >Client setup</a
+                        >
+                    </div>
+                </details>
+            </div>
         </main>
-        <footer>
-            Published versions are permanent. Publisher code runs only when you enable it.
-        </footer>
+        <footer data-ejm="footer">Community packages. Review code before enabling it.</footer>
     </body>
 </html>

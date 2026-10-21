@@ -12,7 +12,8 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "npm run lint && npm run format:check && npm --workspace ejm-harness test"
+    "check": "npm run lint && npm run format:check && npm --workspace ejm-harness test && npm run check:site",
+    "check:site": "npm --prefix site ci --ignore-scripts && npm --prefix site run check && npm --prefix site run budget"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

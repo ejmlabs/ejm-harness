@@ -4,6 +4,10 @@ Reusable open source Rust engine, coding tools, executor, worker, and language
 SDKs. ejm-cli lives in its own sibling repository. No Gerry Workspace dependency.
 
 - Never use em dashes. Use plain, direct prose.
+- Use the fewest words that preserve meaning. Prefer a clear visual or no added
+  content when context explains the task. Keep meaningful labels, accessible
+  names, consent and security facts, honest state and recovery steps. Keep
+  operational docs complete. Follow the [shared content rule](https://github.com/ejmlabs/ejm-ui/blob/main/QUALITY.md#content).
 - Read [the contributor contract](docs/contributing.md) before changing architecture or quality policy.
 - Keep Rust ownership and admission in the harness. SDKs adapt the same public worker protocol.
 - Use one shared governor for every tool, command, and child agent in a harness instance.
@@ -37,7 +41,7 @@ SDKs. ejm-cli lives in its own sibling repository. No Gerry Workspace dependency
 | `crates/ejm-harness-bench`        | Deterministic concurrency and command workloads                                  |
 | `sdk/typescript`, `sdk/python`    | Typed language facades over the worker. Wire types are generated                 |
 | `registry/`                       | Cloudflare extension registry and its Better Auth Worker                         |
-| `site/`                           | Static harness.ejmlabs.com marketing site                                        |
+| `site/`                           | Public harness.ejmlabs.com site and source guides                                |
 | `docs/`                           | Contracts, decisions, evidence. `docs/contributing.md` holds the decision record |
 | `scripts/`                        | The gate, policy checker, generators, benchmark, and hook installer              |
 
@@ -54,7 +58,7 @@ SDKs. ejm-cli lives in its own sibling repository. No Gerry Workspace dependency
 | SDK packages           | npm `ejm-harness`, Python `ejm_harness`                                                   |
 | Public page            | "harness by ejmlabs" at harness.ejmlabs.com                                               |
 | Hosts                  | `ejm-cli` at `../ejm-cli` and `ejm-ide` at `../ejm-ide`, not part of this repo            |
-| Unchanged on purpose   | the manifest file `gerry.package.json` and the registry origin, until the user decides    |
+| Portable manifest      | `gerry.package.json`, retained for format compatibility                                   |
 
 ## Commands
 
@@ -102,7 +106,7 @@ when the change crosses those boundaries.
 - [harness-review](.agents/skills/harness-review/SKILL.md): reviewing a patch for correctness, bounds, recovery, boundaries, and honest claims.
 - [harness-dependencies](.agents/skills/harness-dependencies/SKILL.md): toolchain and tool pins, locks, cargo-deny exceptions, and local build problems.
 - [harness-hosts](.agents/skills/harness-hosts/SKILL.md): public API and rename coordination with ejm-cli and ejm-ide.
-- [harness-site](.agents/skills/harness-site/SKILL.md): the static harness.ejmlabs.com site, the ejmlabs design kit, headers, and deployment.
+- [harness-site](.agents/skills/harness-site/SKILL.md): the public harness.ejmlabs.com site, shared ejm-ui composition, headers, and deployment.
 - [harness-maintenance](.agents/skills/harness-maintenance/SKILL.md): architecture decisions, strict gates, and updating these rules from evidence.
 
 ## OpenSpec skills

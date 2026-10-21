@@ -1,9 +1,27 @@
 # ejm-harness packages
 
 ejm-cli demonstrates the package system. Other Rust, TypeScript, and Python
-hosts can use the same public contracts without terminal dependencies or a
-Gerry Workspace account. The registry is designed for self-service publishing
-at `https://harness.meetgerry.ai`.
+hosts can use the same public contracts without terminal dependencies.
+The registry source targets `https://registry.ejmlabs.com`. This change does not
+provision or launch it. See the [registry launch steps](../registry/README.md#deployment-prerequisites-and-acceptance).
+
+## Registry client origin
+
+Rust hosts select a fixed origin through the public client:
+
+```rust
+let registry =
+    ejm_harness_packages::RegistryClient::new("https://registry.ejmlabs.com")?;
+```
+
+Current ejm-cli source uses the compiled `DEFAULT_REGISTRY` and has no origin
+override. Its registry-name installs, `package login` and `package publish`
+cannot use this new address yet. Local archives and exact npm, PyPI and Git
+sources remain available.
+
+CLI workflows need a separate client/default release for the approved origin.
+Keep credentials scoped to their origin, stop older writers before migration,
+and preserve explicit trust and grants. Never copy a session to another origin.
 
 ## Contracts and ownership
 
