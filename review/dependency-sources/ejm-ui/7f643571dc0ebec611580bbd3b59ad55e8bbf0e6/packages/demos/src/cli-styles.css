@@ -1,0 +1,9 @@
+/* Public passive product preview profile. */
+@source "./previews/CliView.tsx";
+@source "./previews/terminal.tsx";
+@source "./previews/code.tsx";
+@source "./islands/cli-preview*.tsx";
+@source "./islands/Showcase.tsx";
+@source "./islands/LazyPreview.tsx";
+@source "./ShowcaseFrame.tsx";
+@source not "./**/*.test.{ts,tsx}";
