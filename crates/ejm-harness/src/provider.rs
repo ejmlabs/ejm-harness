@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, sync::Mutex, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result, bail, ensure};
 use async_trait::async_trait;
@@ -10,10 +10,20 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{Message, ModelDelta, ModelRequest, ModelResponse, Role, ToolCall};
 
+mod capacity;
 mod claude;
+#[cfg(feature = "test-support")]
+mod fixtures;
 mod observe;
 mod responses;
+use capacity::{Feedback, HeaderFamily, observe_response, observe_usage};
+pub use capacity::{
+    ProviderCapacity, ProviderCapacityObserver, ProviderObservation, ProviderRate,
+    ProviderRateWindow, ProviderRetry, QuotaDomain,
+};
 pub use claude::{ClaudeCodeConfig, ClaudeCodeProvider};
+#[cfg(feature = "test-support")]
+pub use fixtures::ReplayProvider;
 pub use observe::{HttpObserver, HttpTraceHeader, HttpTracePhase, HttpTraceRecord};
 pub use responses::{AvailableModel, REASONING_EFFORTS, ResponsesConfig, ResponsesProvider};
 
@@ -24,6 +34,25 @@ const MAX_SSE_EVENTS: usize = 100_000;
 
 #[async_trait]
 pub trait Provider: Send + Sync {
+    /// Optional nonsecret account scope and owner-supplied rate ceilings.
+    fn capacity(&self) -> ProviderCapacity {
+        ProviderCapacity::default()
+    }
+
+    /// Optional typed feedback. Existing implementations keep their exact
+    /// streaming behavior and report no invented quota information.
+    ///
+    /// # Errors
+    /// Returns the same streaming errors as [`Self::stream`].
+    async fn stream_with_capacity(
+        &self,
+        request: ModelRequest,
+        cancel: CancellationToken,
+        deltas: mpsc::Sender<ModelDelta>,
+        _feedback: Arc<dyn ProviderCapacityObserver>,
+    ) -> Result<ModelResponse> {
+        self.stream(request, cancel, deltas).await
+    }
     /// Return canonical content as well as deltas. Do not retry effects inside a provider.
     ///
     /// # Errors
@@ -38,66 +67,6 @@ pub trait Provider: Send + Sync {
     ) -> Result<ModelResponse>;
 }
 
-enum ReplayMode {
-    Responses(std::collections::VecDeque<ModelResponse>),
-    Echo,
-}
-
-pub struct ReplayProvider {
-    mode: Mutex<ReplayMode>,
-}
-
-impl ReplayProvider {
-    #[must_use]
-    pub fn new(responses: Vec<ModelResponse>) -> Self {
-        Self {
-            mode: Mutex::new(ReplayMode::Responses(responses.into())),
-        }
-    }
-    #[must_use]
-    pub fn echo() -> Self {
-        Self {
-            mode: Mutex::new(ReplayMode::Echo),
-        }
-    }
-}
-
-#[async_trait]
-impl Provider for ReplayProvider {
-    async fn stream(
-        &self,
-        request: ModelRequest,
-        cancel: CancellationToken,
-        deltas: mpsc::Sender<ModelDelta>,
-    ) -> Result<ModelResponse> {
-        let response = match &mut *self
-            .mode
-            .lock()
-            .map_err(|_| anyhow::anyhow!("replay lock poisoned"))?
-        {
-            ReplayMode::Responses(responses) => {
-                responses.pop_front().context("replay exhausted")?
-            }
-            ReplayMode::Echo => ModelResponse {
-                content: request
-                    .messages
-                    .iter()
-                    .rev()
-                    .find(|m| m.role == Role::User)
-                    .map(|m| format!("Demo: {}", m.content))
-                    .unwrap_or_default(),
-                ..Default::default()
-            },
-        };
-        tokio::select! {
-            biased;
-            () = cancel.cancelled() => bail!("cancelled"),
-            result = deltas.send(ModelDelta::Text(response.content.clone())) => { result.context("delta receiver closed")?; }
-        }
-        Ok(response)
-    }
-}
-
 #[derive(Clone)]
 pub struct OpenAiConfig {
     pub base_url: String,
@@ -109,6 +78,7 @@ pub struct OpenAiProvider {
     config: OpenAiConfig,
     client: reqwest::Client,
     endpoint: String,
+    capacity: ProviderCapacity,
 }
 
 impl OpenAiProvider {
@@ -125,17 +95,26 @@ impl OpenAiProvider {
             config,
             client: http_client()?,
             endpoint,
+            capacity: ProviderCapacity::default(),
         })
     }
-}
 
-#[async_trait]
-impl Provider for OpenAiProvider {
-    async fn stream(
+    /// Attach owner-supplied quota scope and hard provider ceilings.
+    ///
+    /// # Errors
+    /// Rejects an invalid domain, concurrency ceiling, or rate window.
+    pub fn with_capacity(mut self, capacity: ProviderCapacity) -> Result<Self> {
+        capacity.validate()?;
+        self.capacity = capacity;
+        Ok(self)
+    }
+
+    async fn stream_observed(
         &self,
         request: ModelRequest,
         cancel: CancellationToken,
         deltas: mpsc::Sender<ModelDelta>,
+        feedback: Feedback,
     ) -> Result<ModelResponse> {
         let body = openai_request(&self.config.model, request);
         let response = tokio::select! {
@@ -143,6 +122,7 @@ impl Provider for OpenAiProvider {
             () = cancel.cancelled() => bail!("cancelled"),
             result = self.client.post(&self.endpoint).bearer_auth(&self.config.api_key).json(&body).send() => result.context("provider connection failed")?,
         };
+        observe_response(&feedback, &response, HeaderFamily::OpenAi);
         ensure!(
             response.status().is_success(),
             "provider returned HTTP {}",
@@ -152,6 +132,7 @@ impl Provider for OpenAiProvider {
         let mut result = ModelResponse::default();
         let mut calls: BTreeMap<usize, PendingCall> = BTreeMap::new();
         let mut finished = false;
+        let mut usage = None;
         while let Some(data) = next_sse(&mut stream, &cancel).await? {
             if data == "[DONE]" {
                 finished = true;
@@ -159,6 +140,9 @@ impl Provider for OpenAiProvider {
             }
             let value: Value =
                 serde_json::from_str(&data).context("invalid provider stream JSON")?;
+            if let Some(reported) = value.get("usage") {
+                usage = capacity::openai_usage(reported);
+            }
             finished |= openai_delta(&value, &mut result, &mut calls, &deltas, &cancel).await?;
         }
         ensure!(finished, "provider stream ended before a completion marker");
@@ -166,7 +150,37 @@ impl Provider for OpenAiProvider {
             .into_values()
             .map(PendingCall::finish)
             .collect::<Result<_>>()?;
+        if let Some(usage) = usage {
+            observe_usage(&feedback, &usage);
+        }
         Ok(result)
+    }
+}
+
+#[async_trait]
+impl Provider for OpenAiProvider {
+    fn capacity(&self) -> ProviderCapacity {
+        self.capacity.clone()
+    }
+
+    async fn stream_with_capacity(
+        &self,
+        request: ModelRequest,
+        cancel: CancellationToken,
+        deltas: mpsc::Sender<ModelDelta>,
+        feedback: Arc<dyn ProviderCapacityObserver>,
+    ) -> Result<ModelResponse> {
+        self.stream_observed(request, cancel, deltas, Some(feedback))
+            .await
+    }
+
+    async fn stream(
+        &self,
+        request: ModelRequest,
+        cancel: CancellationToken,
+        deltas: mpsc::Sender<ModelDelta>,
+    ) -> Result<ModelResponse> {
+        self.stream_observed(request, cancel, deltas, None).await
     }
 }
 
@@ -266,6 +280,7 @@ pub struct AnthropicProvider {
     config: AnthropicConfig,
     client: reqwest::Client,
     endpoint: String,
+    capacity: ProviderCapacity,
 }
 
 impl AnthropicProvider {
@@ -282,17 +297,26 @@ impl AnthropicProvider {
             config,
             client: http_client()?,
             endpoint,
+            capacity: ProviderCapacity::default(),
         })
     }
-}
 
-#[async_trait]
-impl Provider for AnthropicProvider {
-    async fn stream(
+    /// Attach owner-supplied quota scope and hard provider ceilings.
+    ///
+    /// # Errors
+    /// Rejects an invalid domain, concurrency ceiling, or rate window.
+    pub fn with_capacity(mut self, capacity: ProviderCapacity) -> Result<Self> {
+        capacity.validate()?;
+        self.capacity = capacity;
+        Ok(self)
+    }
+
+    async fn stream_observed(
         &self,
         request: ModelRequest,
         cancel: CancellationToken,
         deltas: mpsc::Sender<ModelDelta>,
+        feedback: Feedback,
     ) -> Result<ModelResponse> {
         let body = anthropic_request(&self.config.model, request)?;
         let response = tokio::select! {
@@ -300,6 +324,7 @@ impl Provider for AnthropicProvider {
             () = cancel.cancelled() => bail!("cancelled"),
             result = self.client.post(&self.endpoint).header("x-api-key", &self.config.api_key).header("anthropic-version", "2023-06-01").json(&body).send() => result.context("provider connection failed")?,
         };
+        observe_response(&feedback, &response, HeaderFamily::Anthropic);
         ensure!(
             response.status().is_success(),
             "provider returned HTTP {}",
@@ -309,9 +334,11 @@ impl Provider for AnthropicProvider {
         let mut result = ModelResponse::default();
         let mut calls: BTreeMap<usize, PendingCall> = BTreeMap::new();
         let mut stopped = false;
+        let mut usage = capacity::AnthropicUsage::default();
         while let Some(data) = next_sse(&mut stream, &cancel).await? {
             let value: Value =
                 serde_json::from_str(&data).context("invalid provider stream JSON")?;
+            usage.observe(&value);
             if anthropic_delta(&value, &mut result, &mut calls, &deltas, &cancel).await? {
                 stopped = true;
                 break;
@@ -322,7 +349,37 @@ impl Provider for AnthropicProvider {
             .into_values()
             .map(PendingCall::finish)
             .collect::<Result<_>>()?;
+        if let Some(usage) = usage.finish() {
+            observe_usage(&feedback, &usage);
+        }
         Ok(result)
+    }
+}
+
+#[async_trait]
+impl Provider for AnthropicProvider {
+    fn capacity(&self) -> ProviderCapacity {
+        self.capacity.clone()
+    }
+
+    async fn stream_with_capacity(
+        &self,
+        request: ModelRequest,
+        cancel: CancellationToken,
+        deltas: mpsc::Sender<ModelDelta>,
+        feedback: Arc<dyn ProviderCapacityObserver>,
+    ) -> Result<ModelResponse> {
+        self.stream_observed(request, cancel, deltas, Some(feedback))
+            .await
+    }
+
+    async fn stream(
+        &self,
+        request: ModelRequest,
+        cancel: CancellationToken,
+        deltas: mpsc::Sender<ModelDelta>,
+    ) -> Result<ModelResponse> {
+        self.stream_observed(request, cancel, deltas, None).await
     }
 }
 

@@ -7,9 +7,10 @@ use std::{
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use async_trait::async_trait;
 use ejm_harness::{
-    AnthropicConfig, AnthropicProvider, Harness, HarnessConfig, OpenAiConfig, OpenAiProvider,
-    Provider, ReplayProvider, ResponsesConfig, ResponsesProvider, Tool, ToolCall, ToolContext,
-    ToolDefinition, ToolOutput,
+    AnthropicConfig, AnthropicProvider, CapacityContext, CapacityPolicy, Harness, HarnessConfig,
+    OpenAiConfig, OpenAiProvider, Provider, ProviderCapacity, QuotaDomain, ResponsesConfig,
+    ResponsesProvider, SessionTailOptions, Tool, ToolCall, ToolContext, ToolDefinition, ToolOutput,
+    reset_capacity_learning,
 };
 use ejm_harness_auth::{SecretString, StaticCredential};
 use ejm_harness_exec::{Lease, Reservation};
@@ -27,9 +28,10 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 
 use crate::protocol::{
-    ClientCall, ConfigureParams, HelloResult, MAX_FRAME_BYTES, Notification, PROTOCOL_VERSION,
-    PackageConfig, PackageInfo, PackagePage, ProviderConfig, Request, Response, ResponsePayload,
-    RunStarted, ToolCancellation, ToolInvocation, ToolMethod, ToolProgress, ToolRequest,
+    CapacityResetResult, ClientCall, ConfigureParams, EventsParams, HelloResult, MAX_FRAME_BYTES,
+    Notification, PROTOCOL_VERSION, PackageConfig, PackageInfo, PackagePage, ProviderConfig,
+    Request, Response, ResponsePayload, RunStarted, ToolCancellation, ToolInvocation, ToolMethod,
+    ToolProgress, ToolRequest,
 };
 
 const MAX_PENDING: usize = 64;
@@ -306,15 +308,24 @@ struct PackageHost {
     starts: Arc<tokio::sync::RwLock<()>>,
 }
 
+enum PreparedProvider {
+    Native(Arc<dyn Provider>),
+    Package { package: String, name: String },
+}
+
 async fn load_packages(
     configs: Vec<PackageConfig>,
     cancel: CancellationToken,
+    capacity: Option<&CapacityContext>,
 ) -> Result<PackageHost> {
     ensure!(
         configs.len() <= 128,
         "at most 128 packages may be configured"
     );
-    let pool = RuntimePool::new(RuntimeConfig::default())?;
+    let pool = match capacity {
+        Some(capacity) => RuntimePool::with_capacity(RuntimeConfig::default(), capacity.clone())?,
+        None => RuntimePool::new(RuntimeConfig::default())?,
+    };
     let loaded = tokio::time::timeout(CONFIGURE_TIMEOUT, async {
         let mut entries = Vec::with_capacity(configs.len());
         for config in configs {
@@ -362,12 +373,51 @@ async fn configure(
     params: ConfigureParams,
     outbound: Outbound,
 ) -> Result<(Harness, Arc<Broker>, PackageHost)> {
+    configure_with(params, outbound, CapacityContext::prepare).await
+}
+
+async fn configure_with<F>(
+    params: ConfigureParams,
+    outbound: Outbound,
+    prepare: F,
+) -> Result<(Harness, Arc<Broker>, PackageHost)>
+where
+    F: FnOnce(&mut HarnessConfig, CapacityPolicy) -> Result<CapacityContext> + Send + 'static,
+{
     ensure!(
         params.tools.len() <= MAX_PENDING,
         "at most 64 callback tools may be registered"
     );
-    let config = harness_config(&params);
-    let packages = load_packages(params.packages, outbound.disconnected.child_token()).await?;
+    let mut config = harness_config(&params);
+    let quota = provider_capacity(&params)?;
+    let policy = capacity_policy(&params);
+    let provider = match params
+        .provider
+        .context("provider is required; configure an HTTP or trusted package provider")?
+    {
+        ProviderConfig::Package { package, name } => PreparedProvider::Package { package, name },
+        provider => PreparedProvider::Native(configure_provider(provider, quota)?),
+    };
+    let capacity = if let Some(policy) = policy {
+        let prepared = tokio::task::spawn_blocking(move || {
+            let capacity = prepare(&mut config, policy)?;
+            Ok::<_, anyhow::Error>((config, capacity))
+        });
+        let (prepared_config, capacity) = tokio::select! {
+            () = outbound.disconnected.cancelled() => bail!("capacity configuration cancelled"),
+            result = prepared => result.context("prepare worker capacity")??,
+        };
+        config = prepared_config;
+        Some(capacity)
+    } else {
+        None
+    };
+    let packages = load_packages(
+        params.packages,
+        outbound.disconnected.child_token(),
+        capacity.as_ref(),
+    )
+    .await?;
     let broker = Arc::new(Broker {
         pending: Mutex::new(HashMap::new()),
         outbound,
@@ -375,9 +425,11 @@ async fn configure(
         timeout_ms: config.run_timeout_ms,
     });
     let configured = async {
-        let provider = match params.provider.unwrap_or(ProviderConfig::Echo) {
-            ProviderConfig::Package { package, name } => packages.pool.provider(&package, &name)?,
-            provider => configure_provider(provider)?,
+        let provider = match provider {
+            PreparedProvider::Native(provider) => provider,
+            PreparedProvider::Package { package, name } => {
+                packages.pool.provider(&package, &name)?
+            }
         };
         let mut tools = ejm_harness_coding::tools(ejm_harness_coding::CodingConfig {
             allow_write: params.allow_write,
@@ -395,7 +447,12 @@ async fn configure(
             tools.extend(packages.pool.tools(&package.manifest.name)?);
             hooks.extend(packages.pool.hooks(&package.manifest.name)?);
         }
-        Harness::with_hooks(config, provider, tools, hooks)
+        match capacity {
+            Some(capacity) => {
+                Harness::with_capacity(config, Some(provider), tools, hooks, capacity)
+            }
+            None => Harness::with_hooks(config, provider, tools, hooks),
+        }
     }
     .await;
     match configured {
@@ -409,6 +466,55 @@ async fn configure(
             Err(error)
         }
     }
+}
+
+fn provider_capacity(params: &ConfigureParams) -> Result<Option<ProviderCapacity>> {
+    let Some(quota) = &params.provider_capacity else {
+        return Ok(None);
+    };
+    ensure!(
+        params.capacity.is_some(),
+        "provider_capacity requires an explicit capacity mode"
+    );
+    let origin = match &params.provider {
+        Some(ProviderConfig::Openai { base_url, .. }) => base_url.as_str(),
+        Some(ProviderConfig::Responses { .. }) => "https://api.openai.com",
+        Some(ProviderConfig::Anthropic { .. }) => "https://api.anthropic.com",
+        _ => bail!("provider_capacity requires an HTTP provider"),
+    };
+    Ok(Some(ProviderCapacity {
+        domain: Some(QuotaDomain::new(
+            origin,
+            &quota.account_uuid,
+            &quota.family,
+        )?),
+        max_in_flight: quota.max_in_flight,
+        requests: quota.requests,
+        tokens: quota.tokens,
+    }))
+}
+
+fn capacity_policy(params: &ConfigureParams) -> Option<CapacityPolicy> {
+    fn ceiling<T: Ord>(policy: Option<T>, legacy: Option<T>) -> Option<T> {
+        match (policy, legacy) {
+            (Some(policy), Some(legacy)) => Some(policy.min(legacy)),
+            (policy, legacy) => policy.or(legacy),
+        }
+    }
+    let mut policy = params.capacity?;
+    // Legacy explicit limits remain ceilings when a client opts into coordination.
+    policy.max_sessions = ceiling(policy.max_sessions, params.max_sessions);
+    policy.max_model_requests = ceiling(policy.max_model_requests, params.max_model_requests);
+    if let Some(resources) = &params.resources {
+        policy.max_jobs = ceiling(policy.max_jobs, Some(resources.max_jobs));
+        policy.max_memory_bytes = ceiling(policy.max_memory_bytes, Some(resources.memory_bytes));
+        policy.max_cpu_millis = ceiling(policy.max_cpu_millis, Some(resources.cpu_millis));
+        policy.max_heavy_jobs = ceiling(policy.max_heavy_jobs, Some(resources.max_heavy_jobs));
+        policy.max_processes = ceiling(policy.max_processes, Some(resources.max_processes));
+        policy.max_output_bytes =
+            ceiling(policy.max_output_bytes, Some(resources.max_output_bytes));
+    }
+    Some(policy)
 }
 
 fn harness_config(params: &ConfigureParams) -> HarnessConfig {
@@ -452,7 +558,10 @@ fn harness_config(params: &ConfigureParams) -> HarnessConfig {
     config
 }
 
-fn configure_provider(config: ProviderConfig) -> Result<Arc<dyn Provider>> {
+fn configure_provider(
+    config: ProviderConfig,
+    capacity: Option<ProviderCapacity>,
+) -> Result<Arc<dyn Provider>> {
     if let ProviderConfig::Responses { api_key, .. } | ProviderConfig::Anthropic { api_key, .. } =
         &config
     {
@@ -463,35 +572,40 @@ fn configure_provider(config: ProviderConfig) -> Result<Arc<dyn Provider>> {
         );
     }
     Ok(match config {
-        ProviderConfig::Echo => Arc::new(ReplayProvider::echo()),
-        ProviderConfig::Replay { responses } => Arc::new(ReplayProvider::new(responses)),
         ProviderConfig::Openai {
             base_url,
             api_key,
             model,
-        } => Arc::new(OpenAiProvider::new(OpenAiConfig {
-            base_url,
-            api_key,
-            model,
-        })?),
+        } => Arc::new(
+            OpenAiProvider::new(OpenAiConfig {
+                base_url,
+                api_key,
+                model,
+            })?
+            .with_capacity(capacity.unwrap_or_default())?,
+        ),
         ProviderConfig::Responses {
             api_key,
             model,
             reasoning_effort,
-        } => Arc::new(ResponsesProvider::new(
-            ResponsesConfig {
-                model,
-                reasoning_effort,
-            },
-            Arc::new(StaticCredential::new(SecretString::new(api_key))),
-        )?),
-        ProviderConfig::Anthropic { api_key, model } => {
-            Arc::new(AnthropicProvider::new(AnthropicConfig {
+        } => Arc::new(
+            ResponsesProvider::new(
+                ResponsesConfig {
+                    model,
+                    reasoning_effort,
+                },
+                Arc::new(StaticCredential::new(SecretString::new(api_key))),
+            )?
+            .with_capacity(capacity.unwrap_or_default())?,
+        ),
+        ProviderConfig::Anthropic { api_key, model } => Arc::new(
+            AnthropicProvider::new(AnthropicConfig {
                 base_url: "https://api.anthropic.com/v1".into(),
                 api_key,
                 model,
-            })?)
-        }
+            })?
+            .with_capacity(capacity.unwrap_or_default())?,
+        ),
         ProviderConfig::Package { .. } => {
             bail!("package providers require explicit package configuration")
         }
@@ -510,6 +624,15 @@ async fn dispatch(
             serde_json::to_value(harness.create_session(options).await?)?
         }
         ClientCall::SessionList(_) => serde_json::to_value(harness.list_sessions().await?)?,
+        ClientCall::SessionPage(query) => session_page(harness, query).await?,
+        ClientCall::SessionResolve(params) => {
+            serde_json::to_value(harness.resolve_session(&params.prefix).await?)?
+        }
+        ClientCall::SessionView(params) => serde_json::to_value(
+            harness
+                .session_view(&params.session_id, worker_bounds(params.bounds))
+                .await?,
+        )?,
         ClientCall::RunStart(params) => {
             let _start = packages.starts.read().await;
             let mut run = harness.start(&params.session_id, params.prompt).await?;
@@ -557,18 +680,27 @@ async fn dispatch(
             }
             json!({"accepted":true})
         }
-        ClientCall::EventsList(params) => {
-            let mut events = harness
-                .events(&params.session_id, params.after, params.limit.clamp(1, 64))
-                .await?;
-            while serde_json::to_vec(&events)?.len() > MAX_FRAME_BYTES / 2 {
-                ensure!(events.len() > 1, "event exceeds worker frame capacity");
-                events.pop();
-            }
-            serde_json::to_value(events)?
+        ClientCall::EventsList(params) => events_list(harness, params).await?,
+        ClientCall::EventsPage(params) => serde_json::to_value(
+            harness
+                .events_page(
+                    &params.session_id,
+                    params.after,
+                    params.through,
+                    worker_bounds(params.bounds),
+                )
+                .await?,
+        )?,
+        ClientCall::CapacityStatus(_) => serde_json::to_value(harness.capacity_snapshot())?,
+        ClientCall::CapacityReset(_) => {
+            let profiles_reset = tokio::task::spawn_blocking(reset_capacity_learning)
+                .await
+                .context("reset capacity learning")??;
+            serde_json::to_value(CapacityResetResult { profiles_reset })?
         }
         ClientCall::GovernorStatus(_) => serde_json::to_value(harness.governor().snapshot())?,
         ClientCall::HarnessStatus(_) => serde_json::to_value(harness.status().await)?,
+        ClientCall::SchedulingStatus(_) => serde_json::to_value(harness.scheduling_snapshot())?,
         call @ (ClientCall::PackageList(_)
         | ClientCall::PackageReload(_)
         | ClientCall::PackageCommand(_)
@@ -577,6 +709,36 @@ async fn dispatch(
         }
         _ => bail!("method is invalid in this state"),
     })
+}
+
+async fn events_list(harness: &Harness, params: EventsParams) -> Result<Value> {
+    let mut events = harness
+        .events(&params.session_id, params.after, params.limit.clamp(1, 64))
+        .await?;
+    while serde_json::to_vec(&events)?.len() > MAX_FRAME_BYTES / 2 {
+        ensure!(events.len() > 1, "event exceeds worker frame capacity");
+        events.pop();
+    }
+    Ok(serde_json::to_value(events)?)
+}
+
+async fn session_page(harness: &Harness, mut query: ejm_harness::SessionQuery) -> Result<Value> {
+    query.limit = query.limit.clamp(1, 50);
+    loop {
+        let page = harness.sessions_page(query.clone()).await?;
+        if serde_json::to_vec(&page)?.len() <= MAX_FRAME_BYTES / 2 {
+            return Ok(serde_json::to_value(page)?);
+        }
+        ensure!(query.limit > 1, "session exceeds worker frame capacity");
+        query.limit = query.limit.div_ceil(2);
+    }
+}
+
+fn worker_bounds(bounds: SessionTailOptions) -> SessionTailOptions {
+    SessionTailOptions {
+        max_events: bounds.max_events.min(200),
+        max_bytes: bounds.max_bytes.min(256 * 1024),
+    }
 }
 
 async fn dispatch_package(
@@ -794,6 +956,10 @@ impl Connection {
                                     "packages",
                                     "package_provider",
                                     "package_hooks",
+                                    "capacity",
+                                    "provider_capacity",
+                                    "session_views",
+                                    "scheduling",
                                 ]
                                 .map(String::from)
                                 .to_vec(),
@@ -1013,6 +1179,364 @@ fn timestamp_ms() -> u64 {
 mod tests {
     use super::*;
     use ejm_harness::{Effect, ModelResponse, RunStatus, SessionOptions};
+    use wiremock::{Mock, MockServer, ResponseTemplate, matchers::any};
+
+    fn native_fixture() -> ProviderConfig {
+        ProviderConfig::Openai {
+            base_url: "http://127.0.0.1:1/v1".into(),
+            api_key: String::new(),
+            model: "fixture-model".into(),
+        }
+    }
+
+    async fn provider_fixture(response: ModelResponse) -> (MockServer, ProviderConfig) {
+        let server = MockServer::start().await;
+        let calls = response.tool_calls.iter().enumerate().map(|(index, call)| {
+            json!({"index":index,"id":call.id,"function":{"name":call.name,"arguments":call.arguments.to_string()}})
+        }).collect::<Vec<_>>();
+        let body = format!(
+            "data: {}\n\ndata: [DONE]\n\n",
+            json!({"choices":[{"delta":{"content":response.content,"tool_calls":calls},"finish_reason":"stop"}]})
+        );
+        Mock::given(any())
+            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "text/event-stream"))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let provider = ProviderConfig::Openai {
+            base_url: format!("{}/v1", server.uri()),
+            api_key: String::new(),
+            model: "fixture-model".into(),
+        };
+        (server, provider)
+    }
+
+    #[tokio::test]
+    async fn provider_setup_is_required_before_packages_or_journals() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let state = directory.path().join("state");
+        let (tx, _rx) = mpsc::channel(MAX_PENDING);
+        let outbound = Outbound {
+            tx,
+            bytes: Arc::new(Semaphore::new(OUTPUT_BYTES)),
+            disconnected: CancellationToken::new(),
+        };
+        let params = serde_json::from_value(json!({
+            "state_dir": state,
+            "capacity": {"mode":"fixed"},
+            "packages": [{"root":"/unused-provider-fixture", "grants":{}}]
+        }))?;
+        let error = configure(params, outbound)
+            .await
+            .err()
+            .context("missing provider was accepted")?;
+        assert!(error.to_string().contains("provider is required"));
+        assert!(!state.exists());
+        for kind in ["echo", "replay"] {
+            assert!(
+                serde_json::from_value::<ConfigureParams>(json!({
+                    "provider": {"kind":kind,"responses":[{"content":"removed"}]}
+                }))
+                .is_err()
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn coordinated_configuration_preserves_legacy_explicit_ceilings() -> Result<()> {
+        for mode in ["fixed", "auto"] {
+            let params: ConfigureParams = serde_json::from_value(json!({
+                "max_sessions": 20,
+                "max_model_requests": 3,
+                "resources": {
+                    "max_jobs":3,"max_heavy_jobs":2,"cpu_millis":1500,
+                    "memory_bytes":268_435_456,"max_processes":12,"max_output_bytes":196_608
+                },
+                "capacity": {
+                    "mode":mode,"max_sessions":40,"max_model_requests":2,"max_jobs":5,
+                    "max_heavy_jobs":1,"max_cpu_millis":2000,"max_memory_bytes":134_217_728,
+                    "max_processes":16,"max_output_bytes":65_536
+                }
+            }))?;
+            let policy = capacity_policy(&params).context("missing capacity policy")?;
+            assert_eq!(policy.max_sessions, Some(20));
+            assert_eq!(policy.max_model_requests, Some(2));
+            assert_eq!(policy.max_jobs, Some(3));
+            assert_eq!(policy.max_heavy_jobs, Some(1));
+            assert_eq!(policy.max_cpu_millis, Some(1_500));
+            assert_eq!(policy.max_memory_bytes, Some(128 * 1024 * 1024));
+            assert_eq!(policy.max_processes, Some(12));
+            assert_eq!(policy.max_output_bytes, Some(64 * 1024));
+        }
+        assert!(capacity_policy(&ConfigureParams::default()).is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn provider_quota_scope_uses_host_identity_and_provider_origin() -> Result<()> {
+        let account = uuid::Uuid::new_v4().to_string();
+        let make = |model: &str, base_url: &str| -> Result<ConfigureParams> {
+            Ok(serde_json::from_value(json!({
+                "capacity": {"mode":"fixed"},
+                "provider": {"kind":"openai","base_url":base_url,"api_key":"fixture-key","model":model},
+                "provider_capacity": {"account_uuid":account,"max_in_flight":2,"requests":{"limit":10,"window_ms":60000}}
+            }))?)
+        };
+        let first = make("first-model", "https://fixture.invalid/v1")?;
+        let quota = provider_capacity(&first)?.context("missing quota policy")?;
+        let domain = quota
+            .domain
+            .as_ref()
+            .context("missing quota identity")?
+            .clone();
+        assert_eq!(quota.max_in_flight, Some(2));
+        let provider =
+            configure_provider(first.provider.context("missing provider")?, Some(quota))?;
+        assert_eq!(provider.capacity().domain, Some(domain.clone()));
+        let other = provider_capacity(&make("second-model", "https://fixture.invalid/v2")?)?
+            .context("missing shared model quota")?;
+        assert_eq!(other.domain, Some(domain.clone()));
+        let remote = provider_capacity(&make("first-model", "https://other.invalid/v1")?)?
+            .context("missing separate origin quota")?;
+        assert_ne!(remote.domain, Some(domain));
+        let mut missing_mode = make("first-model", "https://fixture.invalid/v1")?;
+        missing_mode.capacity = None;
+        assert!(provider_capacity(&missing_mode).is_err());
+        let mut invalid_rate = make("first-model", "https://fixture.invalid/v1")?;
+        invalid_rate
+            .provider_capacity
+            .as_mut()
+            .context("missing quota config")?
+            .max_in_flight = Some(0);
+        assert!(
+            configure_provider(
+                invalid_rate.provider.clone().context("missing provider")?,
+                provider_capacity(&invalid_rate)?,
+            )
+            .is_err()
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn invalid_capacity_is_rejected_before_package_import() -> Result<()> {
+        let (tx, _rx) = mpsc::channel(MAX_PENDING);
+        let outbound = Outbound {
+            tx,
+            bytes: Arc::new(Semaphore::new(OUTPUT_BYTES)),
+            disconnected: CancellationToken::new(),
+        };
+        let params = serde_json::from_value(json!({
+            "provider": native_fixture(),
+            "capacity": {"mode":"fixed", "max_model_requests":0},
+            "packages": [{"root":"/unused-capacity-fixture", "grants":{}}]
+        }))?;
+        let error = configure(params, outbound)
+            .await
+            .err()
+            .context("invalid capacity was accepted")?;
+        assert!(error.to_string().contains("model ceiling"));
+        Ok(())
+    }
+
+    fn legacy_fixed_config(
+        state: &std::path::Path,
+        provider: &ProviderConfig,
+    ) -> Result<ConfigureParams> {
+        Ok(serde_json::from_value(json!({
+            "state_dir":state,
+            "provider":provider,
+            "max_sessions":2,
+            "max_model_requests":1,
+            "resources": {
+                "max_jobs":2,"max_heavy_jobs":1,"cpu_millis":750,
+                "memory_bytes":134_217_728,"max_processes":4,"max_queue":47,
+                "max_output_bytes":65_536,"max_artifact_bytes":1_048_576,"max_job_ms":2000
+            }
+        }))?)
+    }
+
+    #[tokio::test]
+    async fn worker_pages_keep_authority_when_history_is_omitted() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let (_provider, provider) = provider_fixture(ModelResponse {
+            content: "offline fixture".into(),
+            ..ModelResponse::default()
+        })
+        .await;
+        let (tx, _rx) = mpsc::channel(MAX_PENDING);
+        let outbound = Outbound {
+            tx,
+            bytes: Arc::new(Semaphore::new(OUTPUT_BYTES)),
+            disconnected: CancellationToken::new(),
+        };
+        let params = legacy_fixed_config(&directory.path().join("state"), &provider)?;
+        let resources = params
+            .resources
+            .clone()
+            .context("missing fixed resources")?;
+        let (harness, _broker, packages) = configure(params, outbound.clone()).await?;
+        assert_eq!(
+            serde_json::to_value(harness.governor().limits())?,
+            serde_json::to_value(resources)?
+        );
+        let first = harness
+            .create_session(SessionOptions {
+                cwd: directory.path().to_owned(),
+                title: "first".into(),
+            })
+            .await?;
+        let second = harness
+            .create_session(SessionOptions {
+                cwd: directory.path().to_owned(),
+                title: "second".into(),
+            })
+            .await?;
+        let mut run = harness.start(&first.id, "offline fixture".into()).await?;
+        let summary = tokio::time::timeout(Duration::from_secs(2), run.wait()).await??;
+        let closing = CancellationToken::new();
+        let call = |method: &str, params: Value| {
+            serde_json::from_value::<ClientCall>(json!({"method":method,"params":params}))
+        };
+        let view = dispatch(
+            &harness,
+            &packages,
+            call(
+                "session.view",
+                json!({"session_id":first.id,"bounds":{"max_events":0}}),
+            )?,
+            &outbound,
+            &closing,
+        )
+        .await?;
+        assert_eq!(view["events"], json!([]));
+        assert_eq!(view["omitted"], true);
+        assert!(view["run_id"].is_null());
+        assert_eq!(view["last_transition"]["run_id"], run.id);
+        assert_eq!(
+            view["last_transition"]["outcome"],
+            serde_json::to_value(summary.status)?
+        );
+        let page = dispatch(
+            &harness,
+            &packages,
+            call("session.page", json!({"limit":1}))?,
+            &outbound,
+            &closing,
+        )
+        .await?;
+        assert_eq!(page["sessions"].as_array().map(Vec::len), Some(1));
+        let following = dispatch(
+            &harness,
+            &packages,
+            call("session.page", json!({"limit":1,"cursor":page["next"]}))?,
+            &outbound,
+            &closing,
+        )
+        .await?;
+        assert_ne!(page["sessions"][0]["id"], following["sessions"][0]["id"]);
+        let resolved = dispatch(
+            &harness,
+            &packages,
+            call("session.resolve", json!({"prefix":second.id}))?,
+            &outbound,
+            &closing,
+        )
+        .await?;
+        assert_eq!(resolved["id"], second.id);
+        let events = dispatch(
+            &harness,
+            &packages,
+            call("events.page", json!({"session_id":first.id,"through":view["durable_cursor"],"bounds":{"max_events":1}}))?,
+            &outbound,
+            &closing,
+        )
+        .await?;
+        assert_eq!(events["events"].as_array().map(Vec::len), Some(1));
+        assert_eq!(events["complete"], false);
+        assert!(harness.capacity_snapshot().is_none());
+        harness.shutdown().await?;
+        packages.pool.shutdown().await?;
+        Ok(())
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[tokio::test]
+    async fn explicit_worker_capacity_enforces_ceilings_and_drains_callbacks() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let (_provider, provider) = provider_fixture(ModelResponse {
+            tool_calls: vec![ToolCall {
+                id: "held".into(),
+                name: "held".into(),
+                arguments: json!({}),
+            }],
+            ..ModelResponse::default()
+        })
+        .await;
+        let root = directory.path().canonicalize()?.join("capacity");
+        let (tx, mut rx) = mpsc::channel(MAX_PENDING);
+        let outbound = Outbound {
+            tx,
+            bytes: Arc::new(Semaphore::new(OUTPUT_BYTES)),
+            disconnected: CancellationToken::new(),
+        };
+        let params: ConfigureParams = serde_json::from_value(json!({
+            "state_dir": directory.path().join("state"),
+            "capacity": {"mode":"fixed", "max_sessions":1,"max_model_requests":1,"max_jobs":1},
+            "tools": [{"name":"held","description":"hold fixture","version":"1","effect":"read","input_schema":{"type":"object"}}],
+            "provider": provider
+        }))?;
+        let (harness, broker, packages) =
+            configure_with(params, outbound, move |config, policy| {
+                CapacityContext::prepare_isolated(config, policy, &root)
+            })
+            .await?;
+        let capacity = harness
+            .capacity_snapshot()
+            .context("missing shared capacity")?;
+        assert_eq!(capacity.hard_model_requests, 1);
+        assert_eq!(capacity.hard_resources.max_jobs, 1);
+        let first = harness
+            .create_session(SessionOptions {
+                cwd: directory.path().to_owned(),
+                title: String::new(),
+            })
+            .await?;
+        let second = harness
+            .create_session(SessionOptions {
+                cwd: directory.path().to_owned(),
+                title: String::new(),
+            })
+            .await?;
+        let mut run = harness.start(&first.id, "hold callback".into()).await?;
+        let frame = tokio::time::timeout(Duration::from_secs(2), rx.recv())
+            .await?
+            .context("missing governed callback")?;
+        let request: ToolRequest = serde_json::from_slice(&frame.bytes)?;
+        assert!(
+            harness
+                .start(&second.id, "exceeds ceiling".into())
+                .await
+                .is_err()
+        );
+        harness.cancel_run(&first.id, &run.id).await?;
+        broker.resolve(Response::error(
+            request.id,
+            "cancelled",
+            "fixture cleanup complete",
+        ));
+        assert_eq!(
+            tokio::time::timeout(Duration::from_secs(2), run.wait())
+                .await??
+                .status,
+            RunStatus::Cancelled
+        );
+        harness.shutdown().await?;
+        packages.pool.shutdown().await?;
+        assert_eq!(harness.governor().snapshot().running, 0);
+        Ok(())
+    }
 
     #[test]
     fn native_provider_configuration_is_local_and_validated() -> Result<()> {
@@ -1021,7 +1545,7 @@ mod tests {
             json!({"kind":"responses","api_key":"fixture-key","model":"fixture-model","reasoning_effort":"high"}),
             json!({"kind":"anthropic","api_key":"fixture-key","model":"fixture-model"}),
         ] {
-            configure_provider(serde_json::from_value(value)?)?;
+            configure_provider(serde_json::from_value(value)?, None)?;
         }
         for value in [
             json!({"kind":"responses","api_key":"","model":"fixture-model"}),
@@ -1032,7 +1556,7 @@ mod tests {
             json!({"kind":"anthropic","api_key":"private-fixture-key","model":""}),
             json!({"kind":"responses","api_key":"private-fixture-key","model":"fixture-model","reasoning_effort":"unknown"}),
         ] {
-            let error = configure_provider(serde_json::from_value(value)?)
+            let error = configure_provider(serde_json::from_value(value)?, None)
                 .err()
                 .context("invalid provider configuration was accepted")?;
             assert!(!error.to_string().contains("private-fixture-key"));
@@ -1076,6 +1600,15 @@ mod tests {
     #[tokio::test]
     async fn cancelled_callbacks_retain_admission_until_host_confirms_cleanup() -> Result<()> {
         let directory = tempfile::tempdir()?;
+        let (_provider, provider) = provider_fixture(ModelResponse {
+            tool_calls: vec![ToolCall {
+                id: "provider-call".into(),
+                name: "host_tool".into(),
+                arguments: json!({}),
+            }],
+            ..ModelResponse::default()
+        })
+        .await;
         let (tx, mut rx) = mpsc::channel(MAX_PENDING);
         let outbound = Outbound {
             tx,
@@ -1091,16 +1624,7 @@ mod tests {
         };
         let params = ConfigureParams {
             state_dir: Some(directory.path().join("state")),
-            provider: Some(ProviderConfig::Replay {
-                responses: vec![ModelResponse {
-                    tool_calls: vec![ToolCall {
-                        id: "provider-call".into(),
-                        name: "host_tool".into(),
-                        arguments: json!({}),
-                    }],
-                    ..ModelResponse::default()
-                }],
-            }),
+            provider: Some(provider),
             tools: vec![definition],
             run_timeout_ms: Some(10_000),
             ..ConfigureParams::default()
@@ -1232,7 +1756,7 @@ mod tests {
                 &mut reader,
                 &mut client_write,
                 "configure",
-                json!({"state_dir":directory.path()})
+                json!({"state_dir":directory.path(),"provider":native_fixture()})
             )
             .await?["result"]["configured"],
             true

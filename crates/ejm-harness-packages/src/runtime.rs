@@ -6,8 +6,8 @@ use std::{
 };
 
 use anyhow::{Context, Result, ensure};
-use ejm_harness::{Hook, Provider, Tool};
-use ejm_harness_exec::{Governor, Reservation};
+use ejm_harness::{CapacityContext, Hook, Provider, Tool};
+use ejm_harness_exec::{Governor, Lease, Reservation, native::NativeOwnerReady};
 pub use ejm_harness_package_spec::RuntimeKind;
 use ejm_harness_package_spec::{HookEvent, Manifest};
 use schemars::JsonSchema;
@@ -19,6 +19,8 @@ use tokio_util::sync::CancellationToken;
 use crate::{adapters, transport::Host};
 
 const MAX_PACKAGES: usize = 128;
+pub(crate) const HOST_MEMORY_BYTES: u64 = 64 * 1024 * 1024;
+const CALLBACK_SCRATCH_BYTES: u64 = 16 * 1024 * 1024;
 
 /// A validated installation. Loading it requires a separate, explicit host grant.
 #[derive(Clone, Debug)]
@@ -54,7 +56,7 @@ impl Default for RuntimeConfig {
     fn default() -> Self {
         Self {
             node: PathBuf::from("node"),
-            python: PathBuf::from("python3"),
+            python: PathBuf::from(if cfg!(windows) { "python" } else { "python3" }),
             max_pending: 64,
             max_frame_bytes: 1024 * 1024,
             max_buffer_bytes: 4 * 1024 * 1024,
@@ -121,6 +123,7 @@ pub struct RuntimePool {
 
 struct Inner {
     config: RuntimeConfig,
+    capacity: Option<CapacityContext>,
     state: Mutex<State>,
     management: tokio::sync::Mutex<()>,
     management_slots: Arc<tokio::sync::Semaphore>,
@@ -184,10 +187,28 @@ impl RuntimePool {
     /// # Errors
     /// Rejects unsupported queue, frame, timeout, or executable configuration.
     pub fn new(config: RuntimeConfig) -> Result<Self> {
+        Self::build(config, None)
+    }
+
+    /// Prepare lazy language hosts against the same context as the final harness.
+    ///
+    /// Resident host memory stays charged through native cleanup. Confirmed
+    /// owner death parks admission before retiring its scope charge. Launch and
+    /// import work use transient execution admission; unused hosts stay lazy.
+    /// Existing `RuntimeConfig` and [`Self::new`] behavior are unchanged.
+    ///
+    /// # Errors
+    /// Rejects the same invalid runtime configuration as [`Self::new`].
+    pub fn with_capacity(config: RuntimeConfig, capacity: CapacityContext) -> Result<Self> {
+        Self::build(config, Some(capacity))
+    }
+
+    fn build(config: RuntimeConfig, capacity: Option<CapacityContext>) -> Result<Self> {
         config.validate()?;
         Ok(Self {
             inner: Arc::new(Inner {
                 config,
+                capacity,
                 state: Mutex::new(State::default()),
                 management: tokio::sync::Mutex::new(()),
                 management_slots: Arc::new(tokio::sync::Semaphore::new(16)),
@@ -384,7 +405,10 @@ impl RuntimePool {
         .await
     }
 
-    /// Stop both hosts and await actual process exit before releasing callback ownership.
+    /// Stop both hosts and await their supported native cleanup.
+    ///
+    /// Confirmed owner death retires scheduling authority after parking
+    /// admission. It does not prove descendant cleanup or workspace safety.
     ///
     /// # Errors
     /// Reports cleanup still pending; keep the Tokio runtime alive until it completes.
@@ -436,9 +460,14 @@ impl RuntimePool {
         args: Value,
         context: PackageContext,
     ) -> Result<Value> {
+        self.require_governor(&context.governor)?;
         let lease = context
             .governor
-            .acquire(&context.session_id, callback_reservation(), &context.cancel)
+            .acquire(
+                &context.session_id,
+                self.callback_reservation(),
+                &context.cancel,
+            )
             .await?;
         self.invoke(
             Callback {
@@ -602,8 +631,8 @@ impl RuntimePool {
         }
         if let Some(kind) = kind {
             let result = async {
-                let host = self.host(kind)?;
-                self.import(&host, &id, cancel).await?;
+                let (host, startup) = self.host(kind, &cancel).await?;
+                self.import(&host, &id, cancel, startup).await?;
                 lock(&self.inner.state)
                     .packages
                     .get_mut(&id)
@@ -612,30 +641,50 @@ impl RuntimePool {
                 Ok(())
             }
             .await;
-            if result.is_err() {
-                self.stop(kind).await?;
-            }
-            result
+            self.finish_imports(kind, result).await
         } else {
             Ok(())
         }
     }
 
-    fn host(&self, kind: RuntimeKind) -> Result<Arc<Host>> {
-        let mut state = lock(&self.inner.state);
-        if let Some(language) = state.languages.get(&kind) {
-            ensure!(
-                !language.blocked && !language.host.stopped(),
-                "package language host is stopped; reload explicitly"
-            );
-            return Ok(language.host.clone());
+    async fn host(
+        &self,
+        kind: RuntimeKind,
+        cancel: &CancellationToken,
+    ) -> Result<(Arc<Host>, Option<Lease>)> {
+        {
+            let state = lock(&self.inner.state);
+            if let Some(language) = state.languages.get(&kind) {
+                ensure!(
+                    !language.blocked && !language.host.stopped(),
+                    "package language host is stopped; reload explicitly"
+                );
+                return Ok((language.host.clone(), None));
+            }
         }
+        // Management serialization prevents another launch while this ticket
+        // waits. Admit the full peak before splitting resident and import work.
+        let (native_ready, resident, startup) = match &self.inner.capacity {
+            Some(capacity) => {
+                let (ready, resident, startup) = self.startup_admission(capacity, cancel).await?;
+                (Some(ready), Some(resident), Some(startup))
+            }
+            None => (None, None, None),
+        };
+        ensure!(
+            !cancel.is_cancelled() && !self.inner.closed.is_cancelled(),
+            "package management cancelled"
+        );
         let host = Host::spawn(
             kind,
             self.inner.config.clone(),
+            native_ready,
+            self.inner.capacity.as_ref().map(CapacityContext::governor),
             self.inner.closed.child_token(),
-        )?;
-        state.languages.insert(
+            (resident, self.inner.capacity.clone()),
+        )
+        .await?;
+        lock(&self.inner.state).languages.insert(
             kind,
             Language {
                 host: host.clone(),
@@ -643,10 +692,94 @@ impl RuntimePool {
                 blocked: false,
             },
         );
-        Ok(host)
+        Ok((host, startup))
     }
 
-    async fn import(&self, host: &Host, id: &str, cancel: CancellationToken) -> Result<()> {
+    async fn startup_admission(
+        &self,
+        capacity: &CapacityContext,
+        cancel: &CancellationToken,
+    ) -> Result<(NativeOwnerReady, Lease, Lease)> {
+        let mut reservation = self.callback_reservation();
+        reservation.memory_bytes += HOST_MEMORY_BYTES;
+        reservation.processes = 1;
+        let governor = capacity.governor();
+        let mut queued = governor.stage("package-import", reservation)?;
+        capacity.notify_demand();
+        let owner = capacity.native_owner();
+        loop {
+            let eligible = tokio::select! {
+                () = self.inner.closed.cancelled() => anyhow::bail!("package runtime is shut down"),
+                eligible = queued.wait_eligible(cancel) => eligible?,
+            };
+            let ready = tokio::select! {
+                () = self.inner.closed.cancelled() => anyhow::bail!("package runtime is shut down"),
+                () = cancel.cancelled() => anyhow::bail!("package management cancelled"),
+                ready = owner.ready() => ready?,
+            };
+            let Some(lease) = queued.try_activate(eligible)? else {
+                // A renewed grant may no longer fit. Keep the ticket's age and
+                // release this unused helper hold before any further wait.
+                drop(ready);
+                continue;
+            };
+            let (resident, startup) = lease.split_resident(HOST_MEMORY_BYTES, 1)?;
+            return Ok((ready, resident, startup));
+        }
+    }
+
+    async fn management_lease(&self, cancel: &CancellationToken) -> Result<Option<Lease>> {
+        match &self.inner.capacity {
+            Some(capacity) => {
+                capacity.notify_demand();
+                let reservation = self.callback_reservation();
+                let governor = capacity.governor();
+                Ok(Some(tokio::select! {
+                    () = self.inner.closed.cancelled() => anyhow::bail!("package runtime is shut down"),
+                    lease = governor.acquire("package-import", reservation, cancel) => lease?,
+                }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub(crate) fn callback_reservation(&self) -> Reservation {
+        Reservation {
+            memory_bytes: if self.inner.capacity.is_some() {
+                CALLBACK_SCRATCH_BYTES
+            } else {
+                Reservation::default().memory_bytes
+            },
+            processes: 0,
+            ..Reservation::default()
+        }
+    }
+
+    pub(crate) fn require_governor(&self, governor: &Arc<Governor>) -> Result<()> {
+        ensure!(
+            self.inner
+                .capacity
+                .as_ref()
+                .is_none_or(|capacity| Arc::ptr_eq(&capacity.governor(), governor)),
+            "package callback must use its prepared capacity governor"
+        );
+        if let Some(capacity) = &self.inner.capacity {
+            capacity.notify_demand();
+        }
+        Ok(())
+    }
+
+    async fn import(
+        &self,
+        host: &Host,
+        id: &str,
+        cancel: CancellationToken,
+        startup: Option<Lease>,
+    ) -> Result<()> {
+        let lease = match startup {
+            Some(lease) => Some(lease),
+            None => self.management_lease(&cancel).await?,
+        };
         let params = {
             let state = lock(&self.inner.state);
             let package = state.packages.get(id).context("package disappeared")?;
@@ -658,7 +791,7 @@ impl RuntimePool {
                 .context("package has no runtime")?;
             json!({"package_id":id,"root":package.installed.root,"entry":runtime.entry,"handlers":package.grants.handlers(&package.installed.manifest)})
         };
-        let result = host.call("load", params, cancel, None, ()).await?;
+        let result = host.call("load", params, cancel, None, lease).await?;
         ensure!(
             result["package_id"] == id,
             "language host returned a different package identity"
@@ -715,9 +848,10 @@ impl RuntimePool {
             return Ok(());
         }
         let result = async {
-            let host = self.host(kind)?;
+            let (host, mut startup) = self.host(kind, &cancel).await?;
             for id in &ids {
-                self.import(&host, id, cancel.clone()).await?;
+                self.import(&host, id, cancel.clone(), startup.take())
+                    .await?;
             }
             let mut state = lock(&self.inner.state);
             for id in &ids {
@@ -730,10 +864,19 @@ impl RuntimePool {
             Ok(())
         }
         .await;
-        if result.is_err() {
-            self.stop(kind).await?;
+        self.finish_imports(kind, result).await
+    }
+
+    async fn finish_imports(&self, kind: RuntimeKind, result: Result<()>) -> Result<()> {
+        if let Err(error) = result {
+            return match self.stop(kind).await {
+                Ok(()) => Err(error),
+                Err(cleanup) => Err(error.context(format!(
+                    "package host cleanup is still pending: {cleanup:#}"
+                ))),
+            };
         }
-        result
+        Ok(())
     }
 
     async fn stop(&self, kind: RuntimeKind) -> Result<()> {
@@ -847,13 +990,6 @@ impl PackageGrants {
             .collect::<BTreeSet<_>>()
             .into_iter()
             .collect()
-    }
-}
-
-pub(crate) fn callback_reservation() -> Reservation {
-    Reservation {
-        processes: 0,
-        ..Reservation::default()
     }
 }
 
