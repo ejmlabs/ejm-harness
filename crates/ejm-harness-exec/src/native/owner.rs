@@ -91,6 +91,7 @@ pub(super) async fn serve(root: &Path, key: &str, generation: Uuid, accounted: b
                 let ad = ad.clone(); let operations=operations.clone(); let monitor=monitor.clone(); let scopes=scopes.clone(); let ready_clients=ready_clients.clone();
                 clients.spawn(async move {
                     let mut transport=wire::framed(stream);
+                    wire::authenticate_server(&mut transport, &ad).await?;
                     let hello:Hello=wire::receive(&mut transport).await?;
                     ensure!(hello.protocol==wire::PROTOCOL && hello.epoch==ad.epoch && hello.capability==ad.capability && hello.domain_key==ad.domain,"native authentication or generation mismatch");
                     transport.codec_mut().set_max_frame_length(wire::MAX_FRAME_BYTES);

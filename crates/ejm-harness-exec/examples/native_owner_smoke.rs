@@ -91,6 +91,42 @@ fn main() -> Result<ExitCode> {
 }
 
 async fn run(args: &[std::ffi::OsString]) -> Result<()> {
+    if args.first().is_some_and(|arg| arg == "relative-cwd-client") {
+        let root = PathBuf::from(args.get(1).context("missing shared root")?);
+        let expected_pid = args
+            .get(2)
+            .context("missing owner PID")?
+            .to_string_lossy()
+            .parse::<u32>()?;
+        let owner = NativeOwner::new(root, "fixture")?;
+        echo(Some(&owner), Path::new(".")).await?;
+        ensure!(
+            owner.snapshot().owner_pid == Some(expected_pid),
+            "relative cwd fixture did not share the original helper"
+        );
+        return Ok(());
+    }
+    if args.first().is_some_and(|arg| arg == "relative-cwd") {
+        let temp = tempfile::tempdir()?;
+        let base = temp.path().canonicalize()?;
+        let root = base.join("state");
+        let second = base.join("second-caller");
+        std::fs::create_dir(&second)?;
+        let owner = NativeOwner::new(&root, "fixture")?;
+        let ready = owner.ready().await?;
+        let pid = owner.snapshot().owner_pid.context("missing owner PID")?;
+        let status = tokio::process::Command::new(std::env::current_exe()?)
+            .arg("relative-cwd-client")
+            .arg(root)
+            .arg(pid.to_string())
+            .current_dir(second)
+            .status()
+            .await?;
+        ensure!(status.success(), "relative caller cwd was not preserved");
+        drop(ready);
+        println!("relative caller cwd preserved through shared helper");
+        return Ok(());
+    }
     #[cfg(unix)]
     if args
         .first()
@@ -241,7 +277,10 @@ async fn echo(owner: Option<&NativeOwner>, directory: &Path) -> Result<()> {
     write.await??;
     errors.await??;
     let output = read.await??;
-    let prefix = format!("private-client-value\n{}\n", directory.display());
+    let prefix = format!(
+        "private-client-value\n{}\n",
+        directory.canonicalize()?.display()
+    );
     ensure!(
         output.starts_with(prefix.as_bytes()) && output.len() == prefix.len() + expected,
         "caller environment, cwd, or stream bytes changed"
