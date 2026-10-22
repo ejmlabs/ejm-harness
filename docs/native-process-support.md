@@ -25,7 +25,7 @@ maintained native API. There is no shell ACL command or plaintext fallback.
 Windows administrators, SYSTEM, and code running as the same user remain within
 the native trust boundary. SQLite still owns its VFS, journals, and sync policy.
 
-The workspace selects an exact-commit [maintained fork](../vendor/README.md)
+The workspace selects an exact-commit [maintained fork](https://github.com/ejmlabs/ejm-rightkit-fs/tree/ad6faff2442ffe6abccd1856f4c0df9a3e472035)
 of upstream 0.4.4. Native permanent locks need direct exclusive final-name
 creation and opt-in same-handle owner-only reopening, which the reviewed
 upstream releases do not expose. The repair preserves the upstream dependency
