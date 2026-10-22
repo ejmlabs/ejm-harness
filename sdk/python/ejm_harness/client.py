@@ -8,6 +8,7 @@ import inspect
 import json
 import math
 import os
+import sys
 import threading
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequence
@@ -118,6 +119,8 @@ class AsyncHarness:
         if not math.isfinite(request_timeout) or request_timeout <= 0:
             raise ValueError("request_timeout must be positive")
         self._config = dict(config or {})
+        if sys.platform == "darwin" and "capacity" not in self._config:
+            self._config["capacity"] = {"mode": "auto"}
         if self._config.get("tools"):
             raise ValueError("register callback definitions and handlers together through tools")
         self._tools = {tool.definition["name"]: tool for tool in tools}

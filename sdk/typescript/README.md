@@ -89,10 +89,10 @@ Requires Node 20 or newer and a compatible worker binary, supplied through `work
 
 ## Capacity and session views
 
-Capacity coordination is opt-in: pass `capacity: { mode: "auto" }` to
-`Harness.create`, or choose `mode: "fixed"` for coordinated fixed targets.
-Omitting capacity keeps the legacy limits within one worker. Automatic
-defaults remain gated on native owner-crash recovery checks. Optional policy
+On macOS, `Harness.create` selects automatic shared capacity by default.
+Elsewhere, omission retains legacy limits pending native acceptance. Pass
+`capacity: { mode: "auto" }` to select auto, `{ mode: "fixed" }` for coordinated
+fixed targets, or `capacity: null` for legacy composition. Optional policy
 ceilings include `max_sessions`, `max_model_requests`, `max_jobs`, and
 `max_memory_bytes`; explicit legacy limits still apply. `capacityStatus()`
 returns cached host targets and observations, or `null` for legacy composition.

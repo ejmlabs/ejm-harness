@@ -1,36 +1,261 @@
 {
   "build_checkpoint": {
-    "path": "/private/tmp/ejm-cli-capacity-release-build-20261021-integration/20261021T155949Z-c353b656/report.json",
-    "sha256": "ba84f5847d7197465cbfc145a85e12435df7f3ddf57f41c94e7284ffd0d2b660",
-    "status": "passed"
-  },
-  "binaries": {
-    "helper": {
-      "path": "/private/tmp/ejm-cli-capacity-release-build-20261021-integration/20261021T155949Z-c353b656/bin/ejm-cli-helper",
-      "sha256": "e32602570773e674ac1172f8d3bf368d2726440b1e110b0fe46e67222d60e657",
-      "bytes": 18143008,
-      "built_path": "/Users/everettmorgan/Desktop/ejm-cli/target/release/ejm-cli"
-    },
-    "fixture": {
-      "path": "/private/tmp/ejm-cli-capacity-release-build-20261021-integration/20261021T155949Z-c353b656/bin/ejm-cli-fixture",
-      "sha256": "eff5a6d9cfff31e981bd19aa0fb6de84d139c2c98177e8f317619df192d4f07b",
-      "bytes": 19968448,
-      "built_path": "/Users/everettmorgan/Desktop/ejm-cli/target/release/deps/ejm_cli-534f9d18b063c054"
-    }
-  },
-  "relay_contracts": {
-    "passed": 19,
-    "failed": 0,
-    "log_sha256": "91d389c9d6668dbffe8e647af5e557ad91e1f28f0f2fe46a64eec4c480e09ee1"
+    "path": "/private/tmp/ejm-cli-capacity-release-build-20261021-integration/20261022T103904Z-68b5d15d/report.json",
+    "sha256": "37851c47f5a02a0e6272c4b30be52f409b7690cc709a291f973737c129613134"
   },
   "acceptance": {
-    "status": "blocked_before_workload",
-    "report": "/private/tmp/ejm-capacity-critical-comparison-20261021-integration/20261021T190543Z-0d8d100e/report.json",
-    "sha256": "558a8f8bb4c01e4dec6ccaeedccb084ee85129b33f55342bf4c0ec83b919d7f7",
-    "error": "RuntimeError: free disk below 10 GiB during waiting_global_lock: 4650917888"
+    "path": "/private/tmp/ejm-capacity-critical-comparison-20261021-integration/20261022T104153Z-a69f5df4/report.json",
+    "sha256": "72d1cab00306198055b471b0927a51727276fb9d61a2ef9bf7aef3f5261378d6"
   },
+  "status": "passed",
+  "comparisons": {
+    "pairs": [
+      {
+        "trial": 1,
+        "fixed_useful_per_second": 66.69709031339895,
+        "auto_inactive_useful_per_second": 67.73327056897486,
+        "auto_active_useful_per_second": 70.64015954809975,
+        "auto_loss_percent": -1.5535614083119098,
+        "active_terminal_loss_percent": -4.291670776719259
+      },
+      {
+        "trial": 2,
+        "fixed_useful_per_second": 64.76732071261691,
+        "auto_inactive_useful_per_second": 65.25530359793049,
+        "auto_active_useful_per_second": 59.844793335755696,
+        "auto_loss_percent": -0.7534399755068533,
+        "active_terminal_loss_percent": 8.291295824032275
+      }
+    ],
+    "rate_definition": "Sum of successful pre-cutoff turns/controller seconds across the two mostly overlapping participants.",
+    "trial_summary": "Median rates across the predeclared alternating trials; individual pair results retained.",
+    "auto_loss_percent": -1.1593731938508212,
+    "active_terminal_loss_percent": 1.8825837473133378,
+    "automatic_status": "passed",
+    "terminal_status": "passed"
+  },
+  "host": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "logical_cpus": 12
+  },
+  "configuration": {
+    "checkpoint": "/private/tmp/ejm-cli-capacity-release-build-20261021-integration/20261022T103904Z-68b5d15d/report.json",
+    "run": true,
+    "seconds": 90,
+    "sweep_seconds": 30,
+    "samples": 20,
+    "budget_seconds": 1800,
+    "storage_gib": 10,
+    "minimum_overlap": 0.9
+  },
+  "latency_verdict": {
+    "status": "passed",
+    "by_boundary": {
+      "input_to_observed_paint": [
+        {
+          "case": "trial-1-auto-active",
+          "count": 20,
+          "budget_ms": 50,
+          "p50_ms": 32.33775,
+          "p95_ms": 33.73775,
+          "status": "within_budget"
+        },
+        {
+          "case": "trial-1-auto-active",
+          "count": 20,
+          "budget_ms": 50,
+          "p50_ms": 31.925458,
+          "p95_ms": 33.979375,
+          "status": "within_budget"
+        },
+        {
+          "case": "trial-2-auto-active",
+          "count": 20,
+          "budget_ms": 50,
+          "p50_ms": 31.884625,
+          "p95_ms": 33.157667,
+          "status": "within_budget"
+        },
+        {
+          "case": "trial-2-auto-active",
+          "count": 20,
+          "budget_ms": 50,
+          "p50_ms": 30.828417,
+          "p95_ms": 34.099167,
+          "status": "within_budget"
+        }
+      ],
+      "stop_to_observed_acknowledgement": [
+        {
+          "case": "trial-1-auto-active",
+          "count": 20,
+          "budget_ms": 50,
+          "p50_ms": 32.02575,
+          "p95_ms": 33.076792,
+          "status": "within_budget"
+        },
+        {
+          "case": "trial-1-auto-active",
+          "count": 20,
+          "budget_ms": 50,
+          "p50_ms": 31.996083,
+          "p95_ms": 32.877709,
+          "status": "within_budget"
+        },
+        {
+          "case": "trial-2-auto-active",
+          "count": 20,
+          "budget_ms": 50,
+          "p50_ms": 31.908458,
+          "p95_ms": 33.917291,
+          "status": "within_budget"
+        },
+        {
+          "case": "trial-2-auto-active",
+          "count": 20,
+          "budget_ms": 50,
+          "p50_ms": 31.901042,
+          "p95_ms": 33.252542,
+          "status": "within_budget"
+        }
+      ],
+      "selected_receipt_to_terminal_write": [
+        {
+          "case": "trial-1-auto-active",
+          "count": 13,
+          "budget_ms": 50,
+          "p50_ms": 23.624625,
+          "p95_ms": 31.595542,
+          "status": "within_budget"
+        },
+        {
+          "case": "trial-1-auto-active",
+          "count": 12,
+          "budget_ms": 50,
+          "p50_ms": 9.834041,
+          "p95_ms": 30.70475,
+          "status": "within_budget"
+        },
+        {
+          "case": "trial-2-auto-active",
+          "count": 12,
+          "budget_ms": 50,
+          "p50_ms": 12.812417,
+          "p95_ms": 32.082792,
+          "status": "within_budget"
+        },
+        {
+          "case": "trial-2-auto-active",
+          "count": 11,
+          "budget_ms": 50,
+          "p50_ms": 11.665042,
+          "p95_ms": 25.487709,
+          "status": "within_budget"
+        }
+      ],
+      "selected_commit_to_terminal_write": [
+        {
+          "case": "trial-1-auto-active",
+          "count": 13,
+          "budget_ms": 50,
+          "p50_ms": 23.630708,
+          "p95_ms": 31.601125,
+          "status": "within_budget"
+        },
+        {
+          "case": "trial-1-auto-active",
+          "count": 12,
+          "budget_ms": 50,
+          "p50_ms": 16.889,
+          "p95_ms": 30.717208,
+          "status": "within_budget"
+        },
+        {
+          "case": "trial-2-auto-active",
+          "count": 12,
+          "budget_ms": 50,
+          "p50_ms": 12.816875,
+          "p95_ms": 32.090208,
+          "status": "within_budget"
+        },
+        {
+          "case": "trial-2-auto-active",
+          "count": 11,
+          "budget_ms": 50,
+          "p50_ms": 11.668292,
+          "p95_ms": 25.498875,
+          "status": "within_budget"
+        }
+      ]
+    },
+    "integrity": [
+      {
+        "case": "trial-1-auto-active",
+        "observer_pid": 99951,
+        "status": "passed",
+        "faults": {},
+        "paired_event_arrays": true,
+        "omitted_markers": 0,
+        "uncovered_saved_markers": 0,
+        "selection_changes": 21
+      },
+      {
+        "case": "trial-1-auto-active",
+        "observer_pid": 99952,
+        "status": "passed",
+        "faults": {},
+        "paired_event_arrays": true,
+        "omitted_markers": 0,
+        "uncovered_saved_markers": 0,
+        "selection_changes": 21
+      },
+      {
+        "case": "trial-2-auto-active",
+        "observer_pid": 14029,
+        "status": "passed",
+        "faults": {},
+        "paired_event_arrays": true,
+        "omitted_markers": 0,
+        "uncovered_saved_markers": 0,
+        "selection_changes": 21
+      },
+      {
+        "case": "trial-2-auto-active",
+        "observer_pid": 14030,
+        "status": "passed",
+        "faults": {},
+        "paired_event_arrays": true,
+        "omitted_markers": 0,
+        "uncovered_saved_markers": 0,
+        "selection_changes": 21
+      }
+    ],
+    "scope": "Each participant and trial independently meets the retained-sample 50 ms p95 budget; full event/display coverage unclaimed."
+  },
+  "all_commands_reaped": true,
+  "all_observers_reaped": true,
+  "source_bridge": "Measured explicit auto implementation is unchanged. Release edits select it by default on macOS and update versions/docs. Focused default-selection tests verify that routing.",
   "limits": [
-    "Local macOS evidence only. Automatic defaults remain disabled.",
-    "Full protected CI, human review and publication are pending."
-  ]
+    "Local macOS evidence only; other platform defaults stay gated.",
+    "Protected CI, human review and publication pending.",
+    "Earlier failed comparison retained at 20261022T101211Z-b871b5e7; host fixed rates varied, so no repair-only causal claim."
+  ],
+  "default_selection_checks": {
+    "typescript": {
+      "status": "passed",
+      "log": "/private/tmp/ejm-capacity-final-ts.log",
+      "sha256": "e75bb2c17d69a3923fd5e3cd35dc412ae23411b6e3f4a7d3bd649ed76bf5083c"
+    },
+    "python": {
+      "status": "passed",
+      "log": "/private/tmp/ejm-capacity-final-python.log",
+      "sha256": "94c996f6688f95349ab4710833a059879c63d1cd8f638066d3ab63c85524e15e"
+    },
+    "cli_parser": {
+      "status": "passed",
+      "log": "/private/tmp/ejm-capacity-final-parser.log",
+      "sha256": "98f625a57e8969059bc597d5c84cbbfcb5dffa7fa2aa36da1aac70553b2a1fe9"
+    }
+  }
 }

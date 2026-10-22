@@ -70,10 +70,11 @@ Package authors export named functions from their entry module. Annotate the sec
 
 ## Capacity and session views
 
-Capacity coordination is opt-in: pass `config={"capacity": {"mode": "auto"}}`,
-or choose `"fixed"` for coordinated fixed targets. Omitting capacity keeps the
-legacy limits within one worker. Automatic defaults remain gated on native
-owner-crash recovery checks. Optional policy ceilings include `max_sessions`,
+On macOS, clients select automatic shared capacity by default. Elsewhere,
+omission retains legacy limits pending native acceptance. Pass
+`config={"capacity": {"mode": "auto"}}` to select auto, `"fixed"` for coordinated
+fixed targets, or `config={"capacity": None}` for legacy composition.
+Optional policy ceilings include `max_sessions`,
 `max_model_requests`, `max_jobs`, and `max_memory_bytes`; explicit legacy limits
 still apply. `capacity_status()` returns cached host targets and observations,
 or `None` for legacy composition. `reset_capacity_learning()` clears aggregate

@@ -4,7 +4,7 @@ exclude = ["registry"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 rust-version = "1.99.1"
@@ -37,12 +37,12 @@ reqwest = { version = "0.13.5", default-features = false, features = ["json", "r
 walkdir = "2"
 base64 = "0.22"
 zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2"] }
-ejm-harness-package-spec = { path = "crates/ejm-harness-package-spec", version = "0.1.0" }
-ejm-harness-packages = { path = "crates/ejm-harness-packages", version = "0.1.0" }
-ejm-harness-exec = { path = "crates/ejm-harness-exec", version = "0.1.0" }
-ejm-harness = { path = "crates/ejm-harness", version = "0.1.0" }
-ejm-harness-auth = { path = "crates/ejm-harness-auth", version = "0.1.0" }
-ejm-harness-coding = { path = "crates/ejm-harness-coding", version = "0.1.0" }
+ejm-harness-package-spec = { path = "crates/ejm-harness-package-spec", version = "0.2.0" }
+ejm-harness-packages = { path = "crates/ejm-harness-packages", version = "0.2.0" }
+ejm-harness-exec = { path = "crates/ejm-harness-exec", version = "0.2.0" }
+ejm-harness = { path = "crates/ejm-harness", version = "0.2.0" }
+ejm-harness-auth = { path = "crates/ejm-harness-auth", version = "0.2.0" }
+ejm-harness-coding = { path = "crates/ejm-harness-coding", version = "0.2.0" }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

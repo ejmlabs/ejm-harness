@@ -1,20 +1,19 @@
 # Capacity release status
 
-This branch is prepared for review. It is not a product release.
+Prepared for source release 0.2.0. Protected review and publication are pending.
 
 ## Verified locally
 
-- Exact public filesystem fork commit: `ad6faff2442ffe6abccd1856f4c0df9a3e472035`.
-- Harness and CLI source allowlists accept only that Git repository. All three consumer lockfiles resolve it.
-- Current-protocol registry open succeeds under a WAL writer; incompatible protocol and replaced database rejection pass.
-- Clean helper startup exit permits one retry; nonzero exit fails immediately; ownership release passes.
-- The scoped release integration passed strict CLI Clippy, release builds, all four Stop regressions, fixed/automatic shared-root smoke and cleanup, and all 19 retained relay backend contracts after the helper-retirement repair. See `capacity-integration-checkpoint.json` for receipts.
+- Exact public filesystem fork: `ad6faff2442ffe6abccd1856f4c0df9a3e472035`; source builds need no crates.io login.
+- Representative acceptance passed: 1,000 total agents, two processes, separate stores, three fixed sweep points and two alternating paired trials.
+- Median automatic throughput loss: -1.1594% (slightly faster than paired fixed). Median active-terminal overhead: 1.8826%. Individual second-trial overhead was 8.29%; the predeclared aggregate gate passed.
+- Required retained-sample input, Stop and selected event-to-paint p95 boundaries stayed below 50 ms. Pressure, learned restart, reservations and cleanup passed. All commands and observers were reaped.
+- Strict CLI Clippy, release helper/fixture builds, four Stop regressions and shared-root smoke passed. The earlier relay contract run passed 19 tests; controller regression run passed 18 tests.
 
-## Remaining release gates
+See [the checkpoint](capacity-integration-checkpoint.json) for exact local receipts, hashes and limits. Earlier failed trials are retained; changing host fixed rates prevent attributing the improvement solely to the tuner repair.
 
-- Finish representative workload acceptance after the helper startup repair. The last automatic case completed 6,777 useful runs but failed one run before helper readiness; cleanup passed. Automatic defaults remain disabled.
-- The final representative workload is blocked before startup by 4.4 GiB free disk, below the 10 GiB guard. No workload ran in that attempt. Source manifests still matched the passed checkpoint.
-- Obtain required CI and human review, merge through protected main, then have a current human maintainer run the source-release workflow.
-- Cargo registry credentials are not required for GitHub source builds. Registry publication, signed native artifacts and other platforms remain separate.
+## Release boundary
 
-The integration preserves current-main authentication and relay safety fixes. Unrelated credential-vault optimization, browser relay work and site redesign are excluded. Original benchmark reports and compressed raw evidence remain available locally with restoration receipts.
+macOS defaults select the measured automatic path. Linux and Windows defaults, other embedding-image calibration and broader hardware claims remain gated. Arbitrary detached macOS descendants are not proven dead; native supervision is not a sandbox. The separate sustained package-idle CPU target remains unmet.
+
+Required CI and human review must pass before protected merge. A current human maintainer must dispatch the source-release workflow. Source archives do not imply registry packages, signed installers or deployed documentation.

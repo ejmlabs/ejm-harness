@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0 - 2026-10-22
+
+- Coordinate participating processes through adaptive shared host capacity, bounded queues and local learning. Enable automatic defaults on macOS after representative 1,000-agent acceptance; other platform defaults remain gated.
+- Retain native lifetime accounting through lazy helpers, with no VM or per-job execution ledger. Native execution is not a sandbox.
+- Remove user-facing replay and fake response providers. Internal offline fixtures remain for tests.
+- Pin the public filesystem fork needed for stable native lock creation. Source builds require no crates.io token for the fork.
+
+Upgrade: replace replay provider configuration with a real provider. Explicit fixed capacity remains available. See the capacity guide for ceilings, recovery limits and measured scope. This version prepares source archives; it does not supply signed installers or registry packages.
+
 Changes follow [Semantic Versioning](https://semver.org/). Each repository is versioned independently.
 
 ## [Unreleased]

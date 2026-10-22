@@ -2,17 +2,18 @@
 
 ## Availability
 
-The capacity registry and additive executor APIs are implemented in this working
-change. Automatic defaults remain gated on native lifecycle, recovery and scale
-verification. Existing `Governor::new` and old host constructors keep their fixed,
+On macOS, the CLI and new TypeScript/Python SDK clients select automatic shared
+host capacity by default. The representative 1,000-agent, two-process acceptance
+passed on this Mac. Linux and Windows default activation remains gated. Existing
+`Governor::new`, old host constructors and raw worker omissions keep their fixed,
 local behavior. An uncoordinated legacy client is outside the shared budget.
 
 The working implementation adds a separate coarse commitment for each shared
 native helper. Targeted simultaneous-start and pool checks passed on this Mac;
-the full crash and consumer checks remain in progress. Release CLI and worker
+the scoped recovery and consumer checks passed. Release CLI and worker
 startup and control-state saturation windows now fit the provisional 32 MiB
 estimate on this Mac, after reducing unused transport buffers. Other target and
-embedding-image calibration, wider acceptance and automatic defaults stay gated.
+embedding-image calibration and wider acceptance remain open.
 See [the measured scope](#helper-commitments).
 
 The scoped macOS sampler met the owner CPU target in short samples, but its

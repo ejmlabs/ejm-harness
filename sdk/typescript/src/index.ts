@@ -206,6 +206,9 @@ export class Harness {
   }
 
   static async create(options: HarnessOptions = {}): Promise<Harness> {
+    if (process.platform === "darwin" && options.capacity === undefined) {
+      options = { ...options, capacity: { mode: "auto" } };
+    }
     const harness = new Harness(options);
     try {
       const hello = await harness.request<HelloResult>("hello", { protocol: 1 });
