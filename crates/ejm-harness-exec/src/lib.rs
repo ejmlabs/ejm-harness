@@ -3,9 +3,12 @@
 //! Native execution is not a security sandbox. Use [`Executor::capabilities`]
 //! and [`RequiredCapabilities`] to require guarantees before a command starts.
 
+mod capacity;
 mod executor;
 mod governor;
 mod monitor;
+pub mod native;
+mod observations;
 pub mod process;
 mod processes;
 
@@ -14,8 +17,13 @@ use std::{collections::BTreeMap, path::PathBuf};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+pub use capacity::{AdmissionPolicy, OperatingSnapshot, OperatingTarget};
 pub use executor::Executor;
-pub use governor::{Governor, Lease};
+pub use governor::{AdmissionEligibility, Governor, Lease, QueuedAdmission};
+pub use observations::{
+    HostObservations, HostSampler, Observation, ObservationAvailability, ObservationSource,
+    ProcessIdentity, ResourceDomainObservation, process_identity,
+};
 
 /// Aggregate admission budgets shared by every session and executor.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

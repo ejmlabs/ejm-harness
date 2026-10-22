@@ -179,7 +179,7 @@ impl OwnedChild {
         if let Some(group) = self.group {
             match kill_process_group(group, signal) {
                 Ok(()) | Err(rustix::io::Errno::SRCH) => {}
-                Err(error) => return Err(error.into()),
+                Err(error) => return Err(io::Error::from_raw_os_error(error.raw_os_error())),
             }
         }
         Ok(())
