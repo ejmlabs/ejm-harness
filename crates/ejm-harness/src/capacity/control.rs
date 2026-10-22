@@ -195,6 +195,7 @@ struct Lane {
     stable: Option<Point>,
     probe: Option<Probe>,
     cooldown: u8,
+    probe_step: usize,
 }
 
 impl Lane {
@@ -212,6 +213,7 @@ impl Lane {
             stable: None,
             probe: None,
             cooldown: 0,
+            probe_step: 0,
         }
     }
 
@@ -255,6 +257,7 @@ impl Lane {
     }
 
     fn reset_evidence(&mut self) {
+        self.probe_step = 0;
         self.stable = None;
         self.probe = None;
         self.interval = Window::default();
@@ -357,6 +360,7 @@ impl Lane {
                 self.target = probe.baseline.target;
             }
             self.stable = None;
+            self.probe_step = 0;
             self.cooldown = COOLDOWN_WINDOWS;
             return true;
         }
@@ -372,22 +376,33 @@ impl Lane {
         };
         if let Some(probe) = self.probe.take() {
             let baseline = probe.baseline;
+            let latency_ok = point.p95 <= baseline.p95_lower.saturating_add(baseline.p95_lower / 4);
             if baseline.class != class {
                 self.target = baseline.target;
                 self.stable = None;
-            } else if rate <= baseline.rate * 1.10
-                || point.p95 > baseline.p95_lower.saturating_add(baseline.p95_lower / 4)
-            {
+                self.probe_step = 0;
+            } else if rate <= baseline.rate * 1.10 || !latency_ok {
                 self.target = baseline.target;
                 self.stable = Some(baseline);
+                self.probe_step = if latency_ok {
+                    point
+                        .target
+                        .saturating_sub(baseline.target)
+                        .saturating_mul(2)
+                        .min(8)
+                } else {
+                    0
+                };
             } else {
                 self.stable = Some(point);
+                self.probe_step = 0;
             }
             self.cooldown = COOLDOWN_WINDOWS;
             return true;
         }
         if self.stable.is_some_and(|stable| stable.class != class) {
             self.stable = Some(point);
+            self.probe_step = 0;
             self.cooldown = COOLDOWN_WINDOWS;
             return false;
         }
@@ -399,7 +414,7 @@ impl Lane {
             });
             self.target = self
                 .target
-                .saturating_add((self.target / 4).clamp(1, 8))
+                .saturating_add((self.target / 4).clamp(1, 8).max(self.probe_step))
                 .min(ceiling);
             return true;
         }
@@ -648,6 +663,26 @@ mod tests {
             "equal throughput must prefer the smaller target"
         );
         assert_eq!(tuner.evidence()[0].as_ref().unwrap().target, 4);
+    }
+
+    #[test]
+    fn latency_safe_plateau_retries_a_larger_bounded_probe() {
+        let mut tuner = Tuner::new(4, 2);
+        window(&mut tuner, 8, Duration::from_millis(10), 1);
+        assert_eq!(tuner.models(), 5);
+        window(&mut tuner, 8, Duration::from_millis(10), 1);
+        assert_eq!(tuner.models(), 4);
+        for _ in 0..2 {
+            window(&mut tuner, 8, Duration::from_millis(10), 1);
+        }
+        assert_eq!(tuner.models(), 6);
+        window(&mut tuner, 12, Duration::from_millis(10), 1);
+        assert_eq!(tuner.models(), 6);
+        assert_eq!(tuner.evidence()[0].as_ref().unwrap().target, 6);
+        assert_eq!(tuner.model.probe_step, 0);
+        tuner.model.probe_step = 8;
+        tuner.model.reduce();
+        assert_eq!(tuner.model.probe_step, 0);
     }
 
     #[test]

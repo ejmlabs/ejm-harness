@@ -1500,3 +1500,9 @@ Harness, CLI and IDE Cargo metadata resolve `ejm-rightkit-fs` version `0.4.4-ejm
 The v10 continuation completed 6,777 useful runs in its first automatic case but failed one run because its helper exited before startup. Cleanup passed with no unresolved helper or client identities. Renewal diagnostics also observed transient database contention that subsequently recovered. This does not establish workload acceptance.
 
 The helper may retire after two idle seconds while its launching client is unscheduled. Startup now permits one rediscovery only after a verified successful child exit, before any command submission. Error exits remain failures and include exit status. Each attempt reacquires ownership and generation admission. The release-profile regression `startup_exit_retries_only_clean_exit_and_remains_bounded` passed on macOS, covering clean-exit retry count, immediate error-exit failure and released ownership. Full workload validation remains pending.
+
+### 2026-10-22 representative acceptance and probe repair
+
+The exact integration checkpoint passed. All nine planned cases completed with successful cleanup, and the one permitted extra triplet also completed. Median automatic throughput loss across all three pairs was 26.3257 percent, above the unchanged 10 percent limit. Latency and median terminal-overhead gates passed. Do not enable automatic defaults or claim throughput acceptance. The evidence is retained in `/private/tmp/ejm-capacity-critical-comparison-20261022-extra-pair/20261022T102724Z-75877202/report.json`.
+
+Controller samples showed repeated rejected one-slot recovery probes. The bounded wider-probe repair passed all 18 controller regressions, including latency, grant refusal, unknown pressure and plateau recovery. Representative acceptance of this repair remains pending.

@@ -285,3 +285,7 @@ The harness reads the committed protocol before requesting a schema write lock. 
 ## Helper retirement during startup
 
 Before readiness or any command submission, a clean helper exit may indicate idle retirement while the client was unscheduled. The executor permits one rediscovery after a verified successful exit, reacquiring the stable owner lock and a fresh accounted generation. Nonzero exits fail with exit status. The existing caller deadline still bounds readiness. No command is retried, no live witness is released and no shared row is refunded by timeout. Verify bounded clean-exit rediscovery and immediate failure on nonzero exit.
+
+## Recovery after an inconclusive small probe
+
+The representative workload on 2026-10-22 completed safely but missed automatic throughput acceptance. A rejected one-slot probe repeats unchanged after every cooldown. Permit a larger subsequent probe only when comparable work misses the throughput gain threshold while still meeting the existing latency guard. Double the probe distance up to the existing eight-slot maximum and keep the same hard ceiling, full-grant evidence, one-lane attribution, pressure backoff and cooldown. Reset the distance after acceptance, latency regression, class change, grant refusal or pressure. The extension adds one bounded integer per lane and no persisted state. Verify a flat small step followed by useful larger growth, plus existing pressure and latency regressions; measure before activation.

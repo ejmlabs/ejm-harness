@@ -114,3 +114,5 @@ remains gated until registry retrieval verifies the new package.
 - [x] 9.3 Remove unnecessary current-protocol schema writes during registry open; retain locked version recheck for creation and migration, privacy checks and existing contention budgets. Verify opening under an active WAL writer and existing protocol rejection.
 
 - [x] 9.4 Permit one pre-command rediscovery after verified clean helper startup exit; preserve caller deadlines, generation admission and lifetime witnesses, reject nonzero exits, and verify the bounded retry contract.
+
+- [ ] 9.5 Let comparable, latency-safe probes with insufficient gain widen their next bounded step up to eight slots. Preserve all grant, pressure, latency and cooldown guards; reset exploration when evidence changes. Verify plateau recovery and existing controller regressions, then rerun representative acceptance before enabling defaults.
