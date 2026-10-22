@@ -1,14 +1,17 @@
-use super::{Harness, ModelWaiter, RunCompletion, ToolContext, hooks::bound_output};
+use super::{
+    Harness, ModelWaiter, RunCompletion, ToolContext, hooks::bound_output, scheduling::Phase,
+};
 use crate::{
     Effect, EventKind, HookContext, Message, ModelDelta, ModelRequest, ModelResponse, RunStatus,
     RunSummary, Session, StepDecision, ToolCall, ToolOutput, Usage, types::timestamp_ms,
 };
 use anyhow::{Context, Result, bail, ensure};
 use futures_util::FutureExt;
+use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
     sync::{Arc, atomic::Ordering},
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tokio::sync::{Mutex, mpsc, watch};
 use tokio_util::sync::CancellationToken;
@@ -61,28 +64,7 @@ impl Harness {
                 }
                 summary.error = Some(format!("{error:#}"));
             }
-            // Cancellation can interrupt a multi-tool response. Close every outstanding pair explicitly.
-            if let Err(error) = self.close_pending(&session.id).await {
-                summary.status = RunStatus::Failed;
-                summary.error = Some(format!("journal unavailable, effects stopped: {error:#}"));
-                self.inner.stopped.cancel();
-            }
-            if let Err(error) = self
-                .emit(
-                    &session.id,
-                    Some(&run_id),
-                    EventKind::RunFinished {
-                        summary: summary.clone(),
-                    },
-                )
-                .await
-            {
-                summary.status = RunStatus::Failed;
-                summary.error = Some(format!("could not persist completion: {error:#}"));
-                self.inner.stopped.cancel();
-            } else {
-                self.observe_run_end(&context, &summary).await;
-            }
+            self.finish_turn(&context, &mut summary).await;
             let mut active = self.inner.active.lock().await;
             let Some(entry) = active.get_mut(&session.id) else {
                 let _ = done.send(Some(RunCompletion {
@@ -109,6 +91,22 @@ impl Harness {
             if let Some(next) = next {
                 prompt = next;
                 run_id = uuid::Uuid::new_v4().to_string();
+                if self
+                    .emit(
+                        &session.id,
+                        Some(&run_id),
+                        EventKind::RunStarted {
+                            prompt: prompt.clone(),
+                        },
+                    )
+                    .await
+                    .is_err()
+                {
+                    self.inner.stopped.cancel();
+                    active.remove(&session.id);
+                    self.inner.changed.notify_waiters();
+                    break;
+                }
                 entry.id.clone_from(&run_id);
                 cancel = self.inner.stopped.child_token();
                 entry.cancel = cancel.clone();
@@ -134,14 +132,6 @@ impl Harness {
     ) -> Result<()> {
         let run_id = &context.run_id;
         let cancel = &context.cancel;
-        self.emit(
-            &session.id,
-            Some(run_id),
-            EventKind::RunStarted {
-                prompt: prompt.clone(),
-            },
-        )
-        .await?;
         let prompt = self.prepare_prompt(context, prompt).await?;
         self.inner
             .store
@@ -158,24 +148,7 @@ impl Harness {
                     .message(&session.id, Message::user(text))
                     .await?;
             }
-            let messages = self.prepare_context(session, &context).await?;
-            if summary.usage.input_tokens >= self.inner.config.max_input_tokens
-                || summary.usage.output_tokens >= self.inner.config.max_output_tokens
-            {
-                summary.status = RunStatus::BudgetExhausted;
-                bail!("token budget exhausted");
-            }
-            let request = ModelRequest {
-                system: self.inner.config.system_prompt.clone(),
-                messages,
-                tools: self.inner.definitions.clone(),
-                max_output_tokens: u32::try_from(
-                    (self.inner.config.max_output_tokens - summary.usage.output_tokens).min(4096),
-                )?,
-            };
-            let response = self
-                .model_step(session, run_id, step, request, cancel)
-                .await?;
+            let (response, memory) = self.prepared_response(session, &context, summary).await?;
             summary.steps = step;
             summary.text.clone_from(&response.content);
             summary.usage.add(&response.usage);
@@ -187,18 +160,29 @@ impl Harness {
                 },
             )
             .await?;
-            self.inner
+            let assistant_sequence = self
+                .inner
                 .store
                 .message(&session.id, Message::assistant(&response))
                 .await?;
+            let calls: Vec<_> = response
+                .tool_calls
+                .iter()
+                .map(|call| call.id.clone())
+                .collect();
             if self
-                .apply_steering(session, run_id, &response.tool_calls, steering)
+                .apply_steering(session, run_id, assistant_sequence, &calls, steering)
                 .await?
             {
                 continue;
             }
+            let plan = self
+                .plan_response_tools(session, &context, &response, assistant_sequence)
+                .await?;
+            drop(response);
+            drop(memory);
             let executed = self
-                .execute_response_tools(session, &context, &response, &mut repeats, steering)
+                .execute_response_tools(session, &context, plan, &mut repeats, steering)
                 .await;
             if repeats.exhausted {
                 summary.status = RunStatus::BudgetExhausted;
@@ -209,6 +193,103 @@ impl Harness {
         }
         summary.status = RunStatus::BudgetExhausted;
         bail!("step budget exhausted")
+    }
+
+    async fn finish_turn(&self, context: &HookContext, summary: &mut RunSummary) {
+        // Cancellation can interrupt a multi-tool response. Close every outstanding pair explicitly.
+        if let Err(error) = self.close_pending(&context.session_id).await {
+            summary.status = RunStatus::Failed;
+            summary.error = Some(format!("journal unavailable, effects stopped: {error:#}"));
+            self.inner.stopped.cancel();
+        }
+        if let Err(error) = self
+            .emit(
+                &context.session_id,
+                Some(&context.run_id),
+                EventKind::RunFinished {
+                    summary: summary.clone(),
+                },
+            )
+            .await
+        {
+            summary.status = RunStatus::Failed;
+            summary.error = Some(format!("could not persist completion: {error:#}"));
+            self.inner.stopped.cancel();
+        } else {
+            self.observe_run_end(context, summary).await;
+        }
+    }
+
+    async fn prepared_response(
+        &self,
+        session: &Session,
+        context: &HookContext,
+        summary: &mut RunSummary,
+    ) -> Result<(ModelResponse, Option<ejm_harness_exec::Lease>)> {
+        let cancel = &context.cancel;
+        let run_id = &context.run_id;
+        let step = context.step;
+        let queued_at = Instant::now();
+        let mut work = self
+            .inner
+            .capacity
+            .as_ref()
+            .map(|capacity| capacity.model_work(cancel, queued_at));
+        self.inner.model_waiters.fetch_add(1, Ordering::Relaxed);
+        let waiting = ModelWaiter {
+            count: &self.inner.model_waiters,
+            _activity: self.inner.scheduling.enter(Phase::ModelWaiting),
+        };
+        let slot = tokio::select! {
+            biased;
+            ()=cancel.cancelled()=>bail!("cancelled before model admission"),
+            slot=self.inner.model_slots.clone().acquire_owned()=>slot?,
+        };
+        let capacity_lease = match &self.inner.capacity {
+            Some(capacity) => Some(capacity.acquire_model(cancel).await?),
+            None => None,
+        };
+        let memory = match &self.inner.capacity {
+            Some(capacity) => Some(capacity.context_memory(&session.id, cancel).await?),
+            None => None,
+        };
+        drop(waiting);
+        let preparing = self.inner.scheduling.enter(Phase::ModelPreparing);
+        if let Some(work) = work.as_mut() {
+            work.prepare_started();
+        }
+        let messages = self.prepare_context(session, context).await?;
+        if summary.usage.input_tokens >= self.inner.config.max_input_tokens
+            || summary.usage.output_tokens >= self.inner.config.max_output_tokens
+        {
+            summary.status = RunStatus::BudgetExhausted;
+            bail!("token budget exhausted");
+        }
+        let request = ModelRequest {
+            system: self.inner.config.system_prompt.clone(),
+            messages,
+            tools: self.inner.definitions.clone(),
+            max_output_tokens: u32::try_from(
+                (self.inner.config.max_output_tokens - summary.usage.output_tokens).min(4096),
+            )?,
+        };
+        if let Some(work) = work.as_mut() {
+            let bytes = request.messages.iter().fold(0_u64, |bytes, message| {
+                bytes.saturating_add(u64::try_from(message.content.len()).unwrap_or(u64::MAX))
+            });
+            work.prepared(bytes);
+        }
+        drop(preparing);
+        let response = self
+            .model_step(session, run_id, step, request, cancel, work.as_mut())
+            .await?;
+        if let Some(work) = work.as_mut() {
+            work.complete();
+        }
+        drop(work);
+        drop(capacity_lease);
+        drop(slot);
+        Ok((response, memory))
     }
 
     async fn prepare_context(
@@ -253,18 +334,12 @@ impl Harness {
         step: u32,
         request: ModelRequest,
         cancel: &CancellationToken,
+        work: Option<&mut crate::capacity::ModelWork>,
     ) -> Result<ModelResponse> {
-        self.inner.model_waiters.fetch_add(1, Ordering::Relaxed);
-        let waiting = ModelWaiter(&self.inner.model_waiters);
-        let slot = tokio::select! {
-            biased;
-            () = cancel.cancelled() => bail!("cancelled"),
-            slot = self.inner.model_slots.clone().acquire_owned() => slot?,
-        };
-        drop(waiting);
         self.emit(&session.id, Some(run), EventKind::ModelStarted { step })
             .await?;
         let (deltas, mut receiver) = mpsc::channel(16);
+        let waiting = self.inner.scheduling.enter(Phase::ProviderWaiting);
         let selected = self
             .inner
             .provider
@@ -273,7 +348,24 @@ impl Harness {
             .provider
             .clone()
             .context("model provider is not configured")?;
-        let provider = selected.stream(request, cancel.child_token(), deltas);
+        let quota = match &self.inner.capacity {
+            Some(capacity) => Some(capacity.acquire_provider(&request, cancel).await?),
+            None => None,
+        };
+        drop(waiting);
+        let provider = async {
+            let _running = self.inner.scheduling.enter(Phase::ModelRunning);
+            if let Some(work) = work {
+                work.provider_started();
+            }
+            if let Some(quota) = &quota {
+                selected
+                    .stream_with_capacity(request, cancel.child_token(), deltas, quota.observer())
+                    .await
+            } else {
+                selected.stream(request, cancel.child_token(), deltas).await
+            }
+        };
         tokio::pin!(provider);
         let mut streamed = String::new();
         let mut response = loop {
@@ -298,7 +390,6 @@ impl Harness {
             streamed.push_str(&text);
             self.emit_text(&session.id, run, &text).await?;
         }
-        drop(slot);
         validate_response(&response)?;
         // Invocation identity belongs to the harness across concurrent provider sessions.
         for call in &mut response.tool_calls {
@@ -319,7 +410,8 @@ impl Harness {
         &self,
         session: &Session,
         run: &str,
-        calls: &[ToolCall],
+        assistant_sequence: i64,
+        calls: &[String],
         steering: &mut mpsc::Receiver<String>,
     ) -> Result<bool> {
         let mut incoming = vec![];
@@ -329,11 +421,16 @@ impl Harness {
         if incoming.is_empty() {
             return Ok(false);
         }
-        for call in calls {
+        for id in calls {
+            let call = self
+                .inner
+                .store
+                .tool_call(&session.id, assistant_sequence, id)
+                .await?;
             self.record_output(
                 session,
                 run,
-                call,
+                &call,
                 ToolOutput::error("Skipped because the user steered this turn before execution."),
             )
             .await?;
@@ -347,16 +444,14 @@ impl Harness {
         Ok(true)
     }
 
-    async fn execute_response_tools(
+    async fn plan_response_tools(
         &self,
         session: &Session,
         context: &HookContext,
         response: &ModelResponse,
-        repeats: &mut RepeatCounts,
-        steering: &mut mpsc::Receiver<String>,
-    ) -> Result<bool> {
+        assistant_sequence: i64,
+    ) -> Result<ToolPlan> {
         let run = &context.run_id;
-        let cancel = &context.cancel;
         let (complete, calls) = match self.inner.strategy.decide(response)? {
             StepDecision::Complete => (true, vec![]),
             StepDecision::Execute(calls) => (false, calls),
@@ -384,14 +479,55 @@ impl Harness {
                 .await?;
             }
         }
-        for (index, original) in calls.iter().enumerate() {
+        Ok(ToolPlan {
+            assistant_sequence,
+            complete,
+            calls: calls.into_iter().map(|call| call.id).collect(),
+        })
+    }
+
+    async fn execute_response_tools(
+        &self,
+        session: &Session,
+        context: &HookContext,
+        plan: ToolPlan,
+        repeats: &mut RepeatCounts,
+        steering: &mut mpsc::Receiver<String>,
+    ) -> Result<bool> {
+        let run = &context.run_id;
+        let cancel = &context.cancel;
+        for (index, id) in plan.calls.iter().enumerate() {
+            let queued_at = Instant::now();
+            let mut work = self
+                .inner
+                .capacity
+                .as_ref()
+                .map(|capacity| capacity.tool_work(cancel, queued_at));
+            let waiting = self.inner.scheduling.enter(Phase::ToolDispatchWaiting);
+            let _dispatch = tokio::select! {
+                biased;
+                ()=cancel.cancelled()=>bail!("cancelled before tool dispatch"),
+                slot=self.inner.tool_dispatch.clone().acquire_owned()=>slot?,
+            };
+            drop(waiting);
             ensure!(!cancel.is_cancelled(), "cancelled");
             if self
-                .apply_steering(session, run, &calls[index..], steering)
+                .apply_steering(
+                    session,
+                    run,
+                    plan.assistant_sequence,
+                    &plan.calls[index..],
+                    steering,
+                )
                 .await?
             {
                 return Ok(false);
             }
+            let original = self
+                .inner
+                .store
+                .tool_call(&session.id, plan.assistant_sequence, id)
+                .await?;
             let (call, skipped) = self
                 .prepare_tool_call(context, original.clone())
                 .await
@@ -402,7 +538,7 @@ impl Harness {
                     )
                 });
             ensure!(!cancel.is_cancelled(), "cancelled");
-            let signature = format!("{}:{}", call.name, call.arguments);
+            let signature = call_signature(&call)?;
             let count = repeats.total.entry(signature).or_default();
             *count += 1;
             if *count > self.inner.config.max_repeated_calls {
@@ -418,10 +554,11 @@ impl Harness {
             let output = if let Some(output) = skipped {
                 output
             } else {
-                self.execute_tool(session, run, &call, cancel, steering)
+                self.execute_tool(session, run, &call, cancel, steering, work.as_mut())
                     .await
                     .unwrap_or_else(|error| ToolOutput::error(format!("{error:#}")))
             };
+            drop(work);
             if self.inner.hooks.is_empty() {
                 self.record_output(session, run, &call, output).await?;
             } else {
@@ -429,7 +566,7 @@ impl Harness {
                     .await?;
             }
         }
-        Ok(complete)
+        Ok(plan.complete)
     }
 
     async fn emit_text(&self, session: &str, run: &str, text: &str) -> Result<()> {
@@ -459,6 +596,7 @@ impl Harness {
         call: &ToolCall,
         cancel: &CancellationToken,
         steering: &mpsc::Receiver<String>,
+        mut work: Option<&mut crate::capacity::ToolWork>,
     ) -> Result<ToolOutput> {
         let tool = self
             .inner
@@ -490,12 +628,20 @@ impl Harness {
             Some(lock)
         };
         let effect_guard = match lock {
-            Some(lock) => Some(
-                tokio::select! { biased; () = cancel.cancelled() => bail!("cancelled"), guard = lock.lock_owned() => Arc::new(guard) },
-            ),
+            Some(lock) => {
+                let _waiting = self.inner.scheduling.enter(Phase::WorkspaceWaiting);
+                Some(
+                    tokio::select! { biased; () = cancel.cancelled() => bail!("cancelled"), guard = lock.lock_owned() => Arc::new(guard) },
+                )
+            }
             None => None,
         };
-        let lease = if let Some(reservation) = tool.reservation() {
+        let reservation = tool.reservation();
+        let work_bytes = reservation
+            .as_ref()
+            .map_or(64 * 1024 * 1024, |reservation| reservation.memory_bytes);
+        let lease = if let Some(reservation) = reservation {
+            let _waiting = self.inner.scheduling.enter(Phase::ToolResourceWaiting);
             Some(
                 self.inner
                     .governor
@@ -517,6 +663,7 @@ impl Harness {
             cwd: session.cwd.clone(),
             cancel: cancel.child_token(),
             governor: self.inner.governor.clone(),
+            native_owner: self.native_owner(),
             effect_guard,
             store: self.inner.store.clone(),
             events: self.inner.events.clone(),
@@ -525,7 +672,17 @@ impl Harness {
             steering.is_empty(),
             "Skipped because the user steered before tool execution."
         );
-        let output = tokio::select! { biased; () = cancel.cancelled() => bail!("cancelled; effect outcome may be uncertain"), output = tool.execute(call.clone(), context) => output };
+        let executing = async {
+            let _running = self.inner.scheduling.enter(Phase::ToolRunning);
+            if let Some(work) = work.as_mut() {
+                work.running(work_bytes);
+            }
+            tool.execute(call.clone(), context).await
+        };
+        let output = tokio::select! { biased; () = cancel.cancelled() => bail!("cancelled; effect outcome may be uncertain"), output = executing => output };
+        if let Some(work) = work.as_mut() {
+            work.complete(output.as_ref().is_ok_and(|output| !output.is_error));
+        }
         drop(lease);
         output
     }
@@ -586,6 +743,20 @@ fn validate_response(response: &ModelResponse) -> Result<()> {
 
 #[derive(Default)]
 struct RepeatCounts {
-    total: HashMap<String, u32>,
+    total: HashMap<[u8; 32], u32>,
     exhausted: bool,
+}
+
+struct ToolPlan {
+    assistant_sequence: i64,
+    complete: bool,
+    calls: Vec<String>,
+}
+
+fn call_signature(call: &ToolCall) -> Result<[u8; 32]> {
+    let mut digest = Sha256::new();
+    digest.update(u64::try_from(call.name.len())?.to_le_bytes());
+    digest.update(call.name.as_bytes());
+    digest.update(serde_json::to_vec(&call.arguments)?);
+    Ok(digest.finalize().into())
 }

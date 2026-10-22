@@ -6,9 +6,9 @@ forbidden = ["ejm-harness", "ejm-harness-coding", "ejm-harness-worker", "clap", 
 reason = "Admission and native process ownership work without an engine, provider, transport, or UI."
 
 [crates.ejm-harness]
-internal = ["ejm-harness-exec", "ejm-harness-auth"]
+internal = ["ejm-harness-exec", "ejm-harness-auth", "ejm-harness"]
 forbidden = ["ejm-harness-coding", "ejm-harness-worker", "clap", "ratatui", "crossterm", "axum"]
-reason = "The engine owns policy and ports; hosts inject providers and tools through public traits."
+reason = "The engine owns policy and ports; hosts inject providers and tools through public traits. Its dev-only self dependency enables test-support for integration fixtures without enabling production defaults."
 
 [crates.ejm-harness-auth]
 internal = []

@@ -1,5 +1,5 @@
 import { type ChildProcessWithoutNullStreams } from "node:child_process";
-import type { ConfigureParams, Effect, Event, GovernorSnapshot, RunStarted, RunSummary, Session as SessionInfo, HarnessSnapshot, PackageInfo, ToolDefinition, ToolOutput } from "./protocol.js";
+import type { ConfigureParams, CapacitySnapshot, Effect, Event, EventPage, EventsPageParams, GovernorSnapshot, RunStarted, RunSummary, SchedulingSnapshot, Session as SessionInfo, SessionPage, SessionQuery, SessionTailOptions, SessionView, HarnessSnapshot, PackageInfo, ToolDefinition, ToolOutput } from "./protocol.js";
 export type * from "./protocol.js";
 export declare class HarnessError extends Error {
     readonly code: string;
@@ -71,6 +71,7 @@ export declare class Harness {
     private exited;
     private chunks;
     private inputBytes;
+    private capabilities;
     private constructor();
     static create(options?: HarnessOptions): Promise<Harness>;
     createSession(options?: {
@@ -78,8 +79,18 @@ export declare class Harness {
         title?: string;
     }): Promise<Session>;
     listSessions(): Promise<Session[]>;
+    /** Read a bounded page. Keep its opaque cursor with the same query. */
+    sessionsPage(query?: Partial<SessionQuery>): Promise<SessionPage>;
+    resolveSession(prefix: string): Promise<Session>;
+    sessionView(sessionId: string, bounds?: Partial<SessionTailOptions>): Promise<SessionView>;
+    eventsPage(sessionId: string, options: Omit<EventsPageParams, "session_id">): Promise<EventPage>;
+    /** Null means this worker uses the legacy process-local fixed composition. */
+    capacityStatus(): Promise<CapacitySnapshot | null>;
+    resetCapacityLearning(): Promise<number>;
     governor(): Promise<GovernorSnapshot>;
     status(): Promise<HarnessSnapshot>;
+    /** Cached local engine phases; callback counts do not prove native child exit. */
+    schedulingStatus(): Promise<SchedulingSnapshot>;
     listPackages(): Promise<PackageInfo[]>;
     /** Reload idle runtime code while keeping the configured manifest and grants. */
     reloadPackage(packageName: string): Promise<void>;
@@ -99,6 +110,7 @@ export declare class Harness {
     cursor(sessionId: string): number;
     changed(sessionId: string): Promise<void>;
     private assertOpen;
+    private requireCapability;
     private encode;
     private send;
     private sendFrame;
@@ -116,6 +128,8 @@ export declare class Session {
         signal?: AbortSignal;
     }): Promise<Run>;
     events(after?: number, limit?: number): Promise<Event[]>;
+    view(bounds?: Partial<SessionTailOptions>): Promise<SessionView>;
+    eventsPage(options: Omit<EventsPageParams, "session_id">): Promise<EventPage>;
     invokePackageCommand(packageName: string, name: string, args?: unknown): Promise<unknown>;
     renderPackageWidget(packageName: string, name: string, args?: unknown): Promise<unknown>;
 }

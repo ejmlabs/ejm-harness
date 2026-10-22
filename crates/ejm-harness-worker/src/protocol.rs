@@ -2,8 +2,9 @@
 use std::{fmt, path::PathBuf};
 
 use ejm_harness::{
-    Event, HarnessSnapshot, ModelResponse, RunSummary, Session, SessionOptions, ToolDefinition,
-    ToolOutput,
+    CapacityPolicy, CapacitySnapshot, Event, EventPage, HarnessSnapshot, ProviderRate, RunSummary,
+    SchedulingSnapshot, Session, SessionOptions, SessionPage, SessionQuery, SessionTailOptions,
+    SessionView, ToolDefinition, ToolOutput,
 };
 use ejm_harness_exec::{GovernorSnapshot, ResourceLimits};
 use ejm_harness_package_spec::Manifest;
@@ -33,6 +34,12 @@ pub enum ClientCall {
     SessionCreate(SessionOptions),
     #[serde(rename = "session.list")]
     SessionList(EmptyParams),
+    #[serde(rename = "session.page")]
+    SessionPage(SessionQuery),
+    #[serde(rename = "session.resolve")]
+    SessionResolve(SessionResolveParams),
+    #[serde(rename = "session.view")]
+    SessionView(SessionViewParams),
     #[serde(rename = "run.start")]
     RunStart(StartParams),
     #[serde(rename = "run.cancel")]
@@ -43,10 +50,18 @@ pub enum ClientCall {
     RunQueue(TextParams),
     #[serde(rename = "events.list")]
     EventsList(EventsParams),
+    #[serde(rename = "events.page")]
+    EventsPage(EventsPageParams),
+    #[serde(rename = "capacity.status")]
+    CapacityStatus(EmptyParams),
+    #[serde(rename = "capacity.reset")]
+    CapacityReset(EmptyParams),
     #[serde(rename = "governor.status")]
     GovernorStatus(EmptyParams),
     #[serde(rename = "harness.status")]
     HarnessStatus(EmptyParams),
+    #[serde(rename = "scheduling.status")]
+    SchedulingStatus(EmptyParams),
     #[serde(rename = "package.list")]
     PackageList(PackageListParams),
     #[serde(rename = "package.reload")]
@@ -71,6 +86,7 @@ pub struct HelloParams {
 pub struct ConfigureParams {
     pub state_dir: Option<PathBuf>,
     pub provider: Option<ProviderConfig>,
+    pub provider_capacity: Option<ProviderQuotaConfig>,
     #[serde(default)]
     pub tools: Vec<ToolDefinition>,
     #[serde(default)]
@@ -80,6 +96,8 @@ pub struct ConfigureParams {
     #[serde(default)]
     pub allow_shell: bool,
     pub resources: Option<ResourceLimits>,
+    /// Omission preserves the original fixed, process-local configuration.
+    pub capacity: Option<CapacityPolicy>,
     pub max_sessions: Option<usize>,
     pub max_model_requests: Option<usize>,
     pub max_steps: Option<u32>,
@@ -92,13 +110,24 @@ pub struct ConfigureParams {
     pub system_prompt: Option<String>,
 }
 
+/// Owner-supplied quota identity. Never derive this UUID from credentials.
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
+pub struct ProviderQuotaConfig {
+    pub account_uuid: String,
+    #[serde(default = "default_quota_family")]
+    pub family: String,
+    pub max_in_flight: Option<usize>,
+    pub requests: Option<ProviderRate>,
+    pub tokens: Option<ProviderRate>,
+}
+
+fn default_quota_family() -> String {
+    "shared".into()
+}
+
 #[derive(Clone, Deserialize, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ProviderConfig {
-    Echo,
-    Replay {
-        responses: Vec<ModelResponse>,
-    },
     Openai {
         base_url: String,
         api_key: String,
@@ -122,11 +151,6 @@ pub enum ProviderConfig {
 impl fmt::Debug for ProviderConfig {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Echo => formatter.write_str("Echo"),
-            Self::Replay { responses } => formatter
-                .debug_struct("Replay")
-                .field("responses", responses)
-                .finish(),
             Self::Openai { model, .. } => formatter
                 .debug_struct("Openai")
                 .field("model", model)
@@ -227,6 +251,33 @@ pub struct EventsParams {
     pub after: u64,
     #[serde(default = "default_page_limit")]
     pub limit: usize,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+pub struct SessionResolveParams {
+    pub prefix: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+pub struct SessionViewParams {
+    pub session_id: String,
+    #[serde(default)]
+    pub bounds: SessionTailOptions,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+pub struct EventsPageParams {
+    pub session_id: String,
+    #[serde(default)]
+    pub after: u64,
+    pub through: u64,
+    #[serde(default)]
+    pub bounds: SessionTailOptions,
+}
+
+#[derive(Debug, Deserialize, Serialize, JsonSchema)]
+pub struct CapacityResetResult {
+    pub profiles_reset: usize,
 }
 
 fn default_page_limit() -> usize {
@@ -351,10 +402,16 @@ pub struct ProtocolSchema {
     tool_request: ToolRequest,
     tool_output: ToolOutput,
     session: Session,
+    session_page: SessionPage,
+    session_view: SessionView,
+    event_page: EventPage,
+    capacity: CapacitySnapshot,
+    capacity_reset: CapacityResetResult,
     run_started: RunStarted,
     run_summary: RunSummary,
     governor: GovernorSnapshot,
     harness: HarnessSnapshot,
+    scheduling: SchedulingSnapshot,
     hello: HelloResult,
     package_page: PackagePage,
 }

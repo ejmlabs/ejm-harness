@@ -33,12 +33,21 @@ pub struct ToolContext {
     pub cwd: PathBuf,
     pub cancel: CancellationToken,
     pub governor: Arc<Governor>,
+    pub(super) native_owner: Option<ejm_harness_exec::native::NativeOwner>,
     pub(super) effect_guard: Option<Arc<OwnedMutexGuard<()>>>,
     pub(super) store: Store,
     pub(super) events: broadcast::Sender<Event>,
 }
 
 impl ToolContext {
+    /// Share the prepared native owner with an executor using this governor.
+    ///
+    /// Legacy harnesses return `None`. Reading the handle starts no helper.
+    #[must_use]
+    pub fn native_owner(&self) -> Option<ejm_harness_exec::native::NativeOwner> {
+        self.native_owner.clone()
+    }
+
     /// Retain effect serialization until work has actually stopped.
     ///
     /// Move this token into blocking work or an executor supervisor that can outlive

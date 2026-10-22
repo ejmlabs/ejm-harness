@@ -42,7 +42,9 @@ rustix = { workspace = true, features = ["process", "fs"] }
 rightkit-fs = { workspace = true, features = ["fs"] }
 
 [dev-dependencies]
+ejm-harness = { workspace = true, features = ["test-support"] }
 wiremock.workspace = true
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 
 [lints]
 workspace = true

@@ -18,14 +18,22 @@ from typing import Any, Generic, TypeVar, cast
 from uuid import uuid4
 
 from .protocol import (
+    CapacityResetResult,
+    CapacitySnapshot,
     ConfigureParams,
     Event,
+    EventPage,
     GovernorSnapshot,
     HarnessSnapshot,
     PackageInfo,
     PackagePage,
     RunStarted,
     RunSummary,
+    SchedulingSnapshot,
+    SessionPage,
+    SessionQuery,
+    SessionTailOptions,
+    SessionView,
     ToolDefinition,
     ToolInvocation,
     ToolOutput,
@@ -41,6 +49,8 @@ MAX_QUEUED = 256
 NORMAL_REQUESTS = 56
 CONTROL_REQUESTS = MAX_PENDING - NORMAL_REQUESTS
 CLEANUP_TIMEOUT = 5
+MAX_SESSION_HINTS = 1000
+MAX_SESSION_WAITS = 4096
 T = TypeVar("T")
 
 
@@ -114,7 +124,11 @@ class AsyncHarness:
         if len(self._tools) != len(tools) or len(tools) > MAX_PENDING:
             raise ValueError("tool names must be unique, with at most 64 tools")
         self._worker_path = str(
-            worker_path or os.environ.get("EJM_HARNESS_WORKER_PATH", "ejm-harness-worker")
+            worker_path
+            or os.environ.get(
+                "EJM_HARNESS_WORKER_PATH",
+                "ejm-harness-worker.exe" if os.name == "nt" else "ejm-harness-worker",
+            )
         )
         self._request_timeout = request_timeout
         self._process: asyncio.subprocess.Process | None = None
@@ -123,6 +137,7 @@ class AsyncHarness:
         self._tasks: set[asyncio.Task[None]] = set()
         self._cursors: dict[str, int] = {}
         self._changes: dict[str, asyncio.Event] = {}
+        self._capabilities: set[str] = set()
         self._failure: Exception | None = None
         self._closing = False
         self._send_lock = asyncio.Lock()
@@ -169,6 +184,15 @@ class AsyncHarness:
                 isinstance(provider, dict) and provider.get("kind") == "package"
             )
             capabilities = hello.get("capabilities")
+            self._capabilities = (
+                {value for value in capabilities if isinstance(value, str)}
+                if isinstance(capabilities, list)
+                else set()
+            )
+            if self._config.get("capacity") is not None:
+                self._require_capability("capacity")
+            if self._config.get("provider_capacity") is not None:
+                self._require_capability("provider_capacity")
             if packages_requested and (
                 not isinstance(capabilities, list) or "packages" not in capabilities
             ):
@@ -207,11 +231,73 @@ class AsyncHarness:
         sessions = cast("list[SessionInfo]", await self._request("session.list", {}))
         return [AsyncSession(self, info) for info in sessions]
 
+    async def sessions_page(self, query: SessionQuery | None = None) -> SessionPage:
+        """Read a bounded page. Keep its opaque cursor with the same query."""
+        self._require_capability("session_views")
+        return cast("SessionPage", await self._request("session.page", query or {}))
+
+    async def resolve_session(self, prefix: str) -> AsyncSession:
+        self._require_capability("session_views")
+        info = cast("SessionInfo", await self._request("session.resolve", {"prefix": prefix}))
+        return AsyncSession(self, info)
+
+    async def session_view(
+        self, session_id: str, *, bounds: SessionTailOptions | None = None
+    ) -> SessionView:
+        self._require_capability("session_views")
+        return cast(
+            "SessionView",
+            await self._request("session.view", {"session_id": session_id, "bounds": bounds or {}}),
+        )
+
+    async def events_page(
+        self,
+        session_id: str,
+        through: int,
+        *,
+        after: int = 0,
+        bounds: SessionTailOptions | None = None,
+    ) -> EventPage:
+        self._require_capability("session_views")
+        return cast(
+            "EventPage",
+            await self._request(
+                "events.page",
+                {
+                    "session_id": session_id,
+                    "after": after,
+                    "through": through,
+                    "bounds": bounds or {},
+                },
+            ),
+        )
+
+    async def capacity_status(self) -> CapacitySnapshot | None:
+        """None means the worker uses legacy process-local fixed composition."""
+        self._require_capability("capacity")
+        return cast("CapacitySnapshot | None", await self._request("capacity.status", {}))
+
+    async def reset_capacity_learning(self) -> int:
+        self._require_capability("capacity")
+        result = cast("CapacityResetResult", await self._request("capacity.reset", {}))
+        return result["profiles_reset"]
+
+    def _require_capability(self, capability: str) -> None:
+        if capability not in self._capabilities:
+            raise HarnessError(
+                "protocol", f"update ejm-harness-worker to a version that supports {capability}"
+            )
+
     async def governor(self) -> GovernorSnapshot:
         return cast("GovernorSnapshot", await self._request("governor.status", {}))
 
     async def status(self) -> HarnessSnapshot:
         return cast("HarnessSnapshot", await self._request("harness.status", {}))
+
+    async def scheduling_status(self) -> SchedulingSnapshot:
+        """Read cached local phases; callback completion does not prove native exit."""
+        self._require_capability("scheduling")
+        return cast("SchedulingSnapshot", await self._request("scheduling.status", {}))
 
     async def list_packages(self) -> list[PackageInfo]:
         packages: list[PackageInfo] = []
@@ -437,11 +523,10 @@ class AsyncHarness:
                 elif method == "event":
                     event = cast("Event", value["params"])
                     session_id = event["session_id"]
-                    if session_id not in self._cursors and len(self._cursors) >= 1000:
-                        raise HarnessError("protocol", "session capacity exceeded")
-                    self._cursors[session_id] = max(
-                        self._cursors.get(session_id, 0), event["sequence"]
-                    )
+                    sequence = max(self._cursors.pop(session_id, 0), event["sequence"])
+                    if len(self._cursors) >= MAX_SESSION_HINTS:
+                        self._cursors.pop(next(iter(self._cursors)))
+                    self._cursors[session_id] = sequence
                     if session_id in self._changes:
                         self._changes[session_id].set()
                 elif isinstance(value.get("id"), str):
@@ -578,13 +663,16 @@ class AsyncHarness:
     async def _changed(self, session_id: str) -> None:
         self._assert_open()
         if session_id not in self._changes:
-            if len(self._changes) >= 1000:
+            if len(self._changes) >= MAX_SESSION_WAITS:
                 raise HarnessError("busy", "session iterator capacity exceeded")
             self._changes[session_id] = asyncio.Event()
         change = self._changes[session_id]
-        with contextlib.suppress(TimeoutError):
-            await asyncio.wait_for(change.wait(), timeout=0.25)
-        change.clear()
+        try:
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(change.wait(), timeout=0.25)
+        finally:
+            if self._changes.get(session_id) is change:
+                self._changes.pop(session_id)
         self._assert_open()
 
 
@@ -613,6 +701,14 @@ class AsyncSession:
 
     async def events(self, after: int = 0, limit: int = 64) -> list[Event]:
         return await self._harness.events(self.id, after, limit)
+
+    async def view(self, *, bounds: SessionTailOptions | None = None) -> SessionView:
+        return await self._harness.session_view(self.id, bounds=bounds)
+
+    async def events_page(
+        self, through: int, *, after: int = 0, bounds: SessionTailOptions | None = None
+    ) -> EventPage:
+        return await self._harness.events_page(self.id, through, after=after, bounds=bounds)
 
     async def invoke_package_command(
         self, package: str, name: str, arguments: object = None
@@ -734,11 +830,41 @@ class Harness:
     def list_sessions(self) -> list[Session]:
         return [Session(self, session) for session in self._call(self._async.list_sessions())]
 
+    def sessions_page(self, query: SessionQuery | None = None) -> SessionPage:
+        return self._call(self._async.sessions_page(query))
+
+    def resolve_session(self, prefix: str) -> Session:
+        return Session(self, self._call(self._async.resolve_session(prefix)))
+
+    def session_view(
+        self, session_id: str, *, bounds: SessionTailOptions | None = None
+    ) -> SessionView:
+        return self._call(self._async.session_view(session_id, bounds=bounds))
+
+    def events_page(
+        self,
+        session_id: str,
+        through: int,
+        *,
+        after: int = 0,
+        bounds: SessionTailOptions | None = None,
+    ) -> EventPage:
+        return self._call(self._async.events_page(session_id, through, after=after, bounds=bounds))
+
+    def capacity_status(self) -> CapacitySnapshot | None:
+        return self._call(self._async.capacity_status())
+
+    def reset_capacity_learning(self) -> int:
+        return self._call(self._async.reset_capacity_learning())
+
     def governor(self) -> GovernorSnapshot:
         return self._call(self._async.governor())
 
     def status(self) -> HarnessSnapshot:
         return self._call(self._async.status())
+
+    def scheduling_status(self) -> SchedulingSnapshot:
+        return self._call(self._async.scheduling_status())
 
     def list_packages(self) -> list[PackageInfo]:
         return self._call(self._async.list_packages())
@@ -789,6 +915,14 @@ class Session:
 
     def events(self, after: int = 0, limit: int = 64) -> list[Event]:
         return self._harness._call(self._async.events(after, limit))
+
+    def view(self, *, bounds: SessionTailOptions | None = None) -> SessionView:
+        return self._harness._call(self._async.view(bounds=bounds))
+
+    def events_page(
+        self, through: int, *, after: int = 0, bounds: SessionTailOptions | None = None
+    ) -> EventPage:
+        return self._harness._call(self._async.events_page(through, after=after, bounds=bounds))
 
     def invoke_package_command(self, package: str, name: str, arguments: object = None) -> object:
         return self._harness._call(self._async.invoke_package_command(package, name, arguments))

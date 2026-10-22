@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +10,12 @@ import { Harness, defineTool, toolOutput } from "../dist/index.js";
 
 const workerPath =
   process.env.EJM_HARNESS_WORKER_PATH ??
-  fileURLToPath(new URL("../../../target/debug/ejm-harness-worker", import.meta.url));
+  fileURLToPath(
+    new URL(
+      `../../../target/debug/ejm-harness-worker${process.platform === "win32" ? ".exe" : ""}`,
+      import.meta.url,
+    ),
+  );
 const toolDefinition = {
   name: "sdk_lookup",
   description: "Look up a test value",
@@ -23,14 +28,23 @@ const toolDefinition = {
     additionalProperties: false,
   },
 };
-const replay = (callId = "sdk-call") => ({
-  kind: "replay",
-  responses: [
-    { tool_calls: [{ id: callId, name: "sdk_lookup", arguments: { value: "hello" } }] },
-    { content: "finished" },
-  ],
-});
+const recordedResponses = (callId = "sdk-call") => [
+  { tool_calls: [{ id: callId, name: "sdk_lookup", arguments: { value: "hello" } }] },
+  { content: "finished" },
+];
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const idleScheduling = {
+  managed_runs: 0,
+  runnable_runs: 0,
+  model_waiting: 0,
+  model_preparing: 0,
+  provider_waiting: 0,
+  model_running: 0,
+  tool_dispatch_waiting: 0,
+  workspace_waiting: 0,
+  tool_resource_waiting: 0,
+  tool_running: 0,
+};
 
 async function within(promise, timeoutMs) {
   let timer;
@@ -49,18 +63,86 @@ async function within(promise, timeoutMs) {
   }
 }
 
-async function fixture(options = {}) {
+async function providerFixture(state, responses) {
+  const root = path.join(state, "fixture-provider");
+  await mkdir(root);
+  await writeFile(
+    path.join(root, "ejm.package.json"),
+    JSON.stringify({
+      schema_version: 1,
+      name: "@fixture/sdk-recorded",
+      version: "1.0.0",
+      description: "Internal SDK provider fixture",
+      runtime: { kind: "node", entry: "entry.mjs" },
+      exports: { providers: [{ name: "model", handler: "model" }] },
+    }),
+  );
+  await writeFile(
+    path.join(root, "entry.mjs"),
+    `const responses = ${JSON.stringify(responses)};
+export function model(request) {
+  if (responses !== null) {
+    if (!responses.length) throw new Error('fixture responses exhausted');
+    return responses.shift();
+  }
+  return {content:'Fixture: '+request.messages.findLast(message => message.role === 'user').content};
+}
+`,
+  );
+  return {
+    packages: [{ root, grants: { providers: ["model"] } }],
+    provider: { kind: "package", package: "@fixture/sdk-recorded", name: "model" },
+  };
+}
+
+async function fixture({ responses = null, ...options } = {}) {
   const state = await mkdtemp(path.join(os.tmpdir(), "ejm-harness-sdk-ts-"));
-  const harness = await Harness.create({ workerPath, state_dir: state, ...options });
+  const config = {
+    state_dir: state,
+    ...(options.provider ? {} : await providerFixture(state, responses)),
+    ...options,
+  };
+  let harness;
+  try {
+    harness = await Harness.create({ workerPath, ...config });
+  } catch (error) {
+    await rm(state, { recursive: true, force: true });
+    throw error;
+  }
   return {
     harness,
     state,
+    config,
     close: async () => {
       await harness.close();
       await rm(state, { recursive: true, force: true });
     },
   };
 }
+
+test("missing and removed providers fail without starting packages or creating state", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "ejm-harness-sdk-provider-ts-"));
+  try {
+    const state = path.join(root, "state");
+    await assert.rejects(
+      Harness.create({
+        workerPath,
+        state_dir: state,
+        packages: [{ root: "/unused-provider-fixture", grants: {} }],
+      }),
+      { code: "configuration", message: /provider is required/ },
+    );
+    for (const kind of ["echo", "replay"]) {
+      await assert.rejects(
+        Harness.create({ workerPath, state_dir: state, provider: { kind, responses: [] } }),
+        { code: "invalid_request" },
+      );
+    }
+    await assert.rejects(stat(state), { code: "ENOENT" });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
 
 test("package configuration rejects workers that do not advertise package support", async () => {
   const request = Harness.prototype.request;
@@ -75,6 +157,231 @@ test("package configuration rejects workers that do not advertise package suppor
     );
   } finally {
     Harness.prototype.request = request;
+  }
+});
+
+test("capacity opt-in rejects an older worker before configuration", async () => {
+  const request = Harness.prototype.request;
+  Harness.prototype.request = async function (method, ...args) {
+    const result = await request.call(this, method, ...args);
+    return method === "hello" ? { ...result, capabilities: [] } : result;
+  };
+  try {
+    await assert.rejects(Harness.create({ workerPath, capacity: { mode: "auto" } }), {
+      code: "protocol",
+      message: /supports capacity/,
+    });
+  } finally {
+    Harness.prototype.request = request;
+  }
+});
+
+test("configured provider quotas require worker support and explicit coordinated mode", async () => {
+  const provider_capacity = { account_uuid: "00000000-0000-4000-8000-000000000001" };
+  const request = Harness.prototype.request;
+  Harness.prototype.request = async function (method, ...args) {
+    const result = await request.call(this, method, ...args);
+    return method === "hello"
+      ? {
+          ...result,
+          capabilities: result.capabilities.filter((name) => name !== "provider_capacity"),
+        }
+      : result;
+  };
+  try {
+    await assert.rejects(
+      Harness.create({ workerPath, capacity: { mode: "auto" }, provider_capacity }),
+      { code: "protocol", message: /supports provider_capacity/ },
+    );
+  } finally {
+    Harness.prototype.request = request;
+  }
+  await assert.rejects(Harness.create({ workerPath, provider_capacity }), {
+    code: "configuration",
+    message: /explicit capacity mode/,
+  });
+});
+
+test("scheduling status rejects an older worker before sending the method", async () => {
+  const request = Harness.prototype.request;
+  let statusCalls = 0;
+  Harness.prototype.request = async function (method, ...args) {
+    if (method === "scheduling.status") statusCalls++;
+    const result = await request.call(this, method, ...args);
+    return method === "hello"
+      ? { ...result, capabilities: result.capabilities.filter((name) => name !== "scheduling") }
+      : result;
+  };
+  let f;
+  try {
+    f = await fixture();
+    await assert.rejects(f.harness.schedulingStatus(), {
+      code: "protocol",
+      message: /supports scheduling/,
+    });
+    assert.equal(statusCalls, 0);
+    assert.equal((await f.harness.status()).active_agents, 0);
+  } finally {
+    await f?.close();
+    Harness.prototype.request = request;
+  }
+});
+
+test("bounded session views preserve completed authority and page the full set", async () => {
+  const fixtureHost = await fixture();
+  const { harness } = fixtureHost;
+  try {
+    assert.equal(await harness.capacityStatus(), null);
+    const first = await harness.createSession({ title: "page first" });
+    const second = await harness.createSession({ title: "page second" });
+    const page = await harness.sessionsPage({ limit: 1 });
+    assert.equal(page.sessions.length, 1);
+    assert.ok(page.next);
+    const following = await harness.sessionsPage({ limit: 1, cursor: page.next });
+    assert.equal(following.sessions.length, 1);
+    assert.notEqual(page.sessions[0].id, following.sessions[0].id);
+    assert.equal((await harness.resolveSession(second.id)).id, second.id);
+    await assert.rejects(harness.sessionsPage({ query: "different", cursor: page.next }));
+
+    const run = await first.start("bounded offline history");
+    const summary = await run.wait();
+    const view = await first.view({ max_events: 1 });
+    assert.equal(view.events.length, 1);
+    assert.equal(view.omitted, true);
+    assert.equal(view.run_id, null);
+    assert.equal(view.last_transition.run_id, run.id);
+    assert.equal(view.last_transition.outcome, summary.status);
+    const authority = await harness.sessionView(first.id, { max_bytes: 0 });
+    assert.deepEqual(authority.events, []);
+    assert.equal(authority.last_transition.run_id, run.id);
+    let after = 0;
+    let finished = false;
+    for (let count = 0; count < 32; count++) {
+      const events = await first.eventsPage({
+        after,
+        through: view.durable_cursor,
+        bounds: { max_events: 1 },
+      });
+      assert.ok(events.events.length <= 1);
+      finished ||= events.events.some((event) => event.type === "run_finished");
+      if (events.complete) break;
+      assert.ok(events.cursor > after);
+      after = events.cursor;
+    }
+    assert.equal(finished, true);
+  } finally {
+    await fixtureHost.close();
+  }
+});
+
+test("invalid coordinated ceilings fail before package loading", async () => {
+  await assert.rejects(
+    Harness.create({
+      workerPath,
+      provider: { kind: "responses", api_key: "fixture-key-never-sent", model: "fixture-model" },
+      capacity: { mode: "fixed", max_model_requests: 0 },
+      packages: [{ root: "/unused-capacity-fixture", grants: {} }],
+    }),
+    { code: "configuration", message: /model ceiling/ },
+  );
+});
+
+test(
+  "explicit coordinated capacity composes package startup, execution, and shutdown",
+  { skip: process.platform === "win32", timeout: 30_000 },
+  async () => {
+    const f = await fixture({
+      requestTimeoutMs: 10_000,
+      capacity: {
+        mode: "auto",
+        max_sessions: 2,
+        max_model_requests: 1,
+        max_jobs: 2,
+        max_memory_bytes: 256 * 1024 * 1024,
+      },
+    });
+    const { harness } = f;
+    try {
+      const capacity = await harness.capacityStatus();
+      assert.ok(capacity);
+      assert.equal(capacity.mode, "auto");
+      assert.equal(capacity.coordinated, true);
+      assert.equal(capacity.hard_model_requests, 1);
+      assert.equal(capacity.hard_resources.max_jobs, 2);
+      assert.equal(capacity.hard_resources.memory_bytes, 256 * 1024 * 1024);
+      assert.equal((await harness.listPackages())[0].manifest.name, "@fixture/sdk-recorded");
+      await within(
+        (async () => {
+          while ((await harness.governor()).running) await delay(25);
+        })(),
+        5000,
+      );
+      const resident = await harness.governor();
+      assert.equal(resident.running, 0);
+      assert.ok(resident.reserved_memory_bytes >= 64 * 1024 * 1024);
+      assert.equal(resident.reserved_processes, 1);
+
+      const session = await harness.createSession({ cwd: f.state });
+      const run = await session.start("coordinated package");
+      assert.equal((await within(run.wait(), 10_000)).text, "Fixture: coordinated package");
+      await within(
+        (async () => {
+          for (;;) {
+            const current = await harness.capacityStatus();
+            assert.ok(current);
+            const governor = await harness.governor();
+            // Helper commitments are host aggregates, not this client's private count.
+            if (
+              current.native_helpers?.committed > 0 &&
+              current.native_helpers?.memory_bytes > 0 &&
+              (await harness.status()).active_agents === 0 &&
+              governor.running === 0
+            ) {
+              assert.equal(governor.reserved_memory_bytes, resident.reserved_memory_bytes);
+              assert.equal(governor.reserved_processes, resident.reserved_processes);
+              return;
+            }
+            await delay(25);
+          }
+        })(),
+        5000,
+      );
+      await harness.close();
+      await harness.close();
+      assert.equal(harness.process.exitCode, 0);
+      assert.equal(harness.process.signalCode, null);
+      await assert.rejects(
+        harness.capacityStatus(),
+        (error) => error.code === "closed" || error.code === "disconnected",
+      );
+    } finally {
+      await f.close();
+    }
+  },
+);
+
+test("live hints evict old session cursors without closing the worker", async () => {
+  const host = await fixture();
+  try {
+    const lines = Array.from({ length: 1001 }, (_, index) =>
+      JSON.stringify({
+        method: "event",
+        params: {
+          type: "text_delta",
+          session_id: `historical-${String(index)}`,
+          run_id: "fixture-run",
+          sequence: index + 1,
+          at_ms: 0,
+          text: "hint",
+        },
+      }),
+    );
+    host.harness.process.stdout.emit("data", Buffer.from(lines.join("\n") + "\n"));
+    assert.equal(host.harness.cursor("historical-0"), 0);
+    assert.equal(host.harness.cursor("historical-1000"), 1001);
+    await host.harness.status();
+  } finally {
+    await host.close();
   }
 });
 
@@ -255,7 +562,7 @@ test("streaming and late wait replay a completed run", async () => {
     for await (const event of run) events.push(event);
     assert.ok(events.some((event) => event.type === "text_delta"));
     assert.equal(events.at(-1).type, "run_finished");
-    assert.equal((await run.wait()).text, "Demo: hello from TypeScript");
+    assert.equal((await run.wait()).text, "Fixture: hello from TypeScript");
     assert.equal((await f.harness.listSessions())[0].id, session.id);
     assert.equal((await f.harness.status()).active_agents, 0);
   } finally {
@@ -274,7 +581,7 @@ test("callback tools and progress use a responsive reverse channel", async () =>
       return toolOutput(`value: ${args.value}`, { data: { found: true } });
     },
   });
-  const f = await fixture({ provider: replay(), tools: [tool] });
+  const f = await fixture({ responses: recordedResponses(), tools: [tool] });
   try {
     const run = await (await f.harness.createSession({ cwd: f.state })).start("look up");
     const events = [];
@@ -313,15 +620,28 @@ test("cancel reaches a blocked callback and releases its capacity after cleanup"
       return "cancelled";
     },
   });
-  const f = await fixture({ provider: replay(), tools: [tool] });
+  const f = await fixture({ responses: recordedResponses(), tools: [tool] });
   try {
+    assert.deepEqual(await f.harness.schedulingStatus(), idleScheduling);
     const run = await (await f.harness.createSession({ cwd: f.state })).start("wait");
-    await invoked;
+    await within(invoked, 5_000);
+    assert.deepEqual(await f.harness.schedulingStatus(), {
+      ...idleScheduling,
+      managed_runs: 1,
+      tool_running: 1,
+    });
+    assert.deepEqual(Object.keys(await f.harness.status()).sort(), [
+      "active_agents",
+      "model_requests",
+      "tools",
+      "waiting_model_requests",
+    ]);
     await run.cancel();
     assert.equal((await run.wait()).status, "cancelled");
     await delay(20);
     assert.equal(cancelled, true);
     assert.equal((await f.harness.governor()).running, 0);
+    assert.deepEqual(await f.harness.schedulingStatus(), idleScheduling);
   } finally {
     await f.close();
   }
@@ -351,10 +671,10 @@ test("cancelled callbacks retain admission until a handler that ignores abort se
       return "settled";
     },
   });
-  const firstCall = replay("first").responses[0];
-  const nextCall = replay("next").responses[0];
+  const firstCall = recordedResponses("first")[0];
+  const nextCall = recordedResponses("next")[0];
   const f = await fixture({
-    provider: { kind: "replay", responses: [firstCall, nextCall, { content: "finished" }] },
+    responses: [firstCall, nextCall, { content: "finished" }],
     tools: [tool],
     resources: { max_jobs: 1, max_heavy_jobs: 1 },
   });
@@ -393,7 +713,7 @@ test("an unresponsive cancelled handler poisons the transport within its cleanup
       return "never settled";
     },
   });
-  const f = await fixture({ provider: replay(), tools: [tool] });
+  const f = await fixture({ responses: recordedResponses(), tools: [tool] });
   try {
     const run = await (await f.harness.createSession({ cwd: f.state })).start("ignore abort");
     await invoked;
@@ -433,7 +753,7 @@ test("disconnect cancels callbacks, and reopening never repeats the uncertain ef
       return "uncertain";
     },
   });
-  const f = await fixture({ provider: replay(), tools: [tool] });
+  const f = await fixture({ responses: recordedResponses(), tools: [tool] });
   let resumed;
   try {
     const session = await f.harness.createSession({ cwd: f.state });
@@ -444,7 +764,7 @@ test("disconnect cancels callbacks, and reopening never repeats the uncertain ef
     await assert.rejects(waiting, /closed|exited|disconnected/);
     await delay(20);
     assert.equal(cancelled, true);
-    resumed = await Harness.create({ workerPath, state_dir: f.state, tools: [tool] });
+    resumed = await Harness.create({ workerPath, ...f.config, tools: [tool] });
     const sessions = await resumed.listSessions();
     assert.equal(sessions[0].id, session.id);
     const events = await resumed.events(session.id);
