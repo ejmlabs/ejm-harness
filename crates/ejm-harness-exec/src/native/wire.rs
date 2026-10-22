@@ -3,8 +3,10 @@ use std::{fs::File, io, net::Ipv4Addr, path::Path, process::ExitStatus, time::Du
 use anyhow::{Context, Result, ensure};
 use bytes::{Bytes, BytesMut};
 use futures_util::{SinkExt, StreamExt};
+use hmac::{Hmac, Mac};
 use rightkit_fs::{StateDir, handle::ReadOptions};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use sha2::Sha256;
 use tokio::net::TcpStream;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 use uuid::Uuid;
@@ -14,7 +16,7 @@ use super::{
 };
 use crate::{HostObservations, HostSampler};
 
-pub(super) const PROTOCOL: u32 = 2;
+pub(super) const PROTOCOL: u32 = 3;
 pub(super) const TIMEOUT: Duration = Duration::from_secs(5);
 pub(super) const IDLE: Duration = Duration::from_secs(2);
 pub(super) const PIPE_BYTES: usize = 16 * 1024;
@@ -240,8 +242,9 @@ pub(super) fn raw_status(status: ExitStatus) -> i64 {
     }
     #[cfg(windows)]
     {
-        use std::os::windows::process::ExitStatusExt;
-        i64::from(status.into_raw())
+        status
+            .code()
+            .map_or(1, |code| i64::from(u32::from_ne_bytes(code.to_ne_bytes())))
     }
     #[cfg(not(any(unix, windows)))]
     {
@@ -308,7 +311,57 @@ pub(super) async fn connect(ad: &Advertisement) -> Result<Transport> {
         .await
         .context("connect native owner timed out")??;
     stream.set_nodelay(true)?;
-    Ok(framed(stream))
+    let mut transport = framed(stream);
+    let nonce = Uuid::new_v4();
+    send(&mut transport, &nonce).await?;
+    let proof: [u8; 32] = receive(&mut transport).await?;
+    server_proof(&transport, ad, nonce, false)?
+        .verify_slice(&proof)
+        .context("native owner authentication failed")?;
+    Ok(transport)
+}
+
+// Only public challenge material crosses the socket before server authentication.
+// Bind both independently observed ports to reject a forwarding listener.
+fn server_proof(
+    transport: &Transport,
+    ad: &Advertisement,
+    nonce: Uuid,
+    serving: bool,
+) -> Result<Hmac<Sha256>> {
+    let local = transport.get_ref().local_addr()?;
+    let peer = transport.get_ref().peer_addr()?;
+    ensure!(
+        local.ip().is_loopback() && peer.ip().is_loopback(),
+        "nonlocal native peer"
+    );
+    let (server, client) = if serving {
+        (local, peer)
+    } else {
+        (peer, local)
+    };
+    let mut mac = Hmac::<Sha256>::new_from_slice(ad.capability.as_bytes())
+        .context("initialize native owner authentication")?;
+    mac.update(b"ejm-native-server-proof\0");
+    mac.update(&ad.protocol.to_be_bytes());
+    mac.update(ad.epoch.as_bytes());
+    mac.update(nonce.as_bytes());
+    mac.update(&server.port().to_be_bytes());
+    mac.update(&client.port().to_be_bytes());
+    mac.update(ad.domain.as_bytes());
+    Ok(mac)
+}
+
+pub(super) async fn authenticate_server(
+    transport: &mut Transport,
+    ad: &Advertisement,
+) -> Result<()> {
+    let nonce: Uuid = receive(transport).await?;
+    let proof: [u8; 32] = server_proof(transport, ad, nonce, true)?
+        .finalize()
+        .into_bytes()
+        .into();
+    send(transport, &proof).await
 }
 
 pub(super) fn directory(root: &Path, key: &str) -> Result<StateDir> {
@@ -343,4 +396,109 @@ pub(super) fn packet(tag: u8, bytes: &[u8]) -> Bytes {
     data.extend_from_slice(&[tag]);
     data.extend_from_slice(bytes);
     data.freeze()
+}
+
+#[cfg(test)]
+mod authentication_tests {
+    use super::*;
+    use tokio::net::TcpListener;
+
+    fn advertisement(port: u16) -> Advertisement {
+        Advertisement {
+            protocol: PROTOCOL,
+            epoch: Uuid::new_v4(),
+            capability: Uuid::new_v4(),
+            pid: std::process::id(),
+            port,
+            domain: "authentication-fixture".into(),
+            accounted: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn wrong_server_proofs_receive_no_private_client_frame() -> Result<()> {
+        for mismatch in ["key", "epoch", "domain", "nonce"] {
+            let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+            let ad = advertisement(listener.local_addr()?.port());
+            let mut server_ad = ad.clone();
+            match mismatch {
+                "key" => server_ad.capability = Uuid::new_v4(),
+                "epoch" => server_ad.epoch = Uuid::new_v4(),
+                "domain" => server_ad.domain = "another-domain".into(),
+                _ => {}
+            }
+            let server = tokio::spawn(async move {
+                let (socket, _) = listener.accept().await?;
+                let mut transport = framed(socket);
+                let nonce: Uuid = receive(&mut transport).await?;
+                let nonce = if mismatch == "nonce" {
+                    Uuid::new_v4()
+                } else {
+                    nonce
+                };
+                let proof: [u8; 32] = server_proof(&transport, &server_ad, nonce, true)?
+                    .finalize()
+                    .into_bytes()
+                    .into();
+                send(&mut transport, &proof).await?;
+                ensure!(
+                    transport.next().await.is_none(),
+                    "private frame reached fake endpoint"
+                );
+                Ok::<_, anyhow::Error>(())
+            });
+            assert!(connect(&ad).await.is_err());
+            tokio::time::timeout(TIMEOUT, server).await???;
+        }
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn real_server_accepts_client_but_forwarding_listener_cannot() -> Result<()> {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+        let ad = advertisement(listener.local_addr()?.port());
+        let server_ad = ad.clone();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await?;
+            let mut transport = framed(socket);
+            authenticate_server(&mut transport, &server_ad).await?;
+            assert_eq!(
+                receive::<String>(&mut transport).await?,
+                "legitimate-client"
+            );
+            let (socket, _) = listener.accept().await?;
+            let mut transport = framed(socket);
+            authenticate_server(&mut transport, &server_ad).await?;
+            ensure!(
+                transport.next().await.is_none(),
+                "forwarder obtained client frame"
+            );
+            Ok::<_, anyhow::Error>(())
+        });
+        let mut direct = connect(&ad).await?;
+        send(&mut direct, &"legitimate-client").await?;
+        drop(direct);
+        let proxy = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+        let fake = Advertisement {
+            port: proxy.local_addr()?.port(),
+            ..ad.clone()
+        };
+        let forwarding = tokio::spawn(async move {
+            let (mut incoming, _) = proxy.accept().await?;
+            let mut outgoing = TcpStream::connect((Ipv4Addr::LOCALHOST, ad.port)).await?;
+            tokio::io::copy_bidirectional(&mut incoming, &mut outgoing).await?;
+            Ok::<_, anyhow::Error>(())
+        });
+        assert!(connect(&fake).await.is_err());
+        tokio::time::timeout(TIMEOUT, forwarding).await???;
+        tokio::time::timeout(TIMEOUT, server).await???;
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_exit_status_preserves_high_bit() {
+        use std::os::windows::process::ExitStatusExt;
+        assert_eq!(raw_status(ExitStatus::from_raw(0x8000_0005)), 0x8000_0005);
+    }
 }
