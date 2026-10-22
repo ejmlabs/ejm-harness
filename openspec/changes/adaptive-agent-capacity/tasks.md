@@ -116,3 +116,5 @@ remains gated until registry retrieval verifies the new package.
 - [x] 9.4 Permit one pre-command rediscovery after verified clean helper startup exit; preserve caller deadlines, generation admission and lifetime witnesses, reject nonzero exits, and verify the bounded retry contract.
 
 - [x] 9.5 Let comparable, latency-safe probes with insufficient gain widen their next bounded step up to eight slots. Preserve all grant, pressure, latency and cooldown guards; reset exploration when evidence changes. Verify plateau recovery and existing controller regressions, then rerun representative acceptance before enabling defaults.
+
+- [x] 9.6 Close admitted-review defects: authenticate native server possession before disclosing Hello or launch data, reject stale discovery when the owner lock is free, bind proof to a fresh nonce and socket endpoints, bump native protocol, resolve relative cwd in the requesting process, and repair Windows status conversion and sampler compilation. Verify fake/forwarding endpoints and legitimate native operation with focused tests.

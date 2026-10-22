@@ -95,6 +95,11 @@ async fn advertisement(owner: &NativeOwner) -> Result<Advertisement> {
     for _ in 0..2 {
         let ownership = wire::stable_lock(&directory, "owner.lock")?;
         loop {
+            match ownership.try_lock() {
+                Ok(()) => break,
+                Err(TryLockError::WouldBlock) => {}
+                Err(TryLockError::Error(error)) => return Err(error.into()),
+            }
             let existing = directory
                 .read_opt(wire::DISCOVERY, 4096)?
                 .map(|bytes| serde_json::from_slice::<Advertisement>(&bytes))
@@ -336,7 +341,11 @@ async fn prepare(owner: &NativeOwner, ad: &Advertisement) -> Result<(Transport, 
     Ok((transport, reply))
 }
 
-pub(super) async fn spawn(ready: &NativeOwnerReady, command: NativeCommand) -> Result<NativeChild> {
+pub(super) async fn spawn(
+    ready: &NativeOwnerReady,
+    mut command: NativeCommand,
+) -> Result<NativeChild> {
+    command.cwd = std::path::absolute(&command.cwd)?.into_os_string();
     let started = Instant::now();
     let piped_stdin = command.piped_stdin;
     let owner = ready.owner.clone();

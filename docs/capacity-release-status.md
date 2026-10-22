@@ -14,6 +14,6 @@ See [the checkpoint](capacity-integration-checkpoint.json) for exact local recei
 
 ## Release boundary
 
-macOS defaults select the measured automatic path. Linux and Windows defaults, other embedding-image calibration and broader hardware claims remain gated. Arbitrary detached macOS descendants are not proven dead; native supervision is not a sandbox. The separate sustained package-idle CPU target remains unmet.
+macOS defaults select the accepted automatic controller. A later protocol 3 authentication repair passed focused native checks; the earlier workload does not measure that added exchange. Linux and Windows defaults, other embedding-image calibration and broader hardware claims remain gated. Arbitrary detached macOS descendants are not proven dead; native supervision is not a sandbox. The separate sustained package-idle CPU target remains unmet.
 
 Required CI and human review must pass before protected merge. A current human maintainer must dispatch the source-release workflow. Source archives do not imply registry packages, signed installers or deployed documentation.

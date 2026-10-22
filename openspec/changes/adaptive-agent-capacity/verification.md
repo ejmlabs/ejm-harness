@@ -1528,3 +1528,16 @@ The public filesystem fork and consumer lockfiles satisfy source distribution.
 Registry publication remains separate. Linux activation, other platform native
 acceptance and broader hardware/idle claims remain open. Required protected CI,
 human review, main merge and source-release dispatch are not complete.
+
+## Admitted review repair, 2026-10-22
+
+Protocol 3 server proof and stale-discovery handling close the reviewed local
+endpoint impersonation path. Independent source review found no remaining
+bypass. Focused authentication/lifecycle tests passed 17, with two optional
+fixtures ignored. Strict executor Clippy passed. A separate real two-process
+relative-cwd run passed using the original helper; environment and stream
+checks remain intact. Windows compile repairs are applied, with native CI
+verification pending. The prior throughput receipt predates the added exchange;
+its native-path overhead does not transfer automatically to this revision.
+Exact dependency source needed for offline lock/privacy review is retained as
+hashed original UTF-8 records under review/dependency-sources/ejm-rightkit-fs.

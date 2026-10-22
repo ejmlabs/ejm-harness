@@ -235,7 +235,7 @@
   },
   "all_commands_reaped": true,
   "all_observers_reaped": true,
-  "source_bridge": "Measured explicit auto implementation is unchanged. Release edits select it by default on macOS and update versions/docs. Focused default-selection tests verify that routing.",
+  "source_bridge": "The measured admission/tuner behavior is unchanged. Protocol 3 subsequently adds server authentication before launch data; 17 focused native tests, independent security review and the shared-helper relative-cwd fixture passed. This receipt does not measure protocol 3 transport overhead.",
   "limits": [
     "Local macOS evidence only; other platform defaults stay gated.",
     "Protected CI, human review and publication pending.",
