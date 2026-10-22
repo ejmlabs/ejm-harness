@@ -1,0 +1,36 @@
+{
+  "build_checkpoint": {
+    "path": "/private/tmp/ejm-cli-capacity-release-build-20261021-integration/20261021T155949Z-c353b656/report.json",
+    "sha256": "ba84f5847d7197465cbfc145a85e12435df7f3ddf57f41c94e7284ffd0d2b660",
+    "status": "passed"
+  },
+  "binaries": {
+    "helper": {
+      "path": "/private/tmp/ejm-cli-capacity-release-build-20261021-integration/20261021T155949Z-c353b656/bin/ejm-cli-helper",
+      "sha256": "e32602570773e674ac1172f8d3bf368d2726440b1e110b0fe46e67222d60e657",
+      "bytes": 18143008,
+      "built_path": "/Users/everettmorgan/Desktop/ejm-cli/target/release/ejm-cli"
+    },
+    "fixture": {
+      "path": "/private/tmp/ejm-cli-capacity-release-build-20261021-integration/20261021T155949Z-c353b656/bin/ejm-cli-fixture",
+      "sha256": "eff5a6d9cfff31e981bd19aa0fb6de84d139c2c98177e8f317619df192d4f07b",
+      "bytes": 19968448,
+      "built_path": "/Users/everettmorgan/Desktop/ejm-cli/target/release/deps/ejm_cli-534f9d18b063c054"
+    }
+  },
+  "relay_contracts": {
+    "passed": 19,
+    "failed": 0,
+    "log_sha256": "91d389c9d6668dbffe8e647af5e557ad91e1f28f0f2fe46a64eec4c480e09ee1"
+  },
+  "acceptance": {
+    "status": "blocked_before_workload",
+    "report": "/private/tmp/ejm-capacity-critical-comparison-20261021-integration/20261021T190543Z-0d8d100e/report.json",
+    "sha256": "558a8f8bb4c01e4dec6ccaeedccb084ee85129b33f55342bf4c0ec83b919d7f7",
+    "error": "RuntimeError: free disk below 10 GiB during waiting_global_lock: 4650917888"
+  },
+  "limits": [
+    "Local macOS evidence only. Automatic defaults remain disabled.",
+    "Full protected CI, human review and publication are pending."
+  ]
+}

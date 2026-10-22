@@ -1,0 +1,2037 @@
+{
+  "recorded_at": "2026-10-19T21:31:03.237548+00:00",
+  "host": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64",
+    "logical_cpus": 12,
+    "model": "Mac16,8",
+    "physical_memory_bytes": 25769803776
+  },
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Homebrew)",
+  "profile": "release",
+  "binary_sha256": {
+    "ejm_harness_bench": "724840f1801fc9398775905b65d2c6fa4b0492bb5532c9ee2830192643a10754"
+  },
+  "binary_bytes": {
+    "ejm_harness_bench": 6580976
+  },
+  "capacity_mode": "legacy",
+  "workloads": [
+    {
+      "agents_per_process": 100,
+      "requested_managed_agents": 100,
+      "participating_processes": 1,
+      "mode": "parked",
+      "elapsed_ms": 1050.602,
+      "participants": [
+        {
+          "admission_ms": 18,
+          "agents": 100,
+          "bounded_page_and_tail_us": 170,
+          "capacity": null,
+          "capacity_mode": "legacy",
+          "commands_completed": 0,
+          "deltas_per_response": 0,
+          "durable_events": 208,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 0,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "journal_after_work": {
+            "append_commits": 208,
+            "calls": 617,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 176, 11, 15, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "commit_ns": 11451041,
+            "max_commit_ns": 666833,
+            "max_queue_wait_ns": 7212375,
+            "max_work_ns": 718584,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 278, 12, 6, 82, 24, 24, 44, 43, 0, 13, 36, 50, 0, 0,
+              0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 452242666,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 101, 96, 8, 39, 317, 35, 20, 0, 1, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 23733994
+          },
+          "journal_at_park": {
+            "append_commits": 108,
+            "calls": 416,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 90, 6, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0
+            ],
+            "commit_ns": 5381666,
+            "max_commit_ns": 177291,
+            "max_queue_wait_ns": 204042,
+            "max_work_ns": 206500,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 278, 11, 6, 82, 24, 9, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 5115714,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 94, 7, 38, 237, 24, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "work_ns": 16028035
+          },
+          "mode": "parked",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 91,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 28,
+            "reported_read_bytes": 0,
+            "reported_written_bytes": 13541376,
+            "rss_bytes": 23789568,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 38,
+            "reported_read_bytes": 0,
+            "reported_written_bytes": 18722816,
+            "rss_bytes": 24133632,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 0,
+          "sampling_interval_ms": 2,
+          "scope": "legacy uncoordinated",
+          "selected_tail_events": 3,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 100,
+          "status": "completed",
+          "work_ms": 7,
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "100",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry",
+            "--parked"
+          ],
+          "sampled_peak_engine_rss_bytes": 23773184,
+          "sampled_peak_process_tree_rss_bytes": 23773184,
+          "rss_samples": 26,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 1049.281
+        }
+      ]
+    },
+    {
+      "agents_per_process": 100,
+      "requested_managed_agents": 100,
+      "participating_processes": 1,
+      "mode": "mixed",
+      "elapsed_ms": 2289.892,
+      "participants": [
+        {
+          "admission_ms": 21,
+          "agents": 100,
+          "bounded_page_and_tail_us": 124,
+          "capacity": null,
+          "capacity_mode": "legacy",
+          "commands_completed": 300,
+          "deltas_per_response": 0,
+          "durable_events": 3200,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 0,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "journal_after_work": {
+            "append_commits": 3200,
+            "calls": 4701,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 938, 1957, 164, 54, 79, 6, 1, 1, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0
+            ],
+            "commit_ns": 169992309,
+            "max_commit_ns": 3076500,
+            "max_queue_wait_ns": 3135042,
+            "max_work_ns": 3089875,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 467, 487, 131, 266, 685, 1062, 445, 528, 600, 18, 2,
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 863910052,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 168, 186, 352, 3165, 612, 87, 113, 10, 1, 1, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 274585588
+          },
+          "journal_at_park": {
+            "append_commits": 108,
+            "calls": 416,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 86, 11, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0
+            ],
+            "commit_ns": 6098873,
+            "max_commit_ns": 189000,
+            "max_queue_wait_ns": 186000,
+            "max_work_ns": 201750,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 224, 66, 6, 59, 46, 7, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 5949247,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6, 95, 6, 5, 243, 46, 15, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "work_ns": 18293325
+          },
+          "mode": "mixed",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 91,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 29,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 13549568,
+            "rss_bytes": 23953408,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 544,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 163225600,
+            "rss_bytes": 27721728,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 4,
+          "sampling_interval_ms": 2,
+          "scope": "legacy uncoordinated",
+          "selected_tail_events": 32,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 100,
+          "status": "completed",
+          "work_ms": 1201,
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "100",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry"
+          ],
+          "sampled_peak_engine_rss_bytes": 27705344,
+          "sampled_peak_process_tree_rss_bytes": 40501248,
+          "rss_samples": 53,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 2288.504
+        }
+      ]
+    },
+    {
+      "agents_per_process": 100,
+      "requested_managed_agents": 100,
+      "participating_processes": 1,
+      "mode": "parked",
+      "elapsed_ms": 1079.954,
+      "participants": [
+        {
+          "admission_ms": 25,
+          "agents": 100,
+          "bounded_page_and_tail_us": 107,
+          "capacity": null,
+          "capacity_mode": "legacy",
+          "commands_completed": 0,
+          "deltas_per_response": 0,
+          "durable_events": 208,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 0,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "journal_after_work": {
+            "append_commits": 208,
+            "calls": 617,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 154, 35, 16, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "commit_ns": 13126289,
+            "max_commit_ns": 321833,
+            "max_queue_wait_ns": 7297000,
+            "max_work_ns": 390917,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6, 158, 117, 17, 38, 64, 25, 40, 52, 2, 12, 31, 54, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 463486754,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 88, 98, 15, 7, 272, 109, 27, 1, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 29388279
+          },
+          "journal_at_park": {
+            "append_commits": 108,
+            "calls": 416,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 70, 28, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0
+            ],
+            "commit_ns": 7266417,
+            "max_commit_ns": 226500,
+            "max_queue_wait_ns": 233000,
+            "max_work_ns": 240125,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 6, 158, 117, 17, 37, 64, 14, 3, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 6969582,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 90, 13, 5, 204, 84, 19, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "work_ns": 21551332
+          },
+          "mode": "parked",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 91,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 35,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 13549568,
+            "rss_bytes": 23953408,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 46,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 18698240,
+            "rss_bytes": 24313856,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 0,
+          "sampling_interval_ms": 2,
+          "scope": "legacy uncoordinated",
+          "selected_tail_events": 3,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 100,
+          "status": "completed",
+          "work_ms": 8,
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "100",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry",
+            "--parked"
+          ],
+          "sampled_peak_engine_rss_bytes": 24084480,
+          "sampled_peak_process_tree_rss_bytes": 24084480,
+          "rss_samples": 25,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 1078.28
+        }
+      ]
+    },
+    {
+      "agents_per_process": 100,
+      "requested_managed_agents": 100,
+      "participating_processes": 1,
+      "mode": "mixed",
+      "elapsed_ms": 2279.357,
+      "participants": [
+        {
+          "admission_ms": 19,
+          "agents": 100,
+          "bounded_page_and_tail_us": 135,
+          "capacity": null,
+          "capacity_mode": "legacy",
+          "commands_completed": 300,
+          "deltas_per_response": 0,
+          "durable_events": 3200,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 0,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "journal_after_work": {
+            "append_commits": 3200,
+            "calls": 4701,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 980, 1961, 119, 55, 78, 5, 2, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0
+            ],
+            "commit_ns": 165361722,
+            "max_commit_ns": 1333167,
+            "max_queue_wait_ns": 2554875,
+            "max_work_ns": 1384334,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 3, 1, 11, 580, 319, 119, 263, 591, 1210, 432, 530, 627, 13, 2,
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 880188700,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 176, 200, 290, 3312, 522, 77, 111, 6, 3, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 265336006
+          },
+          "journal_at_park": {
+            "append_commits": 108,
+            "calls": 416,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 92, 6, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0
+            ],
+            "commit_ns": 5695706,
+            "max_commit_ns": 179792,
+            "max_queue_wait_ns": 184750,
+            "max_work_ns": 192000,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 4, 270, 16, 8, 79, 29, 8, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 5339581,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 94, 7, 15, 256, 29, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "work_ns": 16984389
+          },
+          "mode": "mixed",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 91,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 28,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 13549568,
+            "rss_bytes": 24297472,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 507,
+            "reported_read_bytes": 16384,
+            "reported_written_bytes": 162574336,
+            "rss_bytes": 27820032,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 4,
+          "sampling_interval_ms": 2,
+          "scope": "legacy uncoordinated",
+          "selected_tail_events": 32,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 100,
+          "status": "completed",
+          "work_ms": 1191,
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "100",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry"
+          ],
+          "sampled_peak_engine_rss_bytes": 27770880,
+          "sampled_peak_process_tree_rss_bytes": 40599552,
+          "rss_samples": 54,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 2277.815
+        }
+      ]
+    },
+    {
+      "agents_per_process": 100,
+      "requested_managed_agents": 100,
+      "participating_processes": 1,
+      "mode": "parked",
+      "elapsed_ms": 1067.741,
+      "participants": [
+        {
+          "admission_ms": 21,
+          "agents": 100,
+          "bounded_page_and_tail_us": 103,
+          "capacity": null,
+          "capacity_mode": "legacy",
+          "commands_completed": 0,
+          "deltas_per_response": 0,
+          "durable_events": 208,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 0,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "journal_after_work": {
+            "append_commits": 208,
+            "calls": 617,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 174, 15, 14, 1, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "commit_ns": 12046762,
+            "max_commit_ns": 361792,
+            "max_queue_wait_ns": 7263792,
+            "max_work_ns": 407917,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 237, 50, 9, 67, 38, 22, 21, 69, 2, 13, 32, 52, 0, 0,
+              0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 459392746,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 90, 105, 9, 8, 320, 63, 21, 1, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 25829662
+          },
+          "journal_at_park": {
+            "append_commits": 108,
+            "calls": 416,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 86, 11, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0
+            ],
+            "commit_ns": 6180501,
+            "max_commit_ns": 185167,
+            "max_queue_wait_ns": 216500,
+            "max_work_ns": 219250,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 4, 237, 50, 8, 67, 38, 10, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 5755799,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 95, 7, 8, 246, 42, 14, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "work_ns": 18150500
+          },
+          "mode": "parked",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 91,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 29,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 13549568,
+            "rss_bytes": 24330240,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 40,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 18518016,
+            "rss_bytes": 24690688,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 0,
+          "sampling_interval_ms": 2,
+          "scope": "legacy uncoordinated",
+          "selected_tail_events": 3,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 100,
+          "status": "completed",
+          "work_ms": 7,
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "100",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry",
+            "--parked"
+          ],
+          "sampled_peak_engine_rss_bytes": 24363008,
+          "sampled_peak_process_tree_rss_bytes": 24363008,
+          "rss_samples": 25,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 1066.217
+        }
+      ]
+    },
+    {
+      "agents_per_process": 100,
+      "requested_managed_agents": 100,
+      "participating_processes": 1,
+      "mode": "mixed",
+      "elapsed_ms": 2244.17,
+      "participants": [
+        {
+          "admission_ms": 19,
+          "agents": 100,
+          "bounded_page_and_tail_us": 148,
+          "capacity": null,
+          "capacity_mode": "legacy",
+          "commands_completed": 300,
+          "deltas_per_response": 0,
+          "durable_events": 3200,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 0,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "journal_after_work": {
+            "append_commits": 3200,
+            "calls": 4701,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1049, 1913, 105, 47, 84, 2, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0
+            ],
+            "commit_ns": 159620124,
+            "max_commit_ns": 657208,
+            "max_queue_wait_ns": 1225708,
+            "max_work_ns": 669292,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 1, 5, 10, 731, 458, 109, 264, 557, 1108, 368, 548, 510, 32, 0,
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 804557579,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 176, 189, 456, 3174, 519, 66, 114, 4, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 256871167
+          },
+          "journal_at_park": {
+            "append_commits": 108,
+            "calls": 416,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 91, 5, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0
+            ],
+            "commit_ns": 5578086,
+            "max_commit_ns": 176042,
+            "max_queue_wait_ns": 194458,
+            "max_work_ns": 197083,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 275, 16, 6, 82, 26, 7, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 5148675,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 97, 6, 18, 257, 24, 11, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "work_ns": 16748168
+          },
+          "mode": "mixed",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 91,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 27,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 13549568,
+            "rss_bytes": 23871488,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 499,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 162095104,
+            "rss_bytes": 27770880,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 4,
+          "sampling_interval_ms": 2,
+          "scope": "legacy uncoordinated",
+          "selected_tail_events": 32,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 100,
+          "status": "completed",
+          "work_ms": 1180,
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "100",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry"
+          ],
+          "sampled_peak_engine_rss_bytes": 27607040,
+          "sampled_peak_process_tree_rss_bytes": 40517632,
+          "rss_samples": 53,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 2242.75
+        }
+      ]
+    },
+    {
+      "agents_per_process": 1000,
+      "requested_managed_agents": 1000,
+      "participating_processes": 1,
+      "mode": "parked",
+      "elapsed_ms": 1371.771,
+      "participants": [
+        {
+          "admission_ms": 237,
+          "agents": 1000,
+          "bounded_page_and_tail_us": 125,
+          "capacity": null,
+          "capacity_mode": "legacy",
+          "commands_completed": 0,
+          "deltas_per_response": 0,
+          "durable_events": 2008,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 0,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "journal_after_work": {
+            "append_commits": 2008,
+            "calls": 6017,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 53, 1693, 85, 26, 147, 4, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0
+            ],
+            "commit_ns": 140849158,
+            "max_commit_ns": 654084,
+            "max_queue_wait_ns": 79075042,
+            "max_work_ns": 666833,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 2816, 157, 21, 682, 252, 38, 34, 81, 99, 93, 103,
+              628, 139, 247, 452, 166, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 47401934750,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 896, 1076, 25, 150, 3160, 382, 73, 249, 6, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 297203994
+          },
+          "journal_at_park": {
+            "append_commits": 1008,
+            "calls": 4016,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 866, 46, 26, 63, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "commit_ns": 68177574,
+            "max_commit_ns": 461208,
+            "max_queue_wait_ns": 414250,
+            "max_work_ns": 480208,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 2816, 156, 21, 682, 250, 25, 26, 32, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 55894458,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 26, 963, 14, 145, 2375, 255, 71, 167, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 209432775
+          },
+          "mode": "parked",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 991,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 219,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 191512576,
+            "rss_bytes": 32522240,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 320,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 266080256,
+            "rss_bytes": 34324480,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 0,
+          "sampling_interval_ms": 2,
+          "scope": "legacy uncoordinated",
+          "selected_tail_events": 3,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 1000,
+          "status": "completed",
+          "work_ms": 89,
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "1000",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry",
+            "--parked"
+          ],
+          "sampled_peak_engine_rss_bytes": 34078720,
+          "sampled_peak_process_tree_rss_bytes": 34078720,
+          "rss_samples": 32,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 1370.239
+        }
+      ]
+    },
+    {
+      "agents_per_process": 1000,
+      "requested_managed_agents": 1000,
+      "participating_processes": 1,
+      "mode": "mixed",
+      "elapsed_ms": 13327.451,
+      "participants": [
+        {
+          "admission_ms": 263,
+          "agents": 1000,
+          "bounded_page_and_tail_us": 183,
+          "capacity": null,
+          "capacity_mode": "legacy",
+          "commands_completed": 3000,
+          "deltas_per_response": 0,
+          "durable_events": 32000,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 0,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "journal_after_work": {
+            "append_commits": 32000,
+            "calls": 47001,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10675, 18678, 1263, 117, 389, 862, 12, 2, 1,
+              1, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "commit_ns": 2008021375,
+            "max_commit_ns": 9733000,
+            "max_queue_wait_ns": 11158417,
+            "max_work_ns": 9746083,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 2, 5, 16, 56, 4959, 3097, 832, 2192, 5223, 10949, 6898, 4256,
+              6942, 1535, 6, 17, 16, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 11778777609,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 1860, 1992, 4210, 31398, 5419, 291, 571, 1220,
+              19, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 3182628858
+          },
+          "journal_at_park": {
+            "append_commits": 1008,
+            "calls": 4016,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 798, 111, 36, 52, 6, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "commit_ns": 75586969,
+            "max_commit_ns": 585125,
+            "max_queue_wait_ns": 663000,
+            "max_work_ns": 1521625,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 2, 0, 1, 13, 2497, 448, 31, 569, 351, 50, 31, 23, 1, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 60226694,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 925, 61, 70, 2216, 482, 83, 152, 11, 1, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 231228364
+          },
+          "mode": "mixed",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 991,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 242,
+            "reported_read_bytes": 8192,
+            "reported_written_bytes": 192229376,
+            "rss_bytes": 32129024,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 5225,
+            "reported_read_bytes": 512000,
+            "reported_written_bytes": 1970630656,
+            "rss_bytes": 40321024,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 4,
+          "sampling_interval_ms": 2,
+          "scope": "legacy uncoordinated",
+          "selected_tail_events": 32,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 1000,
+          "status": "completed",
+          "work_ms": 11860,
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "1000",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry"
+          ],
+          "sampled_peak_engine_rss_bytes": 40288256,
+          "sampled_peak_process_tree_rss_bytes": 53215232,
+          "rss_samples": 315,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 13325.903
+        }
+      ]
+    },
+    {
+      "agents_per_process": 1000,
+      "requested_managed_agents": 1000,
+      "participating_processes": 1,
+      "mode": "parked",
+      "elapsed_ms": 1383.23,
+      "participants": [
+        {
+          "admission_ms": 243,
+          "agents": 1000,
+          "bounded_page_and_tail_us": 128,
+          "capacity": null,
+          "capacity_mode": "legacy",
+          "commands_completed": 0,
+          "deltas_per_response": 0,
+          "durable_events": 2008,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 0,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "journal_after_work": {
+            "append_commits": 2008,
+            "calls": 6020,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 29, 1679, 124, 35, 140, 1, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0
+            ],
+            "commit_ns": 142705130,
+            "max_commit_ns": 807083,
+            "max_queue_wait_ns": 78753667,
+            "max_work_ns": 832000,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2793, 188, 20, 663, 280, 29, 26, 80, 113, 97, 162,
+              326, 377, 229, 466, 168, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 48069933714,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 872, 1092, 32, 131, 3108, 454, 81, 248, 2, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 303659421
+          },
+          "journal_at_park": {
+            "append_commits": 1008,
+            "calls": 4016,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 843, 74, 33, 53, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "commit_ns": 69333543,
+            "max_commit_ns": 522500,
+            "max_queue_wait_ns": 463583,
+            "max_work_ns": 540083,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 2793, 188, 20, 662, 280, 24, 17, 30, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 54501295,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 31, 951, 18, 126, 2334, 317, 77, 161, 1, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 214936648
+          },
+          "mode": "parked",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 991,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 225,
+            "reported_read_bytes": 8192,
+            "reported_written_bytes": 191401984,
+            "rss_bytes": 32325632,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 330,
+            "reported_read_bytes": 12288,
+            "reported_written_bytes": 265695232,
+            "rss_bytes": 34193408,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 0,
+          "sampling_interval_ms": 2,
+          "scope": "legacy uncoordinated",
+          "selected_tail_events": 3,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 1000,
+          "status": "completed",
+          "work_ms": 90,
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "1000",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry",
+            "--parked"
+          ],
+          "sampled_peak_engine_rss_bytes": 33980416,
+          "sampled_peak_process_tree_rss_bytes": 33980416,
+          "rss_samples": 32,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 1381.606
+        }
+      ]
+    },
+    {
+      "agents_per_process": 1000,
+      "requested_managed_agents": 1000,
+      "participating_processes": 1,
+      "mode": "mixed",
+      "elapsed_ms": 13355.616,
+      "participants": [
+        {
+          "admission_ms": 235,
+          "agents": 1000,
+          "bounded_page_and_tail_us": 154,
+          "capacity": null,
+          "capacity_mode": "legacy",
+          "commands_completed": 3000,
+          "deltas_per_response": 0,
+          "durable_events": 32000,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 0,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "journal_after_work": {
+            "append_commits": 32000,
+            "calls": 47001,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10411, 18973, 1216, 101, 400, 881, 14, 0, 2,
+              2, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "commit_ns": 2036593744,
+            "max_commit_ns": 11926625,
+            "max_queue_wait_ns": 11931125,
+            "max_work_ns": 11933541,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 1, 4, 23, 46, 5297, 2852, 815, 2267, 5123, 10829, 6857, 4620,
+              6795, 1463, 0, 3, 6, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 11547459226,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 1862, 1874, 4332, 31500, 5282, 306, 572, 1217,
+              18, 0, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 3197298168
+          },
+          "journal_at_park": {
+            "append_commits": 1008,
+            "calls": 4016,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 859, 41, 30, 72, 1, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "commit_ns": 71112915,
+            "max_commit_ns": 583959,
+            "max_queue_wait_ns": 460208,
+            "max_work_ns": 596791,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 11, 2813, 156, 14, 680, 276, 19, 17, 29, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 53517078,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 961, 10, 175, 2373, 226, 76, 161, 1, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 207539257
+          },
+          "mode": "mixed",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 991,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 220,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 191819776,
+            "rss_bytes": 32194560,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 5282,
+            "reported_read_bytes": 278528,
+            "reported_written_bytes": 1972752384,
+            "rss_bytes": 40419328,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 4,
+          "sampling_interval_ms": 2,
+          "scope": "legacy uncoordinated",
+          "selected_tail_events": 32,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 1000,
+          "status": "completed",
+          "work_ms": 11911,
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "1000",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry"
+          ],
+          "sampled_peak_engine_rss_bytes": 40386560,
+          "sampled_peak_process_tree_rss_bytes": 53280768,
+          "rss_samples": 315,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 13354.179
+        }
+      ]
+    },
+    {
+      "agents_per_process": 1000,
+      "requested_managed_agents": 1000,
+      "participating_processes": 1,
+      "mode": "parked",
+      "elapsed_ms": 1400.089,
+      "participants": [
+        {
+          "admission_ms": 253,
+          "agents": 1000,
+          "bounded_page_and_tail_us": 119,
+          "capacity": null,
+          "capacity_mode": "legacy",
+          "commands_completed": 0,
+          "deltas_per_response": 0,
+          "durable_events": 2008,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 0,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "journal_after_work": {
+            "append_commits": 2008,
+            "calls": 6017,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 1695, 121, 29, 136, 3, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0
+            ],
+            "commit_ns": 144403747,
+            "max_commit_ns": 642042,
+            "max_queue_wait_ns": 81079041,
+            "max_work_ns": 686625,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 11, 2626, 344, 20, 590, 344, 30, 33, 75, 121, 15, 237,
+              403, 307, 227, 443, 189, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 48752568412,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 866, 1097, 32, 48, 3090, 546, 77, 257, 4, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 314196621
+          },
+          "journal_at_park": {
+            "append_commits": 1008,
+            "calls": 4016,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 834, 91, 29, 48, 1, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "commit_ns": 68943973,
+            "max_commit_ns": 579667,
+            "max_queue_wait_ns": 444583,
+            "max_work_ns": 595542,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 11, 2626, 344, 19, 590, 343, 24, 17, 41, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 60062691,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 22, 960, 20, 43, 2301, 423, 76, 169, 2, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 223680799
+          },
+          "mode": "parked",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 991,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 236,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 195784704,
+            "rss_bytes": 32227328,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 340,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 273276928,
+            "rss_bytes": 34029568,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 0,
+          "sampling_interval_ms": 2,
+          "scope": "legacy uncoordinated",
+          "selected_tail_events": 3,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 1000,
+          "status": "completed",
+          "work_ms": 92,
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "1000",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry",
+            "--parked"
+          ],
+          "sampled_peak_engine_rss_bytes": 33849344,
+          "sampled_peak_process_tree_rss_bytes": 33849344,
+          "rss_samples": 33,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 1398.528
+        }
+      ]
+    },
+    {
+      "agents_per_process": 1000,
+      "requested_managed_agents": 1000,
+      "participating_processes": 1,
+      "mode": "mixed",
+      "elapsed_ms": 13835.234,
+      "participants": [
+        {
+          "admission_ms": 243,
+          "agents": 1000,
+          "bounded_page_and_tail_us": 170,
+          "capacity": null,
+          "capacity_mode": "legacy",
+          "commands_completed": 3000,
+          "deltas_per_response": 0,
+          "durable_events": 32000,
+          "final": {
+            "active_agents": 0,
+            "model_requests": 0,
+            "tools": {
+              "heavy_running": 0,
+              "queued": 0,
+              "reserved_cpu_millis": 0,
+              "reserved_memory_bytes": 0,
+              "reserved_output_bytes": 0,
+              "reserved_processes": 0,
+              "running": 0
+            },
+            "waiting_model_requests": 0
+          },
+          "journal_after_work": {
+            "append_commits": 32000,
+            "calls": 47001,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9963, 18348, 1910, 343, 447, 881, 82, 18, 6,
+              2, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "commit_ns": 2316032111,
+            "max_commit_ns": 15566125,
+            "max_queue_wait_ns": 15818708,
+            "max_work_ns": 15580166,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 4, 7, 17, 53, 4599, 2817, 952, 2350, 4629, 10175, 8002, 4633,
+              6781, 1873, 64, 31, 14, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 12597379943,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 1940, 1626, 4492, 29811, 6156, 884, 714, 1204,
+              117, 23, 7, 2, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 3609052645
+          },
+          "journal_at_park": {
+            "append_commits": 1008,
+            "calls": 4016,
+            "commit_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 843, 65, 33, 63, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0
+            ],
+            "commit_ns": 71794169,
+            "max_commit_ns": 484000,
+            "max_queue_wait_ns": 472958,
+            "max_work_ns": 497959,
+            "queue_wait_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 14, 2798, 177, 10, 655, 294, 18, 19, 30, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "queue_wait_ns": 55442575,
+            "work_histogram": [
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25, 957, 21, 96, 2397, 280, 72, 168, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            "work_ns": 215560484
+          },
+          "mode": "mixed",
+          "parked_model_requests": 8,
+          "parked_waiting_models": 991,
+          "participants": 1,
+          "process_at_park": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 221,
+            "reported_read_bytes": 4096,
+            "reported_written_bytes": 195100672,
+            "rss_bytes": 32342016,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "process_final": {
+            "available": true,
+            "cached_io_may_not_appear": true,
+            "child_cpu_included": false,
+            "cpu_ms": 5636,
+            "reported_read_bytes": 172032,
+            "reported_written_bytes": 1971691520,
+            "rss_bytes": 28770304,
+            "source": "sysinfo 0.39.6 own process"
+          },
+          "remote_api_calls": 0,
+          "resources": {
+            "cpu_millis": 2000,
+            "max_artifact_bytes": 67108864,
+            "max_heavy_jobs": 1,
+            "max_job_ms": 120000,
+            "max_jobs": 4,
+            "max_output_bytes": 1048576,
+            "max_processes": 32,
+            "max_queue": 256,
+            "memory_bytes": 536870912
+          },
+          "rounds": 3,
+          "sampled_peak_executing_jobs": 4,
+          "sampling_interval_ms": 2,
+          "scope": "legacy uncoordinated",
+          "selected_tail_events": 32,
+          "selected_tail_omitted": false,
+          "simultaneously_managed": 1000,
+          "status": "completed",
+          "work_ms": 12342,
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "1000",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry"
+          ],
+          "sampled_peak_engine_rss_bytes": 39911424,
+          "sampled_peak_process_tree_rss_bytes": 52871168,
+          "rss_samples": 310,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 13833.731
+        }
+      ]
+    },
+    {
+      "agents_per_process": 4096,
+      "requested_managed_agents": 4096,
+      "participating_processes": 1,
+      "mode": "parked",
+      "elapsed_ms": 45.446,
+      "participants": [
+        {
+          "capacity_mode": "legacy",
+          "error": "max_sessions exceeds the selected capacity envelope",
+          "participants": 1,
+          "remote_api_calls": 0,
+          "requested_agents": 4096,
+          "status": "rejected",
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "4096",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry",
+            "--parked"
+          ],
+          "sampled_peak_engine_rss_bytes": 6029312,
+          "sampled_peak_process_tree_rss_bytes": 6029312,
+          "rss_samples": 1,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 43.835
+        }
+      ]
+    },
+    {
+      "agents_per_process": 4096,
+      "requested_managed_agents": 4096,
+      "participating_processes": 1,
+      "mode": "mixed",
+      "elapsed_ms": 51.53,
+      "participants": [
+        {
+          "capacity_mode": "legacy",
+          "error": "max_sessions exceeds the selected capacity envelope",
+          "participants": 1,
+          "remote_api_calls": 0,
+          "requested_agents": 4096,
+          "status": "rejected",
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "4096",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry"
+          ],
+          "sampled_peak_engine_rss_bytes": 6062080,
+          "sampled_peak_process_tree_rss_bytes": 6062080,
+          "rss_samples": 1,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 49.823
+        }
+      ]
+    },
+    {
+      "agents_per_process": 4096,
+      "requested_managed_agents": 4096,
+      "participating_processes": 1,
+      "mode": "parked",
+      "elapsed_ms": 46.079,
+      "participants": [
+        {
+          "capacity_mode": "legacy",
+          "error": "max_sessions exceeds the selected capacity envelope",
+          "participants": 1,
+          "remote_api_calls": 0,
+          "requested_agents": 4096,
+          "status": "rejected",
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "4096",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry",
+            "--parked"
+          ],
+          "sampled_peak_engine_rss_bytes": 0,
+          "sampled_peak_process_tree_rss_bytes": 0,
+          "rss_samples": 1,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 44.128
+        }
+      ]
+    },
+    {
+      "agents_per_process": 4096,
+      "requested_managed_agents": 4096,
+      "participating_processes": 1,
+      "mode": "mixed",
+      "elapsed_ms": 47.49,
+      "participants": [
+        {
+          "capacity_mode": "legacy",
+          "error": "max_sessions exceeds the selected capacity envelope",
+          "participants": 1,
+          "remote_api_calls": 0,
+          "requested_agents": 4096,
+          "status": "rejected",
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "4096",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry"
+          ],
+          "sampled_peak_engine_rss_bytes": 0,
+          "sampled_peak_process_tree_rss_bytes": 0,
+          "rss_samples": 1,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 45.991
+        }
+      ]
+    },
+    {
+      "agents_per_process": 4096,
+      "requested_managed_agents": 4096,
+      "participating_processes": 1,
+      "mode": "parked",
+      "elapsed_ms": 45.123,
+      "participants": [
+        {
+          "capacity_mode": "legacy",
+          "error": "max_sessions exceeds the selected capacity envelope",
+          "participants": 1,
+          "remote_api_calls": 0,
+          "requested_agents": 4096,
+          "status": "rejected",
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "4096",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry",
+            "--parked"
+          ],
+          "sampled_peak_engine_rss_bytes": 5521408,
+          "sampled_peak_process_tree_rss_bytes": 5521408,
+          "rss_samples": 1,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 43.638
+        }
+      ]
+    },
+    {
+      "agents_per_process": 4096,
+      "requested_managed_agents": 4096,
+      "participating_processes": 1,
+      "mode": "mixed",
+      "elapsed_ms": 40.531,
+      "participants": [
+        {
+          "capacity_mode": "legacy",
+          "error": "max_sessions exceeds the selected capacity envelope",
+          "participants": 1,
+          "remote_api_calls": 0,
+          "requested_agents": 4096,
+          "status": "rejected",
+          "command": [
+            "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+            "--agents",
+            "4096",
+            "--rounds",
+            "3",
+            "--park-ms",
+            "1000",
+            "--capacity",
+            "legacy",
+            "--deltas",
+            "0",
+            "--model-requests",
+            "8",
+            "--jobs",
+            "4",
+            "--capacity-root",
+            "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-capacity-benchmark-nod5hchz/registry"
+          ],
+          "sampled_peak_engine_rss_bytes": 5570560,
+          "sampled_peak_process_tree_rss_bytes": 5570560,
+          "rss_samples": 1,
+          "rss_minimum_sample_interval_ms": 20,
+          "elapsed_ms": 39.155
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Deterministic provider fixtures, not hosted API latency or coding quality.",
+    "RSS samples can miss short peaks; summed tree RSS double counts shared pages.",
+    "Benchmark monitor and SDK hosts are excluded from engine RSS.",
+    "A modern host result does not validate the four core, eight GB target machine.",
+    "Each process has a separate journal; groups reuse only shared host capacity state.",
+    "Threaded polling can perturb results; process RSS peaks are sampled separately.",
+    "CPU, I/O, input latency, and full fixed-versus-auto acceptance need separate checks."
+  ]
+}

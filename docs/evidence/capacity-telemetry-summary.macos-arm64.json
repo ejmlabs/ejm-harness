@@ -1,0 +1,250 @@
+{
+  "schema": 1,
+  "date": "2026-10-20",
+  "status": "completed",
+  "scope": "Recurring model/tool lane and journal tracing on one macOS ARM host, using fixed capacity and local deterministic fixtures.",
+  "raw_report": {
+    "path": "docs/evidence/capacity-telemetry.macos-arm64.json",
+    "sha256": "886aeb09d72a01391fdaafff01edefde45f389063953c97d687fb3c225e19f51",
+    "bytes": 269215
+  },
+  "host": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64",
+    "logical_cpus": 12,
+    "model": "Mac16,8",
+    "physical_memory_bytes": 25769803776
+  },
+  "method": "Five alternating paired samples per existing workload, 100 managed runs, fixed models=8/jobs=4, fresh isolated state each invocation. Only recurring lane/journal tracing differs. Scheduling counters remain enabled in both binaries.",
+  "workloads": {
+    "pressure": {
+      "on_work_ms": {
+        "samples": 5,
+        "median": 501,
+        "minimum": 488,
+        "maximum": 527,
+        "nearest_rank_p95": 527
+      },
+      "off_work_ms": {
+        "samples": 5,
+        "median": 506,
+        "minimum": 493,
+        "maximum": 526,
+        "nearest_rank_p95": 526
+      },
+      "ratio_of_median_work_overhead_percent": -0.988142292490124,
+      "paired_work_overhead_percent": {
+        "samples": 5,
+        "median": -1.0141987829614618,
+        "minimum": -4.752851711026618,
+        "maximum": 4.980079681274896,
+        "nearest_rank_p95": 4.980079681274896,
+        "raw": [
+          0.5928853754940677, -1.0141987829614618, -4.752851711026618, 4.980079681274896,
+          -4.597701149425292
+        ]
+      },
+      "on_own_process_cpu_ms": {
+        "samples": 5,
+        "median": 393,
+        "minimum": 389,
+        "maximum": 419,
+        "nearest_rank_p95": 419
+      },
+      "off_own_process_cpu_ms": {
+        "samples": 5,
+        "median": 396,
+        "minimum": 385,
+        "maximum": 416,
+        "nearest_rank_p95": 416
+      },
+      "on_process_tree_rss_bytes": {
+        "samples": 5,
+        "median": 27738112,
+        "minimum": 27574272,
+        "maximum": 28000256,
+        "nearest_rank_p95": 28000256
+      },
+      "off_process_tree_rss_bytes": {
+        "samples": 5,
+        "median": 27754496,
+        "minimum": 27525120,
+        "maximum": 27983872,
+        "nearest_rank_p95": 27983872
+      },
+      "parity": {
+        "agents": 100,
+        "simultaneously_managed": 100,
+        "commands_completed": 0,
+        "durable_events": 13200,
+        "resources": {
+          "cpu_millis": 2000,
+          "max_artifact_bytes": 67108864,
+          "max_heavy_jobs": 1,
+          "max_job_ms": 120000,
+          "max_jobs": 4,
+          "max_output_bytes": 1048576,
+          "max_processes": 32,
+          "max_queue": 256,
+          "memory_bytes": 536870912
+        },
+        "final": {
+          "active_agents": 0,
+          "model_requests": 0,
+          "tools": {
+            "heavy_running": 0,
+            "queued": 0,
+            "reserved_cpu_millis": 0,
+            "reserved_memory_bytes": 100663296,
+            "reserved_output_bytes": 0,
+            "reserved_processes": 0,
+            "running": 0
+          },
+          "waiting_model_requests": 0
+        }
+      }
+    },
+    "mixed": {
+      "on_work_ms": {
+        "samples": 5,
+        "median": 1352,
+        "minimum": 1340,
+        "maximum": 1523,
+        "nearest_rank_p95": 1523
+      },
+      "off_work_ms": {
+        "samples": 5,
+        "median": 1348,
+        "minimum": 1344,
+        "maximum": 1424,
+        "nearest_rank_p95": 1424
+      },
+      "ratio_of_median_work_overhead_percent": 0.29673590504450953,
+      "paired_work_overhead_percent": {
+        "samples": 5,
+        "median": 0.5204460966542701,
+        "minimum": -1.3245033112582738,
+        "maximum": 10.756676557863498,
+        "nearest_rank_p95": 10.756676557863498,
+        "raw": [
+          10.756676557863498, -1.3245033112582738, -0.29761904761904656, 6.9522471910112404,
+          0.5204460966542701
+        ]
+      },
+      "on_own_process_cpu_ms": {
+        "samples": 5,
+        "median": 470,
+        "minimum": 458,
+        "maximum": 487,
+        "nearest_rank_p95": 487
+      },
+      "off_own_process_cpu_ms": {
+        "samples": 5,
+        "median": 477,
+        "minimum": 467,
+        "maximum": 493,
+        "nearest_rank_p95": 493
+      },
+      "on_process_tree_rss_bytes": {
+        "samples": 5,
+        "median": 49414144,
+        "minimum": 49397760,
+        "maximum": 49545216,
+        "nearest_rank_p95": 49545216
+      },
+      "off_process_tree_rss_bytes": {
+        "samples": 5,
+        "median": 49348608,
+        "minimum": 49348608,
+        "maximum": 49479680,
+        "nearest_rank_p95": 49479680
+      },
+      "parity": {
+        "agents": 100,
+        "simultaneously_managed": 100,
+        "commands_completed": 300,
+        "durable_events": 3200,
+        "resources": {
+          "cpu_millis": 2000,
+          "max_artifact_bytes": 67108864,
+          "max_heavy_jobs": 1,
+          "max_job_ms": 120000,
+          "max_jobs": 4,
+          "max_output_bytes": 1048576,
+          "max_processes": 32,
+          "max_queue": 256,
+          "memory_bytes": 536870912
+        },
+        "final": {
+          "active_agents": 0,
+          "model_requests": 0,
+          "tools": {
+            "heavy_running": 0,
+            "queued": 0,
+            "reserved_cpu_millis": 0,
+            "reserved_memory_bytes": 100663296,
+            "reserved_output_bytes": 0,
+            "reserved_processes": 0,
+            "running": 0
+          },
+          "waiting_model_requests": 0
+        }
+      }
+    }
+  },
+  "interpretation": [
+    "The pressure paired median is -1.01%, with individual pairs from -4.75% to +4.98%. The mixed paired median is +0.52%, with pairs from -1.32% to +10.76%.",
+    "Mixed work includes two slower instrumented samples, at +10.76% and +6.95%. The observed spread must remain visible.",
+    "Five pairs per workload do not resolve tracing cost below workload variance. These samples support no zero-overhead, speedup, tail-latency, or performance-budget claim.",
+    "Commands, durable events, managed-run counts, immutable resources and final resource accounting match across every on/off invocation. The instrumented variant records exactly the expected useful model/tool outcomes with no failures or cancellations."
+  ],
+  "provenance": {
+    "source_normalization_verified": true,
+    "frozen_sources_unchanged_after_measurement": true,
+    "frozen_binaries_unchanged_after_measurement": true,
+    "exact_elision_patch": "Embedded in raw_report.build.elision_patch_text",
+    "build_command": [
+      "cargo",
+      "build",
+      "--release",
+      "--offline",
+      "--locked",
+      "-p",
+      "ejm-harness-bench"
+    ],
+    "build_environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_TARGET_DIR": "/Users/everettmorgan/Desktop/ejm-harness/target"
+    },
+    "build_runner": {
+      "path": "/private/tmp/ejm-capacity-telemetry-compare.py",
+      "sha256": "8ce6255483d030f4dc0e77278fa99d4413095f320204347c85bedf72125ff5c0",
+      "bytes": 10418
+    },
+    "measurement_runner": {
+      "path": "/private/tmp/ejm-capacity-telemetry-measure.py",
+      "sha256": "2dc9a9e773bb51fdb79a88a0bd2e0107a256f04d1d33a61e926fabeaf28f1f3a",
+      "bytes": 7773
+    },
+    "execution_access": "System access was required for sysctl host facts, ps process sampling and native fixture supervision. No network or paid API calls.",
+    "preflight_attempt": {
+      "path": "/private/tmp/ejm-capacity-telemetry-sg90rarp/measurement.preflight-disk-guard.json",
+      "sha256": "6c4a133ca66fcbaf454b300eb7e3436efa75a58be6ccd04558d52509bdce5224",
+      "bytes": 19968,
+      "status": "failed",
+      "samples": 0,
+      "error": "stopped before workload: free disk below 512 MiB",
+      "free_disk_before_bytes": 257048576
+    }
+  },
+  "limits": [
+    "One macOS ARM host with local deterministic fixtures and no paid API calls.",
+    "Fixed mode preserves control choices when outcome tracing is elided; automatic tuning overhead is not isolated here.",
+    "Journal metric storage and snapshot reads remain in both variants; this isolates recurring tracing work.",
+    "Own-process CPU/I/O deltas run from the pre-park snapshot through work and final status, including a one-second park; child CPU is excluded.",
+    "RSS sampling uses the existing ps-based harness at a minimum 20-ms interval, can miss short peaks, and can double-count shared pages.",
+    "Five samples cannot establish tail latency or detect an overhead below workload variance; nearest-rank p95 is the maximum observed sample.",
+    "Lane queue/service histograms include the intentional one-second provider park and coarse timing buckets. work_ms excludes the park; these are fixture timings, not production latency percentiles."
+  ]
+}

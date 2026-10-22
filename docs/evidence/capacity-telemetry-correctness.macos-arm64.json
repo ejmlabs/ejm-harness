@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "date": "2026-10-20",
+  "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "scope": "Lane timing/outcome correctness, separate from admission-credit ownership",
+  "result": {
+    "real_engine_boundary_tests": 5,
+    "existing_timing_separation_tests": 1,
+    "strict_core_all_target_clippy": "passed",
+    "scoped_rustfmt": "passed"
+  },
+  "commands": [
+    "cargo test -p ejm-harness --lib capacity::telemetry --offline --locked -- --test-threads=1",
+    "cargo test -p ejm-harness --lib model_timing_separates_preparation_and_provider_wait_from_service --offline --locked",
+    "cargo clippy -p ejm-harness --all-targets --offline --locked -- -D warnings"
+  ],
+  "cargo_environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "serialization": "/tmp/ejm-capacity-cargo.lock"
+  },
+  "checks": [
+    "one observation per cancelled static/shared/context model admission",
+    "context admission failure and provider callback failure excluded from useful work",
+    "separate queue/preparation/provider wait/service timing intervals",
+    "tool dispatch/resource/workspace waiter cancellation preserves external and retained owner leases",
+    "service starts only at callback entry",
+    "skipped/denied/invalid/error calls excluded from successful tool service",
+    "all fixture accounting drains without observer-owned credit"
+  ],
+  "source_sha256": {
+    "crates/ejm-harness/src/capacity.rs": "23533f67cac12ae24473567c4132b6c5af01969476c1a1e25e3ece7048b56c50",
+    "crates/ejm-harness/src/capacity/telemetry.rs": "540cbe17e5778fb92ef76782e76c1b381ba7ab6e90fa18d6319ec0c746e20cdc",
+    "crates/ejm-harness/src/capacity/tests.rs": "e72ebfe348a96c9b3db33b3c496fe4e4cf1f37da2dfba4894b2c56bf3660baca",
+    "crates/ejm-harness/src/capacity/learning.rs": "87b3d3ff63e1291767515029ab54cf6794f33442acdf873fdf46ba39ba512ba2",
+    "crates/ejm-harness/src/engine/driver.rs": "3e8293360baaf613c4edbf4a26c57f869755c6285434259ce97a15309d550fbb"
+  },
+  "logs": {
+    "ejm-capacity-telemetry-tests-01a155dd.log": "f930528fea3f5d3cf49427c1849605b4fac60b0a464aa0c58a318c3115c32c24",
+    "ejm-capacity-telemetry-stages-01a155dd.log": "4fb899bd650d25afadd0c978b160fa99b80fac213ab49ef617551f19e6d50eb6",
+    "ejm-capacity-telemetry-clippy-01a155dd.log": "1562b7fa7b75c18c6721cdd6848cbe9ba179520d75702702dfe0d25d20ed8911"
+  },
+  "limits": [
+    "Bounded local fixtures with no paid provider or new public API/dependency",
+    "Tracing overhead is measured separately; these correctness checks do not close its performance gate",
+    "Tool callback timing includes admission inside self-governing tools and cannot prove native descendant cleanup"
+  ]
+}
