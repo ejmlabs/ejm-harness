@@ -483,12 +483,15 @@ async fn lost_readiness_reply_rediscovers_before_submitting_a_launch() {
             .await
             .unwrap();
         cached.port = stale.local_addr().unwrap().port();
-        *crate::governor::lock(&handle.inner.cached) = Some(cached);
+        *crate::governor::lock(&handle.inner.cached) = Some(cached.clone());
         let marker = temp.path().join("effects");
         let unsubmitted_marker = marker.clone();
         let disconnected = tokio::spawn(async move {
             let (stream, _) = stale.accept().await.unwrap();
             let mut transport = wire::framed(stream);
+            wire::authenticate_server(&mut transport, &cached)
+                .await
+                .unwrap();
             let hello: Hello = wire::receive(&mut transport).await.unwrap();
             assert!(matches!(hello.action, Action::Hold));
             assert!(!unsubmitted_marker.exists());

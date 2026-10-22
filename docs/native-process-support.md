@@ -29,7 +29,8 @@ The workspace selects an exact-commit [maintained fork](https://github.com/ejmla
 of upstream 0.4.4. Native permanent locks need direct exclusive final-name
 creation and opt-in same-handle owner-only reopening, which the reviewed
 upstream releases do not expose. The repair preserves the upstream dependency
-manifest and licenses. Ordinary state writes keep their existing durability
+manifest and licenses. Preserve the fork’s LICENSE-MIT, LICENSE-APACHE and
+source notices when distributing it. Ordinary state writes keep their existing durability
 contract. Source and native builds use the public fork commit. Cargo registry publication
 waits for a verified registry version; the Git pin does not satisfy that gate.
 
@@ -279,3 +280,25 @@ the new public vault/process/resolver APIs must therefore be pinned by both
 hosts before consumer CI can prove integration. Do not substitute an untrusted
 pull-request harness ref. This local change neither edits shared workflows nor
 produces their reviewed SHA, native jobs, package artifacts, or signing proof.
+
+## Local endpoint authentication
+
+Native protocol 3 authenticates the server before Hello or any launch data.
+The RustCrypto HMAC-SHA256 proof covers a fresh client nonce, protocol, epoch,
+domain and independently observed TCP endpoint ports. A forwarding listener
+cannot reuse a proof for another socket. Existing frame, time and connection
+limits apply. A free owner lock makes a discovered endpoint stale without
+contacting it. This local authentication is not encrypted remote transport.
+
+Relative working directories are resolved in the requesting process before
+serialization. The shared helper does not reinterpret them against its own cwd.
+
+The focused macOS authentication and lifecycle run passed 17 tests, with the
+separate startup and saturation fixtures left unrun. A two-process relative-cwd
+fixture shared the original helper and preserved cwd, environment and streams.
+Strict executor Clippy passed. Native Windows verification remains pending CI.
+The earlier 1,000-agent measurement predates this authentication exchange; it
+must not be described as measuring protocol 3 overhead.
+
+[Filesystem review source](../review/dependency-sources/ejm-rightkit-fs/README.md)
+supplies the exact pinned lock/privacy implementation for offline review.
