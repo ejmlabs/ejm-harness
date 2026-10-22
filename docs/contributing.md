@@ -78,20 +78,20 @@ step. Existing product gate commands, permissions, secret names and human
 admission rules are unchanged. Runtime sources, manifests, locks and public
 SDK contracts do not change.
 
-The target also supports CLI harness selection and an optional UI source pin.
-This harness profile selects no sibling harness. It has no
-`.github/ui-source.json`, so the optional UI checkout, source archive and
-locked npm install stay inactive. Adding such a pin later needs its own
-review; this update adds no UI dependency or package installation.
+The workflow supports CLI harness selection and an optional UI source pin.
+This harness profile selects no sibling harness. Its first UI pin in
+`.github/ui-source.json` selects accepted owner
+`79a1aa8b1075f834717bc0c0299dc2c41a22b966`. After protected acceptance,
+shared preparation exports that exact owner and installs its locked npm
+workspace with lifecycle scripts disabled. No harness runtime depends on UI.
 
-The planned UI adoption retains exact install metadata from protected owner
-revision `79a1aa8b1075f834717bc0c0299dc2c41a22b966` under
-`review/dependency-sources/ejm-ui/`. Its chunk manifest records each original
-mode, blob, size and SHA-256. These 13 complete files are inert review data,
-with ordinary nonexecutable fixture modes. Never import, execute, install or
-package them. Narrow formatter and lint exclusions preserve their exact bytes;
-first-party checks remain active. This preparation selects no UI pin and
-does not establish a complete source supplement for a later owner revision.
+The [install manifest](../review/dependency-sources/ejm-ui/manifest.json)
+binds all 13 retained install metadata files to their owner modes, blobs,
+sizes and SHA-256 hashes. These files are inert review data, not runnable
+source or proof of the new install path. Never import or execute them.
+A fresh admitted change after merge must verify the installed checkout.
+The newer UI source is retained separately for a later pin upgrade and site
+migration. This bootstrap does not activate those changes or publish a site.
 
 ### Review source context
 
