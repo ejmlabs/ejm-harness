@@ -1,0 +1,1258 @@
+{
+  "schema": 1,
+  "checkpoint": "bounded-diagnostics-zombie-identity-and-explicit-exit-progress",
+  "recorded_utc": "2026-10-20T18:29:35.357813+00:00",
+  "status": "focused_verification_passed",
+  "scope": "macOS arm64 executor process sampler correctness and focused package gates; no throughput or helper-footprint measurement",
+  "owner": "ejm-harness-exec",
+  "host": {
+    "architecture": "arm64",
+    "darwin_release": "25.5.0",
+    "xnu_build": "12377.121.10",
+    "source": "Same-session read-only uname captured in pinned kernel provenance."
+  },
+  "diagnostics": {
+    "detail_limit_utf8_bytes": 512,
+    "allocation": "Successful observations and recovered RSS retries add no failure-detail String allocation.",
+    "failure_stages": ["topology_enumeration", "blocking_join", "missing_seed", "owned_rss_retry"],
+    "safe_fields": [
+      "stage",
+      "PID",
+      "expected birth",
+      "TaskAllInfo error",
+      "BSDInfo error or matching identity",
+      "raw BSD status",
+      "INEXIT",
+      "absence confirmation"
+    ],
+    "join_failure_detail": "Cancelled or panicked class only; no panic payload.",
+    "per_job_propagation": "One bounded first diagnostic per affected job, using existing native Completion.error and executor error context."
+  },
+  "guarantees": {
+    "fresh_identity": "Unreadable paired RSS becomes exiting metadata only after a fresh BSD observation matches the selected precise birth and carries native INEXIT; stale selection flags do not suffice.",
+    "precedence": "Birth replacement and positively observed zombie state take precedence over INEXIT. Readable paired identity/RSS remains a readable sample.",
+    "incomplete_rss": "Exiting metadata has no synthetic RSS value. Any aggregate containing it is incomplete and cannot replace the previous complete memory peak.",
+    "retained_ownership": "Exact birth and selected ancestry remain tracked, including newly discovered descendants through an exiting parent.",
+    "occupied_process_count": "Every attributed exiting process still counts against the full process reservation.",
+    "readable_lower_bound": "Readable components remain a memory lower bound and can still trigger the memory limit while another owned RSS is unavailable.",
+    "leases": "Exit progress does not release or reduce any job, host, helper, scope or retained ownership lease. Existing native wait and cleanup remain the release boundary.",
+    "ordinary_unknown": "Unreadable live identity without fresh authoritative exit progress still receives at most the existing one RSS retry, then fails closed and cancels only its affected owner.",
+    "learning_and_growth": "Incomplete per-job RSS does not feed a smaller cost or target growth. Current adaptive learning and target updates do not consume ObservedUsage or CommandOutput peak memory.",
+    "completed_exit": "INEXIT, nonzero-argument BSD visibility, TaskAllInfo failure and elapsed time do not prove task termination, reclaimed RSS, completed descendants or refundable capacity."
+  },
+  "unchanged_contracts": {
+    "sample_interval_ms": 100,
+    "topology": "One shared full-host BSD topology scan, with paired RSS reads selected for owned roots and descendants.",
+    "rss_retry_maximum": 1,
+    "new_retries": 0,
+    "new_timeouts": 0,
+    "new_dependencies": 0,
+    "public_api_changes": false,
+    "native_wire_field_changes": false,
+    "native_wire_protocol_changes": false,
+    "unchanged_manifest_public_and_wire_hashes_across_all_five_checkpoints": {
+      "Cargo.toml": "40ce94b31b2a3b82c0a503139beacfff1fbf1f4e165c0d0f466809fd67ff2d99",
+      "Cargo.lock": "072a52712dd92466e59bd62c31a75bcfdaa430e4e7e66c1d45f33c0854df504a",
+      "crates/ejm-harness-exec/Cargo.toml": "af00431b60bdc32f2323f2f94fbc0e9f0d70b014ace606fe39f753bef4f7482f",
+      "crates/ejm-harness-exec/src/lib.rs": "29614c341baaff1fddee074aba54a7752cb107e606f1de72bc9fd44dbd6bfe9e",
+      "crates/ejm-harness-exec/src/native/wire.rs": "14facaf3222ae03fd26063e3a32dedda92aa2076f168dbc1e745b33a09c3739f"
+    },
+    "changes": "Private sampler metadata, monitor handling, bounded diagnostics and diagnostic formatting helpers only."
+  },
+  "verification_controls": {
+    "global_workload_lock": {
+      "local_path": "/tmp/ejm-capacity-cargo.lock",
+      "mechanism": "exclusive fcntl.flock",
+      "released_after_each_checkpoint": true
+    },
+    "disk_floor_bytes": 10737418240,
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_NET_OFFLINE": "true"
+    },
+    "cargo_flags": ["--offline", "--locked"],
+    "system_access": true,
+    "failed_runs_preserved": true
+  },
+  "runner": {
+    "local_path": "/private/tmp/ejm-native-diagnostic-checks-20261020.py",
+    "sha256": "aa6057a325bb2c92fd1f92277036e0a1729ef9f9a27e122ad2cfb232bdf2b3ba",
+    "source_line_separator": "\n",
+    "source_has_final_newline": true,
+    "source_lines": [
+      "import datetime",
+      "import fcntl",
+      "import hashlib",
+      "import json",
+      "import os",
+      "import pathlib",
+      "import shutil",
+      "import subprocess",
+      "import sys",
+      "import time",
+      "import uuid",
+      "",
+      "",
+      "ROOT = pathlib.Path('/Users/everettmorgan/Desktop/ejm-harness')",
+      "FLOOR = 10 * 1024**3",
+      "OUT = pathlib.Path('/private/tmp/ejm-native-diagnostic-checks-20261020')",
+      "",
+      "",
+      "def stamp():",
+      "    return datetime.datetime.now(datetime.timezone.utc).isoformat()",
+      "",
+      "",
+      "def digest(path):",
+      "    return hashlib.sha256(path.read_bytes()).hexdigest()",
+      "",
+      "",
+      "def source_hashes():",
+      "    files = [ROOT / 'Cargo.toml', ROOT / 'Cargo.lock', ROOT / 'crates/ejm-harness-exec/Cargo.toml']",
+      "    for directory in ('src', 'tests', 'examples'):",
+      "        files.extend((ROOT / 'crates/ejm-harness-exec' / directory).rglob('*.rs'))",
+      "    return {str(path.relative_to(ROOT)): digest(path) for path in sorted(files)}",
+      "",
+      "",
+      "def main():",
+      "    OUT.mkdir(exist_ok=True)",
+      "    evidence = OUT / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])",
+      "    evidence.mkdir(mode=0o700)",
+      "    report = {'started_utc': stamp(), 'evidence': str(evidence), 'runner_sha256': digest(pathlib.Path(__file__)), 'commands': [], 'disk': []}",
+      "    print('EVIDENCE_DIRECTORY=' + str(evidence), flush=True)",
+      "    with open('/tmp/ejm-capacity-cargo.lock', 'a') as workload_lock:",
+      "        print('WAITING_FOR_GLOBAL_LOCK', flush=True)",
+      "        fcntl.flock(workload_lock, fcntl.LOCK_EX)",
+      "        print('GLOBAL_LOCK_ACQUIRED', flush=True)",
+      "        try:",
+      "            report['source_hashes_before'] = source_hashes()",
+      "            environment = dict(os.environ, CARGO_INCREMENTAL='0', CARGO_BUILD_JOBS='2', CARGO_NET_OFFLINE='true')",
+      "            commands = [",
+      "                ['cargo', 'fmt', '--all', '--', '--check'],",
+      "                ['cargo', 'test', '-p', 'ejm-harness-exec', '--all-targets', '--offline', '--locked'],",
+      "                ['cargo', 'clippy', '-p', 'ejm-harness-exec', '--all-targets', '--offline', '--locked', '--', '-D', 'warnings'],",
+      "            ]",
+      "            for index, command in enumerate(commands, 1):",
+      "                free = shutil.disk_usage('/private/tmp').free",
+      "                report['disk'].append({'phase': f'before_command_{index}', 'free_bytes': free, 'timestamp_utc': stamp()})",
+      "                if free < FLOOR:",
+      "                    raise RuntimeError(f'disk floor: {free} bytes free, require {FLOOR}')",
+      "                log = evidence / f'{index:02d}-{command[1]}.log'",
+      "                print('RUNNING=' + json.dumps(command), flush=True)",
+      "                started = time.monotonic()",
+      "                with log.open('wb') as output:",
+      "                    result = subprocess.run(command, cwd=ROOT, env=environment, stdout=output, stderr=subprocess.STDOUT, timeout=600, check=False)",
+      "                observation = {'command': command, 'exit_code': result.returncode, 'elapsed_seconds': time.monotonic() - started, 'log': str(log), 'log_sha256': digest(log)}",
+      "                report['commands'].append(observation)",
+      "                print('FINISHED=' + json.dumps(observation), flush=True)",
+      "                if result.returncode:",
+      "                    raise RuntimeError(f'command {index} failed with exit {result.returncode}')",
+      "            report['status'] = 'passed'",
+      "        except Exception as error:",
+      "            report['status'] = 'failed'",
+      "            report['error'] = str(error)",
+      "        finally:",
+      "            report['source_hashes_after'] = source_hashes()",
+      "            report['sources_unchanged'] = report.get('source_hashes_before') == report['source_hashes_after']",
+      "            if not report['sources_unchanged']:",
+      "                report['status'] = 'failed'",
+      "                report.setdefault('error', 'executor source changed during checks')",
+      "            report['finished_utc'] = stamp()",
+      "            (evidence / 'report.json').write_text(json.dumps(report, indent=2) + '\\n')",
+      "            print(json.dumps({'status': report['status'], 'error': report.get('error'), 'sources_unchanged': report['sources_unchanged'], 'report': str(evidence / 'report.json')}), flush=True)",
+      "    print('GLOBAL_LOCK_RELEASED', flush=True)",
+      "    return 0 if report['status'] == 'passed' else 1",
+      "",
+      "",
+      "if __name__ == '__main__':",
+      "    sys.exit(main())"
+    ]
+  },
+  "checkpoints": [
+    {
+      "checkpoint": "semantic_failure_before_zombie_inclusive_bsd",
+      "status": "failed",
+      "started_utc": "2026-10-20T17:46:40.193237+00:00",
+      "finished_utc": "2026-10-20T17:46:50.366086+00:00",
+      "raw_report": {
+        "local_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T174640Z-d6f27f8a/report.json",
+        "sha256": "0215ea42304fa0ba1816038cb7636172866e49d9d854dab6ff3f27a4da16995f"
+      },
+      "runner_sha256": "aa6057a325bb2c92fd1f92277036e0a1729ef9f9a27e122ad2cfb232bdf2b3ba",
+      "sources_unchanged": true,
+      "focused_source_hashes": {
+        "crates/ejm-harness-exec/src/processes/macos.rs": "9b77d7ebc84ab1547ccf9fd58443065bae66e1f91da69eb2bfc9470dae9b06fc",
+        "crates/ejm-harness-exec/src/processes.rs": "904ae1b760c19e2e67a8968949d5ecdec8f2b6e21db5649cf3f0b8a86247d399",
+        "crates/ejm-harness-exec/src/monitor.rs": "a80d5ee338a9109948719460df830a93e468fea248472aa9e00c4700e18b95b9",
+        "crates/ejm-harness-exec/src/executor.rs": "c3640569ecdc10691f5aa2fbbdb7941accf36c47dc7d925df91a9ccce02de3bf",
+        "crates/ejm-harness-exec/src/native/owner.rs": "cd2539431b065b0f514aef3b7a7e30a429a51386534da47e6df745d21061af6c",
+        "crates/ejm-harness-exec/src/native.rs": "6d9c5a69dff0726d0a41678cab817c1a33780221855611ac5e8c5d401a038d1b"
+      },
+      "commands": [
+        {
+          "command": ["cargo", "fmt", "--all", "--", "--check"],
+          "exit_code": 0,
+          "elapsed_seconds": 0.49038045800989494,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T174640Z-d6f27f8a/01-fmt.log",
+          "portable_log_excerpt": []
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "ejm-harness-exec",
+            "--all-targets",
+            "--offline",
+            "--locked"
+          ],
+          "exit_code": 101,
+          "elapsed_seconds": 9.670288458000869,
+          "log_sha256": "0500c3fb3eda20191d30b7b3c3b7a51075c6b58cdd11bf1bcd424076e4c8bbeb",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T174640Z-d6f27f8a/02-test.log",
+          "test_counts": {
+            "passed": 35,
+            "failed": 1,
+            "ignored": 1,
+            "suites": [
+              {
+                "target": "Running unittests src/lib.rs (target/debug/deps/ejm_harness_exec-9eca716e6a350983)",
+                "result": "FAILED",
+                "passed": 35,
+                "failed": 1,
+                "ignored": 1,
+                "summary": "test result: FAILED. 35 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.19s"
+              }
+            ]
+          },
+          "portable_log_excerpt": [
+            "test native::tests::incompatible_requests_are_rejected_before_native_effects ... FAILED",
+            "---- native::tests::incompatible_requests_are_rejected_before_native_effects stdout ----",
+            "thread 'native::tests::incompatible_requests_are_rejected_before_native_effects' (32489464) panicked at crates/ejm-harness-exec/src/native/tests.rs:602:36:",
+            "    native::tests::incompatible_requests_are_rejected_before_native_effects",
+            "test result: FAILED. 35 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.19s"
+          ]
+        }
+      ],
+      "semantic_failure": {
+        "test": "native::tests::incompatible_requests_are_rejected_before_native_effects",
+        "native_command": "/usr/bin/true",
+        "failure_stage": "owned_rss_retry",
+        "bounded_detail": "stage=owned_rss_retry; pid=57453; expected_birth=1792518406305449; first=[task_all=return code = 0, errno = 3, message = 'No such process'; bsd=return code = 0, errno = 3, message = 'No such process'; absence=unconfirmed]; retry=[task_all=return code = 0, errno = 3, message = 'No such process'; bsd=return code = 0, errno = 3, message = 'No such process'; absence=unconfirmed]",
+        "bounded_detail_utf8_bytes": 377,
+        "detail_limit_bytes": 512,
+        "clippy_reached": false
+      }
+    },
+    {
+      "checkpoint": "semantic_failure_after_zombie_fix_before_exit_progress",
+      "status": "failed",
+      "started_utc": "2026-10-20T18:00:15.390843+00:00",
+      "finished_utc": "2026-10-20T18:00:25.726607+00:00",
+      "raw_report": {
+        "local_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T180015Z-fd992c4f/report.json",
+        "sha256": "4efce502b91f5c6d8d6d4945968089e70d09c51c07be9f79141a4e023ff8afc9"
+      },
+      "runner_sha256": "aa6057a325bb2c92fd1f92277036e0a1729ef9f9a27e122ad2cfb232bdf2b3ba",
+      "sources_unchanged": true,
+      "focused_source_hashes": {
+        "crates/ejm-harness-exec/src/processes/macos.rs": "556bfff0f440d90b072d17a7f99d74d00b53c22bad2388bed9e2de3cdc3c14de",
+        "crates/ejm-harness-exec/src/processes.rs": "904ae1b760c19e2e67a8968949d5ecdec8f2b6e21db5649cf3f0b8a86247d399",
+        "crates/ejm-harness-exec/src/monitor.rs": "121eeebd4ba6b3e409b2ce74d332735bd40bbdbb4aab8bfb3496ea307985ccf5",
+        "crates/ejm-harness-exec/src/executor.rs": "c3640569ecdc10691f5aa2fbbdb7941accf36c47dc7d925df91a9ccce02de3bf",
+        "crates/ejm-harness-exec/src/native/owner.rs": "cd2539431b065b0f514aef3b7a7e30a429a51386534da47e6df745d21061af6c",
+        "crates/ejm-harness-exec/src/native.rs": "6d9c5a69dff0726d0a41678cab817c1a33780221855611ac5e8c5d401a038d1b"
+      },
+      "commands": [
+        {
+          "command": ["cargo", "fmt", "--all", "--", "--check"],
+          "exit_code": 0,
+          "elapsed_seconds": 0.522163083020132,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T180015Z-fd992c4f/01-fmt.log",
+          "portable_log_excerpt": []
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "ejm-harness-exec",
+            "--all-targets",
+            "--offline",
+            "--locked"
+          ],
+          "exit_code": 101,
+          "elapsed_seconds": 9.800362874986604,
+          "log_sha256": "89cf1704be85f8a362a3a6e70f65c69468e8a64b2735d23f4d658b840d34e063",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T180015Z-fd992c4f/02-test.log",
+          "test_counts": {
+            "passed": 35,
+            "failed": 1,
+            "ignored": 1,
+            "suites": [
+              {
+                "target": "Running unittests src/lib.rs (target/debug/deps/ejm_harness_exec-9eca716e6a350983)",
+                "result": "FAILED",
+                "passed": 35,
+                "failed": 1,
+                "ignored": 1,
+                "summary": "test result: FAILED. 35 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.16s"
+              }
+            ]
+          },
+          "portable_log_excerpt": [
+            "test native::tests::domain_selection_is_shared_and_existing_readiness_stays_fixed ... FAILED",
+            "---- native::tests::domain_selection_is_shared_and_existing_readiness_stays_fixed stdout ----",
+            "thread 'native::tests::domain_selection_is_shared_and_existing_readiness_stays_fixed' (32512271) panicked at crates/ejm-harness-exec/src/native/tests.rs:126:36:",
+            "    native::tests::domain_selection_is_shared_and_existing_readiness_stays_fixed",
+            "test result: FAILED. 35 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.16s"
+          ]
+        }
+      ],
+      "semantic_failure": {
+        "test": "native::tests::domain_selection_is_shared_and_existing_readiness_stays_fixed",
+        "native_command": "/usr/bin/true",
+        "failure_stage": "owned_rss_retry",
+        "bounded_detail": "stage=owned_rss_retry; pid=63145; expected_birth=1792519222017335; first=[task_all=return code = 0, errno = 3, message = 'No such process'; bsd=matching_live_identity; absence=not_checked]; retry=[task_all=return code = 0, errno = 3, message = 'No such process'; bsd=matching_live_identity; absence=not_checked]",
+        "bounded_detail_utf8_bytes": 311,
+        "detail_limit_bytes": 512,
+        "clippy_reached": false
+      }
+    },
+    {
+      "checkpoint": "semantic_tests_passed_clippy_only_failure",
+      "status": "failed",
+      "started_utc": "2026-10-20T18:15:41.593851+00:00",
+      "finished_utc": "2026-10-20T18:15:54.646654+00:00",
+      "raw_report": {
+        "local_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T181541Z-705c564f/report.json",
+        "sha256": "5fa8c04f6e47ff7eff6c025517bc111b6dc13eed33f42b13adfbfc3caee7c622"
+      },
+      "runner_sha256": "aa6057a325bb2c92fd1f92277036e0a1729ef9f9a27e122ad2cfb232bdf2b3ba",
+      "sources_unchanged": true,
+      "focused_source_hashes": {
+        "crates/ejm-harness-exec/src/processes/macos.rs": "de9a88c8002e9c7960f0bce06d4f6013b25a335f83d090ae94b6b1a2c68d3b5a",
+        "crates/ejm-harness-exec/src/processes.rs": "0ca642c9fcf842abcbc8e6055e3f7bc07a5af9ac13dd026c8a4448265cf2b3d2",
+        "crates/ejm-harness-exec/src/monitor.rs": "9092bac00bd40b7576eda5f5256118382c25ddd8ac8a16108a512510627cd8bc",
+        "crates/ejm-harness-exec/src/executor.rs": "c3640569ecdc10691f5aa2fbbdb7941accf36c47dc7d925df91a9ccce02de3bf",
+        "crates/ejm-harness-exec/src/native/owner.rs": "cd2539431b065b0f514aef3b7a7e30a429a51386534da47e6df745d21061af6c",
+        "crates/ejm-harness-exec/src/native.rs": "6d9c5a69dff0726d0a41678cab817c1a33780221855611ac5e8c5d401a038d1b"
+      },
+      "commands": [
+        {
+          "command": ["cargo", "fmt", "--all", "--", "--check"],
+          "exit_code": 0,
+          "elapsed_seconds": 0.5362699170364067,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T181541Z-705c564f/01-fmt.log",
+          "portable_log_excerpt": []
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "ejm-harness-exec",
+            "--all-targets",
+            "--offline",
+            "--locked"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 11.180712999950629,
+          "log_sha256": "b1cc0f583da77c0786829d9af8967d59d029c8b29f8d4da372aba7e19d023cc2",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T181541Z-705c564f/02-test.log",
+          "test_counts": {
+            "passed": 76,
+            "failed": 0,
+            "ignored": 2,
+            "suites": [
+              {
+                "target": "Running unittests src/lib.rs (target/debug/deps/ejm_harness_exec-9eca716e6a350983)",
+                "result": "ok",
+                "passed": 39,
+                "failed": 0,
+                "ignored": 1,
+                "summary": "test result: ok. 39 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.12s"
+              },
+              {
+                "target": "Running tests/capacity.rs (target/debug/deps/capacity-7a114f898512b1dd)",
+                "result": "ok",
+                "passed": 13,
+                "failed": 0,
+                "ignored": 0,
+                "summary": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+              },
+              {
+                "target": "Running tests/executor.rs (target/debug/deps/executor-7cce6117ffd61313)",
+                "result": "ok",
+                "passed": 16,
+                "failed": 0,
+                "ignored": 1,
+                "summary": "test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.21s"
+              },
+              {
+                "target": "Running tests/governor.rs (target/debug/deps/governor-b360bb9ab7341735)",
+                "result": "ok",
+                "passed": 8,
+                "failed": 0,
+                "ignored": 0,
+                "summary": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+              },
+              {
+                "target": "Running unittests examples/native_owner_helper.rs (target/debug/examples/native_owner_helper-75c645644c223e7a)",
+                "result": "ok",
+                "passed": 0,
+                "failed": 0,
+                "ignored": 0,
+                "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+              },
+              {
+                "target": "Running unittests examples/native_owner_smoke.rs (target/debug/examples/native_owner_smoke-36576305e6f4ae7c)",
+                "result": "ok",
+                "passed": 0,
+                "failed": 0,
+                "ignored": 0,
+                "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+              }
+            ]
+          },
+          "portable_log_excerpt": [
+            "test result: ok. 39 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.12s",
+            "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+            "test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.21s",
+            "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          ]
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "-p",
+            "ejm-harness-exec",
+            "--all-targets",
+            "--offline",
+            "--locked",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 101,
+          "elapsed_seconds": 1.3235814580111764,
+          "log_sha256": "dbd757dfbaacb775768678e22bccb6a6620e46d4994d830f16857b9789fa6820",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T181541Z-705c564f/03-clippy.log",
+          "portable_log_excerpt": [
+            "error: binding's name is too similar to existing binding",
+            "   --> crates/ejm-harness-exec/src/monitor.rs:141:29",
+            "   --> crates/ejm-harness-exec/src/monitor.rs:140:22",
+            "error: this function has too many lines (101/100)",
+            "   --> crates/ejm-harness-exec/src/executor.rs:248:5",
+            "error: this function has too many lines (104/100)",
+            "   --> crates/ejm-harness-exec/src/native/owner.rs:134:1",
+            "error: could not compile `ejm-harness-exec` (lib) due to 3 previous errors",
+            "error: could not compile `ejm-harness-exec` (lib test) due to 3 previous errors"
+          ]
+        }
+      ]
+    },
+    {
+      "checkpoint": "semantic_tests_passed_remaining_clippy_only_failure",
+      "status": "failed",
+      "started_utc": "2026-10-20T18:19:28.060147+00:00",
+      "finished_utc": "2026-10-20T18:19:40.764347+00:00",
+      "raw_report": {
+        "local_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T181928Z-9cc06cce/report.json",
+        "sha256": "a24b6ac8ecbf4f9fe82111a1bab0bc44dcb4a4212c390ed9ee8a9cc92102179b"
+      },
+      "runner_sha256": "aa6057a325bb2c92fd1f92277036e0a1729ef9f9a27e122ad2cfb232bdf2b3ba",
+      "sources_unchanged": true,
+      "focused_source_hashes": {
+        "crates/ejm-harness-exec/src/processes/macos.rs": "de9a88c8002e9c7960f0bce06d4f6013b25a335f83d090ae94b6b1a2c68d3b5a",
+        "crates/ejm-harness-exec/src/processes.rs": "0ca642c9fcf842abcbc8e6055e3f7bc07a5af9ac13dd026c8a4448265cf2b3d2",
+        "crates/ejm-harness-exec/src/monitor.rs": "2e7bea6372e883f43ecd927d18d30987702395c257a950ff81077e1ec9c0cf46",
+        "crates/ejm-harness-exec/src/executor.rs": "5054530f5e8d28b026edebb47c826e1f9083249b897274950f3cd7d3692bf503",
+        "crates/ejm-harness-exec/src/native/owner.rs": "1af9f6bb983c2cbe7fb1fbc658a7bb21ef391a1d568278d915ec6c18fc8fc07f",
+        "crates/ejm-harness-exec/src/native.rs": "6d9c5a69dff0726d0a41678cab817c1a33780221855611ac5e8c5d401a038d1b"
+      },
+      "commands": [
+        {
+          "command": ["cargo", "fmt", "--all", "--", "--check"],
+          "exit_code": 0,
+          "elapsed_seconds": 0.4750994580099359,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T181928Z-9cc06cce/01-fmt.log",
+          "portable_log_excerpt": []
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "ejm-harness-exec",
+            "--all-targets",
+            "--offline",
+            "--locked"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 10.914904458040837,
+          "log_sha256": "50350c2d9421ce2d2f7aeaf035b391b4303cc0b7defe2cb9509f3d573b23665d",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T181928Z-9cc06cce/02-test.log",
+          "test_counts": {
+            "passed": 76,
+            "failed": 0,
+            "ignored": 2,
+            "suites": [
+              {
+                "target": "Running unittests src/lib.rs (target/debug/deps/ejm_harness_exec-9eca716e6a350983)",
+                "result": "ok",
+                "passed": 39,
+                "failed": 0,
+                "ignored": 1,
+                "summary": "test result: ok. 39 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.17s"
+              },
+              {
+                "target": "Running tests/capacity.rs (target/debug/deps/capacity-7a114f898512b1dd)",
+                "result": "ok",
+                "passed": 13,
+                "failed": 0,
+                "ignored": 0,
+                "summary": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+              },
+              {
+                "target": "Running tests/executor.rs (target/debug/deps/executor-7cce6117ffd61313)",
+                "result": "ok",
+                "passed": 16,
+                "failed": 0,
+                "ignored": 1,
+                "summary": "test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.21s"
+              },
+              {
+                "target": "Running tests/governor.rs (target/debug/deps/governor-b360bb9ab7341735)",
+                "result": "ok",
+                "passed": 8,
+                "failed": 0,
+                "ignored": 0,
+                "summary": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+              },
+              {
+                "target": "Running unittests examples/native_owner_helper.rs (target/debug/examples/native_owner_helper-75c645644c223e7a)",
+                "result": "ok",
+                "passed": 0,
+                "failed": 0,
+                "ignored": 0,
+                "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+              },
+              {
+                "target": "Running unittests examples/native_owner_smoke.rs (target/debug/examples/native_owner_smoke-36576305e6f4ae7c)",
+                "result": "ok",
+                "passed": 0,
+                "failed": 0,
+                "ignored": 0,
+                "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+              }
+            ]
+          },
+          "portable_log_excerpt": [
+            "test result: ok. 39 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.17s",
+            "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+            "test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.21s",
+            "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          ]
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "-p",
+            "ejm-harness-exec",
+            "--all-targets",
+            "--offline",
+            "--locked",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 101,
+          "elapsed_seconds": 1.3054194580181502,
+          "log_sha256": "25176a2caea8b3d8448d5203ff353bb6fbae503dab1ba838c57064198065a0f2",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T181928Z-9cc06cce/03-clippy.log",
+          "portable_log_excerpt": [
+            "error: unused import: `bail`",
+            " --> crates/ejm-harness-exec/src/executor.rs:9:31",
+            "error: this function has too many lines (101/100)",
+            "   --> crates/ejm-harness-exec/src/native/owner.rs:134:1",
+            "error: could not compile `ejm-harness-exec` (lib) due to 2 previous errors",
+            "error: could not compile `ejm-harness-exec` (lib test) due to 2 previous errors"
+          ]
+        }
+      ]
+    },
+    {
+      "checkpoint": "final_focused_green",
+      "status": "passed",
+      "started_utc": "2026-10-20T18:22:34.292275+00:00",
+      "finished_utc": "2026-10-20T18:22:47.351084+00:00",
+      "raw_report": {
+        "local_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T182234Z-e34dc696/report.json",
+        "sha256": "49a771745e49369bbfc0a681522213870156d306d89f7b5e8d7ac9736d5bd22e"
+      },
+      "runner_sha256": "aa6057a325bb2c92fd1f92277036e0a1729ef9f9a27e122ad2cfb232bdf2b3ba",
+      "sources_unchanged": true,
+      "focused_source_hashes": {
+        "crates/ejm-harness-exec/src/processes/macos.rs": "de9a88c8002e9c7960f0bce06d4f6013b25a335f83d090ae94b6b1a2c68d3b5a",
+        "crates/ejm-harness-exec/src/processes.rs": "0ca642c9fcf842abcbc8e6055e3f7bc07a5af9ac13dd026c8a4448265cf2b3d2",
+        "crates/ejm-harness-exec/src/monitor.rs": "2e7bea6372e883f43ecd927d18d30987702395c257a950ff81077e1ec9c0cf46",
+        "crates/ejm-harness-exec/src/executor.rs": "f18c7bc6ba855a00c3d3357fd8455d86139c104f64a55a0280bae615cae9758b",
+        "crates/ejm-harness-exec/src/native/owner.rs": "0248571ec68133af319cf460ee26527c44b21dd1736df9cf15a508fc38e1e8ef",
+        "crates/ejm-harness-exec/src/native.rs": "6d9c5a69dff0726d0a41678cab817c1a33780221855611ac5e8c5d401a038d1b"
+      },
+      "commands": [
+        {
+          "command": ["cargo", "fmt", "--all", "--", "--check"],
+          "exit_code": 0,
+          "elapsed_seconds": 0.35022075002780184,
+          "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T182234Z-e34dc696/01-fmt.log",
+          "portable_log_excerpt": []
+        },
+        {
+          "command": [
+            "cargo",
+            "test",
+            "-p",
+            "ejm-harness-exec",
+            "--all-targets",
+            "--offline",
+            "--locked"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 11.258149416011292,
+          "log_sha256": "b4798f30a331db07252faa02a135bf6fab911ef64319a5fbe866da3490dd2717",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T182234Z-e34dc696/02-test.log",
+          "test_counts": {
+            "passed": 76,
+            "failed": 0,
+            "ignored": 2,
+            "suites": [
+              {
+                "target": "Running unittests src/lib.rs (target/debug/deps/ejm_harness_exec-9eca716e6a350983)",
+                "result": "ok",
+                "passed": 39,
+                "failed": 0,
+                "ignored": 1,
+                "summary": "test result: ok. 39 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.15s"
+              },
+              {
+                "target": "Running tests/capacity.rs (target/debug/deps/capacity-7a114f898512b1dd)",
+                "result": "ok",
+                "passed": 13,
+                "failed": 0,
+                "ignored": 0,
+                "summary": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+              },
+              {
+                "target": "Running tests/executor.rs (target/debug/deps/executor-7cce6117ffd61313)",
+                "result": "ok",
+                "passed": 16,
+                "failed": 0,
+                "ignored": 1,
+                "summary": "test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.21s"
+              },
+              {
+                "target": "Running tests/governor.rs (target/debug/deps/governor-b360bb9ab7341735)",
+                "result": "ok",
+                "passed": 8,
+                "failed": 0,
+                "ignored": 0,
+                "summary": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+              },
+              {
+                "target": "Running unittests examples/native_owner_helper.rs (target/debug/examples/native_owner_helper-75c645644c223e7a)",
+                "result": "ok",
+                "passed": 0,
+                "failed": 0,
+                "ignored": 0,
+                "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+              },
+              {
+                "target": "Running unittests examples/native_owner_smoke.rs (target/debug/examples/native_owner_smoke-36576305e6f4ae7c)",
+                "result": "ok",
+                "passed": 0,
+                "failed": 0,
+                "ignored": 0,
+                "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+              }
+            ]
+          },
+          "portable_log_excerpt": [
+            "test result: ok. 39 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.15s",
+            "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+            "test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.21s",
+            "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+            "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+          ]
+        },
+        {
+          "command": [
+            "cargo",
+            "clippy",
+            "-p",
+            "ejm-harness-exec",
+            "--all-targets",
+            "--offline",
+            "--locked",
+            "--",
+            "-D",
+            "warnings"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 1.4429996670223773,
+          "log_sha256": "2288117e01c300d874d4b9a8d3262fcb175205dbfee6b59c21c5dffa292be21e",
+          "local_log_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T182234Z-e34dc696/03-clippy.log",
+          "portable_log_excerpt": [
+            "    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.39s"
+          ]
+        }
+      ]
+    }
+  ],
+  "final_green": {
+    "raw_report": {
+      "local_path": "/private/tmp/ejm-native-diagnostic-checks-20261020/20261020T182234Z-e34dc696/report.json",
+      "sha256": "49a771745e49369bbfc0a681522213870156d306d89f7b5e8d7ac9736d5bd22e"
+    },
+    "source_hashes_before_and_after": {
+      "Cargo.lock": "072a52712dd92466e59bd62c31a75bcfdaa430e4e7e66c1d45f33c0854df504a",
+      "Cargo.toml": "40ce94b31b2a3b82c0a503139beacfff1fbf1f4e165c0d0f466809fd67ff2d99",
+      "crates/ejm-harness-exec/Cargo.toml": "af00431b60bdc32f2323f2f94fbc0e9f0d70b014ace606fe39f753bef4f7482f",
+      "crates/ejm-harness-exec/examples/native_owner_helper.rs": "1d00dad2855ec36af3e461841ce56c99d86fbd7e007052ef5fed1759c6d48b1b",
+      "crates/ejm-harness-exec/examples/native_owner_smoke.rs": "504faeba4e5ec364f17dab9c4ec1deb4f64f8bd34fd9d726edefd7b3b84d03a8",
+      "crates/ejm-harness-exec/src/capacity.rs": "0d972f75ab8c6fe9e676fb27f9231d478defdc9507295415b903633b404f3f9a",
+      "crates/ejm-harness-exec/src/executor.rs": "f18c7bc6ba855a00c3d3357fd8455d86139c104f64a55a0280bae615cae9758b",
+      "crates/ejm-harness-exec/src/governor.rs": "e00b0d4149b80692a5a880aae0d292d09c56f8f09f19f02c88332bdb411d6976",
+      "crates/ejm-harness-exec/src/lib.rs": "29614c341baaff1fddee074aba54a7752cb107e606f1de72bc9fd44dbd6bfe9e",
+      "crates/ejm-harness-exec/src/monitor.rs": "2e7bea6372e883f43ecd927d18d30987702395c257a950ff81077e1ec9c0cf46",
+      "crates/ejm-harness-exec/src/native/admission.rs": "d6b4556737c98acdda25ac7c1072cd74dc93459773dee00a39c3a5df924bebcf",
+      "crates/ejm-harness-exec/src/native/client.rs": "4926a6133d6dbf57b00056d1cd9dd44c3f5270404108770971e44fc02049c2b5",
+      "crates/ejm-harness-exec/src/native/owner.rs": "0248571ec68133af319cf460ee26527c44b21dd1736df9cf15a508fc38e1e8ef",
+      "crates/ejm-harness-exec/src/native/placement.rs": "5585fa7f9e19ed49ea3380b389257f2a7331291b1d99ec5b621f019acc88d635",
+      "crates/ejm-harness-exec/src/native/recovery.rs": "ada62279e10867f53fd4401b46527a93a8eb51592b816ed9c9f9f965b23ffefb",
+      "crates/ejm-harness-exec/src/native/tests.rs": "3e518b6810bbf9ebb03c6bbe9ffb9d7f57d0c2f9f77372c74ff8a3f0226dfee8",
+      "crates/ejm-harness-exec/src/native/wire.rs": "14facaf3222ae03fd26063e3a32dedda92aa2076f168dbc1e745b33a09c3739f",
+      "crates/ejm-harness-exec/src/native.rs": "6d9c5a69dff0726d0a41678cab817c1a33780221855611ac5e8c5d401a038d1b",
+      "crates/ejm-harness-exec/src/observations/linux.rs": "d9b6858499a44700ff9f31d52fa8388a966d07a7c5284fc50a8f6c3927e78637",
+      "crates/ejm-harness-exec/src/observations.rs": "7c5a015d7f0aa4d1a4b64bd5e08f8d98060f137c09cee4a3f148436c1ae5d43d",
+      "crates/ejm-harness-exec/src/process.rs": "49eccd29aef316295dd1b92de38e6e11b0b65d225af5fddaaadf3f7cf1bfaad6",
+      "crates/ejm-harness-exec/src/processes/macos.rs": "de9a88c8002e9c7960f0bce06d4f6013b25a335f83d090ae94b6b1a2c68d3b5a",
+      "crates/ejm-harness-exec/src/processes.rs": "0ca642c9fcf842abcbc8e6055e3f7bc07a5af9ac13dd026c8a4448265cf2b3d2",
+      "crates/ejm-harness-exec/tests/capacity.rs": "cb0eea98ce103b9625ea4dfc9c709ceb3bfada725b7719667c711e50ce29c8ed",
+      "crates/ejm-harness-exec/tests/executor.rs": "38d058f21127796ae7554d06ddea4ce89dda6c925c91de994cdab56d56e93979",
+      "crates/ejm-harness-exec/tests/governor.rs": "16570fdf96e35415048c190603c55e83bdbe64cee854726399e6612cf9bffe08"
+    },
+    "sources_unchanged": true,
+    "current_files_match_frozen_hashes_when_packaged": true,
+    "disk_samples": [
+      {
+        "phase": "before_command_1",
+        "free_bytes": 25428918272,
+        "timestamp_utc": "2026-10-20T18:22:34.297436+00:00"
+      },
+      {
+        "phase": "before_command_2",
+        "free_bytes": 25428918272,
+        "timestamp_utc": "2026-10-20T18:22:34.647840+00:00"
+      },
+      {
+        "phase": "before_command_3",
+        "free_bytes": 25426972672,
+        "timestamp_utc": "2026-10-20T18:22:45.906416+00:00"
+      }
+    ],
+    "tests": {
+      "passed": 76,
+      "failed": 0,
+      "ignored": 2,
+      "suites": [
+        {
+          "target": "Running unittests src/lib.rs (target/debug/deps/ejm_harness_exec-9eca716e6a350983)",
+          "result": "ok",
+          "passed": 39,
+          "failed": 0,
+          "ignored": 1,
+          "summary": "test result: ok. 39 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.15s"
+        },
+        {
+          "target": "Running tests/capacity.rs (target/debug/deps/capacity-7a114f898512b1dd)",
+          "result": "ok",
+          "passed": 13,
+          "failed": 0,
+          "ignored": 0,
+          "summary": "test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s"
+        },
+        {
+          "target": "Running tests/executor.rs (target/debug/deps/executor-7cce6117ffd61313)",
+          "result": "ok",
+          "passed": 16,
+          "failed": 0,
+          "ignored": 1,
+          "summary": "test result: ok. 16 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.21s"
+        },
+        {
+          "target": "Running tests/governor.rs (target/debug/deps/governor-b360bb9ab7341735)",
+          "result": "ok",
+          "passed": 8,
+          "failed": 0,
+          "ignored": 0,
+          "summary": "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "target": "Running unittests examples/native_owner_helper.rs (target/debug/examples/native_owner_helper-75c645644c223e7a)",
+          "result": "ok",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        },
+        {
+          "target": "Running unittests examples/native_owner_smoke.rs (target/debug/examples/native_owner_smoke-36576305e6f4ae7c)",
+          "result": "ok",
+          "passed": 0,
+          "failed": 0,
+          "ignored": 0,
+          "summary": "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+        }
+      ]
+    },
+    "formatting_passed": true,
+    "strict_clippy_passed": true
+  },
+  "regression_coverage": [
+    {
+      "path": "crates/ejm-harness-exec/src/processes.rs",
+      "test": "sampling_failure_details_keep_a_bounded_utf8_prefix",
+      "protects": "UTF-8-safe 512-byte diagnostic bounds."
+    },
+    {
+      "path": "crates/ejm-harness-exec/src/processes/macos.rs",
+      "test": "failed_memory_read_retries_once_without_losing_accounting",
+      "protects": "Bounded calls, ordinary uncertainty, and fresh initial or retried INEXIT progress."
+    },
+    {
+      "path": "crates/ejm-harness-exec/src/processes/macos.rs",
+      "test": "retried_memory_read_revalidates_replacement_and_exit",
+      "protects": "Birth replacement and zombie/absence precedence over progress."
+    },
+    {
+      "path": "crates/ejm-harness-exec/src/processes/macos.rs",
+      "test": "selected_exit_progress_requires_fresh_evidence_after_rss_failure",
+      "protects": "Stale flags cannot excuse unknown memory, while readable RSS remains authoritative."
+    },
+    {
+      "path": "crates/ejm-harness-exec/src/processes/macos.rs",
+      "test": "retained_normal_exit_does_not_become_an_unreadable_process",
+      "protects": "Positive same-birth zombie observation before reap and clean sampling after reap."
+    },
+    {
+      "path": "crates/ejm-harness-exec/src/monitor.rs",
+      "test": "exiting_ancestry_retains_occupancy_and_the_last_complete_memory_peak",
+      "protects": "Exact ownership/ancestry, incomplete peak retention, and readable lower-bound enforcement."
+    },
+    {
+      "path": "crates/ejm-harness-exec/src/monitor.rs",
+      "test": "exiting_processes_still_enforce_the_full_process_limit",
+      "protects": "Exiting processes remain occupied and descendants count against the limit."
+    },
+    {
+      "path": "crates/ejm-harness-exec/src/monitor.rs",
+      "test": "uncertain_descendants_retain_identity_and_cancel_only_their_owner",
+      "protects": "Ordinary unknown observations retain identities and fail only their affected job, with bounded diagnostic propagation."
+    }
+  ],
+  "kernel_source_evidence": {
+    "repository": "apple-oss-distributions/xnu",
+    "tag": "xnu-12377.121.6",
+    "tag_object_sha": "9b6e7590204b89788e28b137ddfc897bb1292d8b",
+    "commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+    "host_version_limit": "The returned Apple tag snapshot has no xnu-12377.121.10 tag. Evidence uses the nearby public xnu-12377.121.6 tag, not the exact installed kernel build.",
+    "interpretation_limit": "The captured second failure did not record INEXIT or raw BSD status. Pinned nearby source supports an exit path that permits its call sequence; it is not runtime proof that either historical failing PID took that path. Other TaskAllInfo failure causes remain possible.",
+    "libproc": {
+      "version": "0.14.11",
+      "commit": "9c5b669ca414918eadc81e70ec654505a0c8a93f",
+      "typed_error_limit": "pidinfo<T> returns Result<T, String>. Diagnostic errno text is not parsed, and last_os_error after formatting is not used for classification."
+    },
+    "sources": [
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+        "path": "bsd/kern/proc_info.c",
+        "git_blob_sha": "23bb9d616ded31edb69ac61f40c76a1a322303a9"
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+        "path": "bsd/kern/kern_proc.c",
+        "git_blob_sha": "dfb3a45064614be24b7fed96d0a05e0dbdb36d41"
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+        "path": "bsd/kern/kern_exit.c",
+        "git_blob_sha": "b5633e45be897491c3b670c5944fc198ec662c60"
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+        "path": "bsd/kern/kern_sig.c",
+        "git_blob_sha": "c25ed3fb98106095c82e12177f9e85a4c9dea7be"
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+        "path": "bsd/sys/proc_info.h",
+        "git_blob_sha": "13132b4571b1a146e93a727d091f5c2405b7d312"
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+        "path": "bsd/sys/proc_internal.h",
+        "git_blob_sha": "22a54a70058e6823798bf46f43a5bf2971f241c7"
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+        "path": "osfmk/kern/task.c",
+        "git_blob_sha": "bac41b9376b7c1cadac5ed0ca09edd6807d0c458"
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "commit": "ac9718fb1af618d5ce8678d0dc6e8a58f252216f",
+        "path": "osfmk/kern/thread.c",
+        "git_blob_sha": "25245beacee116a0852393e272d3b385d3d986e0"
+      },
+      {
+        "repository": "andrewdavidmackenzie/libproc-rs",
+        "commit": "9c5b669ca414918eadc81e70ec654505a0c8a93f",
+        "path": "src/libproc/proc_pid.rs",
+        "git_blob_sha": "b3b2d0c9be8e0ac51e0b89f3084fa2f0071c5a8e"
+      },
+      {
+        "repository": "andrewdavidmackenzie/libproc-rs",
+        "commit": "9c5b669ca414918eadc81e70ec654505a0c8a93f",
+        "path": "src/libproc/helpers.rs",
+        "git_blob_sha": "a1b270c5eb1cc41aa49dfc507382cd5b08758df6"
+      }
+    ],
+    "excerpts": [
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "bsd/kern/proc_info.c",
+        "first_line": 2198,
+        "last_line": 2214,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/proc_info.c#L2198-L2214",
+        "meaning": "Only selected BSD/identifier flavors enable zombie lookup for nonzero arg; TaskAllInfo has no such lookup.",
+        "numbered_source_lines": [
+          "2198: \t/* Check if we need to look for zombies */",
+          "2199: \tif ((flavor == PROC_PIDTBSDINFO) || (flavor == PROC_PIDT_SHORTBSDINFO) || (flavor == PROC_PIDT_BSDINFOWITHUNIQID)",
+          "2200: \t    || (flavor == PROC_PIDUNIQIDENTIFIERINFO)) {",
+          "2201: \t\tif (arg) {",
+          "2202: \t\t\tfindzomb = 1;",
+          "2203: \t\t}",
+          "2204: \t}",
+          "2205: ",
+          "2206: \tif ((p = proc_find(pid)) == PROC_NULL) {",
+          "2207: \t\tif (findzomb) {",
+          "2208: \t\t\tp = proc_find_zombref(pid);",
+          "2209: \t\t}",
+          "2210: \t\tif (p == PROC_NULL) {",
+          "2211: \t\t\terror = ESRCH;",
+          "2212: \t\t\tgoto out;",
+          "2213: \t\t}",
+          "2214: \t\tzombie = 1;"
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "bsd/kern/kern_sig.c",
+        "first_line": 1393,
+        "last_line": 1403,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/kern_sig.c#L1393-L1403",
+        "meaning": "Positive-PID kill, including signal zero, can return success through the zombie lookup.",
+        "numbered_source_lines": [
+          "1393: \tif (uap->pid > 0) {",
+          "1394: \t\t/* kill single process */",
+          "1395: \t\tif ((p = proc_find(uap->pid)) == NULL) {",
+          "1396: \t\t\tif (pzfind(uap->pid)) {",
+          "1397: \t\t\t\t/*",
+          "1398: \t\t\t\t * POSIX 1003.1-2001 requires returning success when killing a",
+          "1399: \t\t\t\t * zombie; see Rationale for kill(2).",
+          "1400: \t\t\t\t */",
+          "1401: \t\t\t\treturn 0;",
+          "1402: \t\t\t}",
+          "1403: \t\t\treturn ESRCH;"
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "bsd/kern/kern_proc.c",
+        "first_line": 813,
+        "last_line": 817,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/kern_proc.c#L813-L817",
+        "meaning": "The exited-list predicate tests P_REF_DEAD, not SZOMB.",
+        "numbered_source_lines": [
+          "813: bool",
+          "814: proc_list_exited(proc_t p)",
+          "815: {",
+          "816: \treturn os_ref_get_raw_mask(&p->p_refcount) & P_REF_DEAD;",
+          "817: }"
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "bsd/kern/kern_proc.c",
+        "first_line": 1127,
+        "last_line": 1133,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/kern_proc.c#L1127-L1133",
+        "meaning": "Zombie-reference lookup uses that exited-list predicate.",
+        "numbered_source_lines": [
+          "1127: again:",
+          "1128: \tp = phash_find_locked(pid);",
+          "1129: ",
+          "1130: \t/* should we bail? */",
+          "1131: \tif ((p == PROC_NULL) || !proc_list_exited(p)) {",
+          "1132: \t\treturn PROC_NULL;",
+          "1133: \t}"
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "bsd/kern/kern_exit.c",
+        "first_line": 2266,
+        "last_line": 2269,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/kern_exit.c#L2266-L2269",
+        "meaning": "The process moves to zombproc and becomes invisible to proc_find before the later SZOMB state.",
+        "numbered_source_lines": [
+          "2266: \tLIST_REMOVE(p, p_list);",
+          "2267: \tLIST_INSERT_HEAD(&zombproc, p, p_list); /* Place onto zombproc. */",
+          "2268: \t/* will not be visible via proc_find */",
+          "2269: \tos_atomic_or(&p->p_refcount, P_REF_DEAD, relaxed);"
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "bsd/kern/proc_info.c",
+        "first_line": 687,
+        "last_line": 691,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/proc_info.c#L687-L691",
+        "meaning": "BSDInfo reports the stored process status rather than inferring a completed exit.",
+        "numbered_source_lines": [
+          "687: \tbzero(pbsd, sizeof(struct proc_bsdinfo));",
+          "688: \tpbsd->pbi_status = p->p_stat;",
+          "689: \tpbsd->pbi_xstatus = p->p_xstat;",
+          "690: \tpbsd->pbi_pid = proc_getpid(p);",
+          "691: \tpbsd->pbi_ppid = p->p_ppid;"
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "bsd/kern/kern_exit.c",
+        "first_line": 2769,
+        "last_line": 2773,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/kern_exit.c#L2769-L2773",
+        "meaning": "SZOMB is assigned later in exit cleanup.",
+        "numbered_source_lines": [
+          "2769: \t\tDTRACE_PROC2(exited, proc_t, p, int, exitval);",
+          "2770: \t\tKERNEL_DEBUG_CONSTANT_IST(KDEBUG_COMMON,",
+          "2771: \t\t    BSDDBG_CODE(DBG_BSD_PROC, BSD_PROC_EXIT) | DBG_FUNC_END,",
+          "2772: \t\t    pid, exitval, 0, 0, 0);",
+          "2773: \t\tp->p_stat = SZOMB;"
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "bsd/kern/proc_info.c",
+        "first_line": 717,
+        "last_line": 719,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/proc_info.c#L717-L719",
+        "meaning": "Native INEXIT derives from P_LEXIT.",
+        "numbered_source_lines": [
+          "717: \tif ((p->p_lflag & P_LEXIT) == P_LEXIT) {",
+          "718: \t\tpbsd->pbi_flags |= PROC_FLAG_INEXIT;",
+          "719: \t}"
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "bsd/sys/proc_info.h",
+        "first_line": 102,
+        "last_line": 106,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/sys/proc_info.h#L102-L106",
+        "meaning": "The public header defines INEXIT as exit progress.",
+        "numbered_source_lines": [
+          "102: /* pbi_flags values */",
+          "103: #define PROC_FLAG_SYSTEM        1       /*  System process */",
+          "104: #define PROC_FLAG_TRACED        2       /* process currently being traced, possibly by gdb */",
+          "105: #define PROC_FLAG_INEXIT        4       /* process is working its way in exit() */",
+          "106: #define PROC_FLAG_PPWAIT        8"
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "bsd/kern/kern_exit.c",
+        "first_line": 1752,
+        "last_line": 1762,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/kern_exit.c#L1752-L1762",
+        "meaning": "P_LEXIT and proc_prepareexit precede task_terminate_internal on normal exit.",
+        "numbered_source_lines": [
+          "1752: \tp->p_lflag |= P_LEXIT;",
+          "1753: \tp->p_xstat = rv;",
+          "1754: \tp->p_lflag |= jetsam_flags;",
+          "1755: ",
+          "1756: \tproc_transend(p, 1);",
+          "1757: \tproc_unlock(p);",
+          "1758: ",
+          "1759: \tproc_prepareexit(p, rv, perf_notify);",
+          "1760: ",
+          "1761: \t/* Last thread to terminate will call proc_exit() */",
+          "1762: \ttask_terminate_internal(task);"
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "bsd/kern/kern_exit.c",
+        "first_line": 2316,
+        "last_line": 2325,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/kern_exit.c#L2316-L2325",
+        "meaning": "The alternate single-thread exit path also prepares exit before task termination.",
+        "numbered_source_lines": [
+          "2316: \tif (!(p->p_lflag & P_LEXIT)) {",
+          "2317: \t\t/*",
+          "2318: \t\t * This can happen if a thread_terminate() occurs",
+          "2319: \t\t * in a single-threaded process.",
+          "2320: \t\t */",
+          "2321: \t\tp->p_lflag |= P_LEXIT;",
+          "2322: \t\tproc_transend(p, 1);",
+          "2323: \t\tproc_unlock(p);",
+          "2324: \t\tproc_prepareexit(p, 0, TRUE);",
+          "2325: \t\t(void) task_terminate_internal(task);"
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "bsd/kern/kern_sig.c",
+        "first_line": 3611,
+        "last_line": 3618,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/bsd/kern/kern_sig.c#L3611-L3618",
+        "meaning": "The normal exit path holds the task before later exit progress flags.",
+        "numbered_source_lines": [
+          "3611: sig_lock_to_exit(proc_t p)",
+          "3612: {",
+          "3613: \tthread_t        self = current_thread();",
+          "3614: ",
+          "3615: \tp->exit_thread = self;",
+          "3616: \tproc_unlock(p);",
+          "3617: ",
+          "3618: \ttask_hold_and_wait(proc_task(p), true);"
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "osfmk/kern/task.c",
+        "first_line": 3680,
+        "last_line": 3684,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/kern/task.c#L3680-L3684",
+        "meaning": "This is a kernel hold that user code cannot over-resume.",
+        "numbered_source_lines": [
+          "3680:  *\tSame as the internal routine above, except that is must lock",
+          "3681:  *\tand verify that the task is active.  This differs from task_suspend",
+          "3682:  *\tin that it places a kernel hold on the task rather than just a",
+          "3683:  *\tuser-level hold.  This keeps users from over resuming and setting",
+          "3684:  *\tit running out from under the kernel."
+        ]
+      },
+      {
+        "repository": "apple-oss-distributions/xnu",
+        "path": "osfmk/kern/task.c",
+        "first_line": 3757,
+        "last_line": 3765,
+        "url": "https://github.com/apple-oss-distributions/xnu/blob/ac9718fb1af618d5ce8678d0dc6e8a58f252216f/osfmk/kern/task.c#L3757-L3765",
+        "meaning": "The current exit thread is excluded from the wait for other task threads.",
+        "numbered_source_lines": [
+          "3757: \t/*",
+          "3758: \t *\tIterate through all the threads and wait for them to",
+          "3759: \t *\tstop.  Do not wait for the current thread if it is within",
+          "3760: \t *\tthe task.",
+          "3761: \t */",
+          "3762: \tqueue_iterate(&task->threads, thread, thread_t, task_threads) {",
+          "3763: \t\tif (thread != self) {",
+          "3764: \t\t\tthread_wait(thread, until_not_runnable);",
+          "3765: \t\t}"
+        ]
+      },
+      {
+        "repository": "andrewdavidmackenzie/libproc-rs",
+        "path": "src/libproc/proc_pid.rs",
+        "first_line": 264,
+        "last_line": 266,
+        "url": "https://github.com/andrewdavidmackenzie/libproc-rs/blob/9c5b669ca414918eadc81e70ec654505a0c8a93f/src/libproc/proc_pid.rs#L264-L266",
+        "meaning": "The maintained typed API returns a String error rather than structured errno.",
+        "numbered_source_lines": [
+          "264: #[cfg(target_os = \"macos\")]",
+          "265: pub fn pidinfo<T: PIDInfo>(pid: i32, arg: u64) -> Result<T, String> {",
+          "266:     let flavor = T::flavor() as i32;"
+        ]
+      },
+      {
+        "repository": "andrewdavidmackenzie/libproc-rs",
+        "path": "src/libproc/helpers.rs",
+        "first_line": 7,
+        "last_line": 13,
+        "url": "https://github.com/andrewdavidmackenzie/libproc-rs/blob/9c5b669ca414918eadc81e70ec654505a0c8a93f/src/libproc/helpers.rs#L7-L13",
+        "meaning": "The maintained helper snapshots errno and formats it as diagnostic text.",
+        "numbered_source_lines": [
+          "7: /// Helper function to get errno and return a String with the passed in `return_code`, the error",
+          "8: /// number and a possible message",
+          "9: pub fn get_errno_with_message(return_code: i32) -> String {",
+          "10:     let e = errno();",
+          "11:     let code = e.0;",
+          "12:     format!(\"return code = {return_code}, errno = {code}, message = '{e}'\")",
+          "13: }"
+        ]
+      }
+    ],
+    "raw_local_provenance": [
+      {
+        "local_path": "/private/tmp/ejm-xnu-zombie-evidence-20261020/report.md",
+        "sha256": "eb8bc4f6fad2dbea4cacf0ae29958912bf3de08e580a8c54497d9f29112c23f0"
+      },
+      {
+        "local_path": "/private/tmp/ejm-xnu-zombie-evidence-20261020/excerpts.md",
+        "sha256": "421706e52742b59838b855120b5b6164a5ade467ec585140ad0342f9aa8d9108"
+      },
+      {
+        "local_path": "/private/tmp/ejm-xnu-zombie-evidence-20261020/provenance.json",
+        "sha256": "148086a70c19c4a5f7670bdc1a9b4f070df1c9b2fc53deb785ea316fff86d53a"
+      },
+      {
+        "local_path": "/private/tmp/ejm-xnu-zombie-evidence-20261020/exit-order-and-libproc.md",
+        "sha256": "c35098c458cc4cc55fdcc4bc5c8965956dd8bd6913b20e5e6a8b79124237a94a"
+      },
+      {
+        "local_path": "/private/tmp/ejm-xnu-zombie-evidence-20261020/exit-order-provenance.json",
+        "sha256": "167d0f61a25a1a0b99d1725be410e9836137fbbcc6e475c8876e64f6b6a21b57"
+      }
+    ]
+  },
+  "limits": [
+    "Focused tests and source evidence do not establish exact RSS during native exit progress or hard OS memory containment.",
+    "Process observation remains reactive. Descendants that escape and are reparented between samples may not be attributed without stronger OS containment.",
+    "The final green checkpoint covers this executor package on this macOS arm64 host. It is not a full repository, release, Linux or Windows result.",
+    "This artifact contains no throughput, sampled fixed/auto matrix, startup-peak or eight-idle-helper measurement. Those have separate gates and evidence.",
+    "No claim is made that the provisional helper allowance or automatic defaults are validated by this sampler proof."
+  ]
+}
