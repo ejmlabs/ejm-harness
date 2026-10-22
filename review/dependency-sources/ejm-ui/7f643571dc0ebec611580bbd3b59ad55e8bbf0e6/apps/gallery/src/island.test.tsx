@@ -1,0 +1,30 @@
+import { act } from 'react';
+import { hydrateRoot } from 'react-dom/client';
+import { renderToString } from 'react-dom/server';
+import { afterEach, expect, it, vi } from 'vitest';
+import { island } from './island';
+
+afterEach(() => vi.unstubAllEnvs());
+it('keeps server controls disabled until handlers are ready and accepts their first click', async () => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  const clicked = vi.fn();
+  const module = { default: () => <button onClick={clicked}>Open a dialog</button> };
+  vi.stubEnv('SSR', true);
+  const Server = (await island(async () => module, 'Examples')).default;
+  document.body.innerHTML = `<div id="root">${renderToString(<Server />)}</div>`;
+  const container = document.getElementById('root')!;
+  expect(container.querySelector('button')?.matches(':disabled')).toBe(true);
+  let resolve!: (value: typeof module) => void;
+  const pending = new Promise<typeof module>(done => { resolve = done; });
+  vi.stubEnv('SSR', false);
+  const Browser = (await island(() => pending, 'Examples')).default;
+  let root!: ReturnType<typeof hydrateRoot>;
+  await act(async () => { root = hydrateRoot(container, <Browser />); });
+  expect(container.querySelector('button')?.matches(':disabled')).toBe(true);
+  await act(async () => { resolve(module); await pending; });
+  const button = container.querySelector('button')!;
+  expect(button.matches(':disabled')).toBe(false);
+  await act(async () => { button.click(); });
+  expect(clicked).toHaveBeenCalledOnce();
+  act(() => root.unmount());
+});
