@@ -152,7 +152,9 @@ async fn install_deadline_releases_admission_without_persisting() -> Result<()> 
     )
     .await;
     assert!(error.is_err_and(|error| error.to_string().contains("deadline")));
-    tokio::time::timeout(std::time::Duration::from_secs(5), governor.wait_idle()).await?;
+    // Deadline returns may precede the detached blocking task's cleanup. The
+    // task must retain admission until it stops, then release without installing.
+    tokio::time::timeout(std::time::Duration::from_secs(2), governor.wait_idle()).await?;
     assert!(manager.list()?.is_empty());
     assert_eq!(governor.snapshot().running, 0);
     assert_eq!(governor.snapshot().queued, 0);
