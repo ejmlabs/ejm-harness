@@ -1,0 +1,21 @@
+{
+  "name": "@ejm/gallery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The ejm-ui gallery and docs: a prerendered Vite and React site on @ejm/ssg.",
+  "scripts": {
+    "dev": "ejm-ssg dev",
+    "build": "ejm-ssg build",
+    "budget": "ejm-ssg budget",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ejm/core": "0.1.0",
+    "@ejm/demos": "0.1.0",
+    "@ejm/site": "0.1.0",
+    "@ejm/ssg": "0.1.0",
+    "@ejm/tokens": "0.1.0",
+    "@ejm/ui": "0.1.0"
+  }
+}
