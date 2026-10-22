@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 - 2026-10-22
+## [0.2.0] - 2026-10-22
 
 - Coordinate participating processes through adaptive shared host capacity, bounded queues and local learning. Enable automatic defaults on macOS after representative 1,000-agent acceptance; other platform defaults remain gated.
 - Retain native lifetime accounting through lazy helpers, with no VM or per-job execution ledger. Native execution is not a sandbox.

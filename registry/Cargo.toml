@@ -1,6 +1,6 @@
 [package]
 name = "ejm-registry"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 rust-version = "1.99.1"
@@ -11,7 +11,7 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-ejm-harness-package-spec = { path = "../crates/ejm-harness-package-spec", version = "0.1.0" }
+ejm-harness-package-spec = { path = "../crates/ejm-harness-package-spec", version = "0.2.0" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 semver = "1"
