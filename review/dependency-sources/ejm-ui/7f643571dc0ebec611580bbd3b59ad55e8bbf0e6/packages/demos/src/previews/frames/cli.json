@@ -1,0 +1,99 @@
+{
+ "provider": "replay",
+ "cwd": "~/code/harbor",
+ "title": "Fix the flaky retry test",
+ "sessionId": "s_4f2a91",
+ "write": true,
+ "shell": true,
+ "agents": 0,
+ "models": 0,
+ "tools": 0,
+ "blocks": [
+  {
+   "id": 1,
+   "kind": "you",
+   "title": "you",
+   "lines": [
+    {
+     "t": "Fix the flaky retry test. Make time deterministic, add boundary tests, and check the diff.",
+     "r": null
+    }
+   ]
+  },
+  {
+   "id": 6,
+   "kind": "tool",
+   "title": "done · patch_file src/retry.rs",
+   "lines": [
+    {
+     "t": "Patched src/retry.rs (999 bytes)",
+     "r": "ok"
+    }
+   ]
+  },
+  {
+   "id": 8,
+   "kind": "tool",
+   "title": "done · shell cargo test --quiet",
+   "lines": [
+    {
+     "t": "exit: Some(0) | 603 ms",
+     "r": "dim"
+    },
+    {
+     "t": "",
+     "r": "dim"
+    },
+    {
+     "t": "running 3 tests",
+     "r": "dim"
+    },
+    {
+     "t": "...",
+     "r": "dim"
+    },
+    {
+     "t": "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s",
+     "r": "dim"
+    }
+   ]
+  },
+  {
+   "id": 11,
+   "kind": "assistant",
+   "title": "",
+   "lines": [
+    {
+     "t": "All 3 tests pass. git diff --check is clean. The only change is the retry helper and its boundary tests.",
+     "r": null
+    }
+   ]
+  }
+ ],
+ "hints": [
+  [
+   "/",
+   "commands"
+  ],
+  [
+   "Enter",
+   "send"
+  ],
+  [
+   "Ctrl+C",
+   "stop/quit"
+  ],
+  [
+   "Alt+Enter",
+   "new line"
+  ],
+  [
+   "Ctrl+K",
+   "steer"
+  ],
+  [
+   "Ctrl+S",
+   "sessions"
+  ]
+ ]
+}

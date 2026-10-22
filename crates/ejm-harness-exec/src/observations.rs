@@ -169,7 +169,7 @@ impl HostSampler {
             now.duration_since(previous) >= sysinfo::MINIMUM_CPU_UPDATE_INTERVAL
         });
         self.previous_cpu = Some(now);
-        let mut result = HostObservations {
+        let result = HostObservations {
             sampled_at: now,
             cpu_millis: std::thread::available_parallelism()
                 .ok()
@@ -211,6 +211,8 @@ impl HostSampler {
                 Unsupported
             },
         };
+        #[cfg(unix)]
+        let mut result = result;
         #[cfg(unix)]
         {
             use rustix::process::{Resource, getrlimit};
