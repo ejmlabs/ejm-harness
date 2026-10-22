@@ -1,0 +1,528 @@
+{
+  "schema": "ejm-harness.native-helper-simultaneous-start.v1",
+  "status": "targeted_final_pass_with_prior_failures_retained",
+  "platform": "macOS arm64",
+  "date": "2026-10-20",
+  "host": {
+    "sw_vers": "ProductName:\t\tmacOS\nProductVersion:\t\t26.5.2\nBuildVersion:\t\t25F84",
+    "uname": "Darwin Everetts-MacBook-Pro.local 25.5.0 Darwin Kernel Version 25.5.0: Tue Jun  9 22:28:34 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T6041 arm64",
+    "hardware": "Mac16,8\n12\n25769803776"
+  },
+  "final_build_inputs": 130,
+  "build_provenance_sha256": "0e9043805d31b6e14a6344f76b088c72d90bf07eeb5ac01f49e49ce068710ffe",
+  "workload": {
+    "participants_per_mode": 8,
+    "managed_agents_per_participant": 100,
+    "rounds": 8,
+    "park_ms": 500,
+    "model_requests": 1,
+    "jobs": 1,
+    "nofile_soft": [4096, 4224, 4352, 4480, 4608, 4736, 4864, 4992],
+    "intentional_launch_stagger_seconds": 0,
+    "command_overall_deadline_seconds": 5,
+    "case_completion_deadline_seconds": 180,
+    "helper_cleanup_deadline_seconds": 12
+  },
+  "attempts": [
+    {
+      "label": "startup-floor-observer-v1",
+      "status": "failed",
+      "report_sha256": "d3f86150f1da7818d707fc749d4075db1e014a8d7cbdba2b922c7e4c5338f39e",
+      "report_member": "startup-floor-observer-v1/report.json",
+      "binary": {
+        "path": "/private/tmp/ejm-capacity-startup-floor-release-20261020/ejm-harness-bench",
+        "cargo_path": "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "sha256": "6cf88a35fd0d112c9f8ad92760edaad03efea8f5c9ef7fcfcf0b6dd28536843a",
+        "bytes": 7520160
+      },
+      "source_verification_before": {
+        "checked_inputs": 129,
+        "mismatches": []
+      },
+      "source_verification_after": {
+        "checked_inputs": 129,
+        "mismatches": []
+      },
+      "cases": [
+        {
+          "mode": "fixed",
+          "status": "failed",
+          "launched": 8,
+          "completed_participants_from_logs": 7,
+          "successful_commands_from_completed_logs": 5600,
+          "clients": [
+            {
+              "pid": 27504,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 27505,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 27506,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 27507,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 27508,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 27509,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 27510,
+              "status": "rejected",
+              "commands_completed": 0,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 27511,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": null
+            }
+          ],
+          "launch_span_seconds": 0.013946542050689459,
+          "completion_elapsed_seconds": 19.211156042001676,
+          "helper_cleanup_elapsed_seconds": 1.8996201660484076,
+          "validation_error": "fixed participant failed complete 800-command JSON check: PID 27510",
+          "client_identities_ended_and_reaped": 8,
+          "client_signals_requested": 0,
+          "observed_helper_identities": 7,
+          "observed_helper_identities_ended_and_witnesses_released": 7,
+          "participant_witnesses_observed": 7,
+          "participant_witnesses_released": 7,
+          "raw_cleanup_verdict": true,
+          "cleanup_errors": []
+        },
+        {
+          "mode": "auto",
+          "status": "failed",
+          "launched": 2,
+          "completed_participants_from_logs": 0,
+          "successful_commands_from_completed_logs": 0,
+          "clients": [
+            {
+              "pid": 38944,
+              "status": null,
+              "commands_completed": 0,
+              "recorded_returncode": null
+            },
+            {
+              "pid": 38945,
+              "status": null,
+              "commands_completed": 0,
+              "recorded_returncode": null
+            }
+          ],
+          "launch_span_seconds": null,
+          "completion_elapsed_seconds": null,
+          "helper_cleanup_elapsed_seconds": 3.1917006708681583e-5,
+          "validation_error": "invalid physical-footprint maximum",
+          "client_identities_ended_and_reaped": 2,
+          "client_signals_requested": 2,
+          "observed_helper_identities": 0,
+          "observed_helper_identities_ended_and_witnesses_released": 0,
+          "participant_witnesses_observed": 0,
+          "participant_witnesses_released": 0,
+          "raw_cleanup_verdict": false,
+          "cleanup_errors": []
+        }
+      ]
+    },
+    {
+      "label": "startup-floor-observer-v2",
+      "status": "failed",
+      "report_sha256": "576fb7ec72a880c2d98bd456957612391a565c52201e3ab8bd2a4544ac7dcd89",
+      "report_member": "startup-floor-observer-v2/report.json",
+      "binary": {
+        "path": "/private/tmp/ejm-capacity-startup-floor-release-20261020/ejm-harness-bench",
+        "cargo_path": "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "sha256": "6cf88a35fd0d112c9f8ad92760edaad03efea8f5c9ef7fcfcf0b6dd28536843a",
+        "bytes": 7520160
+      },
+      "source_verification_before": {
+        "checked_inputs": 129,
+        "mismatches": []
+      },
+      "source_verification_after": {
+        "checked_inputs": 129,
+        "mismatches": []
+      },
+      "cases": [
+        {
+          "mode": "fixed",
+          "status": "passed",
+          "launched": 8,
+          "completed_participants_from_logs": 8,
+          "successful_commands_from_completed_logs": 6400,
+          "clients": [
+            {
+              "pid": 43278,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 43279,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 43280,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 43281,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 43282,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 43283,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 43284,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 43285,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            }
+          ],
+          "launch_span_seconds": 0.03696425002999604,
+          "completion_elapsed_seconds": 18.523989666020498,
+          "helper_cleanup_elapsed_seconds": 1.9240624580415897,
+          "validation_error": null,
+          "client_identities_ended_and_reaped": 8,
+          "client_signals_requested": 0,
+          "observed_helper_identities": 8,
+          "observed_helper_identities_ended_and_witnesses_released": 8,
+          "participant_witnesses_observed": 8,
+          "participant_witnesses_released": 8,
+          "raw_cleanup_verdict": true,
+          "cleanup_errors": []
+        },
+        {
+          "mode": "auto",
+          "status": "failed",
+          "launched": 8,
+          "completed_participants_from_logs": 7,
+          "successful_commands_from_completed_logs": 5600,
+          "clients": [
+            {
+              "pid": 56403,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 56404,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 56405,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 56406,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 56407,
+              "status": null,
+              "commands_completed": 0,
+              "recorded_returncode": 1
+            },
+            {
+              "pid": 56408,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": null
+            },
+            {
+              "pid": 56409,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": null
+            },
+            {
+              "pid": 56410,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": null
+            }
+          ],
+          "launch_span_seconds": 0.09064712497638538,
+          "completion_elapsed_seconds": 19.267006457957905,
+          "helper_cleanup_elapsed_seconds": 1.9278612500056624,
+          "validation_error": "auto participant failed complete 800-command JSON check: PID 56407",
+          "client_identities_ended_and_reaped": 8,
+          "client_signals_requested": 0,
+          "observed_helper_identities": 7,
+          "observed_helper_identities_ended_and_witnesses_released": 7,
+          "participant_witnesses_observed": 8,
+          "participant_witnesses_released": 8,
+          "raw_cleanup_verdict": true,
+          "cleanup_errors": []
+        }
+      ]
+    },
+    {
+      "label": "selected-helper-final",
+      "status": "passed",
+      "report_sha256": "32323000480ab32796f24d633a04ab8c144edbad98aef9aa27db36a101261b28",
+      "report_member": "selected-helper-final/report.json",
+      "binary": {
+        "path": "/private/tmp/ejm-capacity-selected-helper-release-20261020/ejm-harness-bench",
+        "cargo_path": "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "sha256": "245fb5547789043a33633624c727fa55cc2ed33e4158ed8e0df8bc74b0ee8521",
+        "bytes": 7520160
+      },
+      "source_verification_before": {
+        "checked_inputs": 130,
+        "mismatches": []
+      },
+      "source_verification_after": {
+        "checked_inputs": 130,
+        "mismatches": []
+      },
+      "cases": [
+        {
+          "mode": "fixed",
+          "status": "passed",
+          "launched": 8,
+          "completed_participants_from_logs": 8,
+          "successful_commands_from_completed_logs": 6400,
+          "clients": [
+            {
+              "pid": 78278,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 78279,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 78280,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 78281,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 78282,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 78283,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 78284,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 78285,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            }
+          ],
+          "launch_span_seconds": 0.013778958993498236,
+          "completion_elapsed_seconds": 19.027690958988387,
+          "helper_cleanup_elapsed_seconds": 1.8957992919604294,
+          "validation_error": null,
+          "client_identities_ended_and_reaped": 8,
+          "client_signals_requested": 0,
+          "observed_helper_identities": 8,
+          "observed_helper_identities_ended_and_witnesses_released": 8,
+          "participant_witnesses_observed": 8,
+          "participant_witnesses_released": 8,
+          "raw_cleanup_verdict": true,
+          "cleanup_errors": []
+        },
+        {
+          "mode": "auto",
+          "status": "passed",
+          "launched": 8,
+          "completed_participants_from_logs": 8,
+          "successful_commands_from_completed_logs": 6400,
+          "clients": [
+            {
+              "pid": 91487,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 91488,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 91489,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 91490,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 91491,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 91492,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 91493,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            },
+            {
+              "pid": 91494,
+              "status": "completed",
+              "commands_completed": 800,
+              "recorded_returncode": 0
+            }
+          ],
+          "launch_span_seconds": 0.06079687498277053,
+          "completion_elapsed_seconds": 18.597321707988158,
+          "helper_cleanup_elapsed_seconds": 1.926592540985439,
+          "validation_error": null,
+          "client_identities_ended_and_reaped": 8,
+          "client_signals_requested": 0,
+          "observed_helper_identities": 8,
+          "observed_helper_identities_ended_and_witnesses_released": 8,
+          "participant_witnesses_observed": 8,
+          "participant_witnesses_released": 8,
+          "raw_cleanup_verdict": true,
+          "cleanup_errors": []
+        }
+      ]
+    }
+  ],
+  "bundle": {
+    "file": "native-helper-simultaneous-start.macos-arm64.tar.gz",
+    "sha256": "927d9ab516029e545c77ce121607b984afc53066e8b8a85a7a417dc8e469190e",
+    "bytes": 907532,
+    "uncompressed_payload_bytes": 15544265,
+    "member_count": 274,
+    "manifest_member": "manifest.json",
+    "every_member_verified": true,
+    "deterministic_bytes_verified": true,
+    "contents": [
+      "Exact raw attempt reports",
+      "Retained runners and identity probe source",
+      "All launched client stdout and stderr",
+      "Release build receipt and logs",
+      "122 of 130 recorded final build inputs",
+      "Focused checks including failed attempts",
+      "Evidence packaging source",
+      "Explicit retained-source scope note"
+    ],
+    "excluded": [
+      "Session databases",
+      "Capacity databases",
+      "Executables and compiled probes",
+      "Eight unrelated package-distribution source members listed in SCOPE.md"
+    ],
+    "source_snapshot_revision": {
+      "status": "revised subset, not byte-identical measured source",
+      "reason": "independent open source scope cleanup",
+      "omitted_members": [
+        "source/crates/ejm-harness-package-spec/src/archive.rs",
+        "source/crates/ejm-harness-package-spec/src/lib.rs",
+        "source/crates/ejm-harness-package-spec/tests/archives.rs",
+        "source/crates/ejm-harness-packages/src/registry.rs",
+        "source/crates/ejm-harness-packages/src/registry/credentials/tests.rs",
+        "source/crates/ejm-harness-packages/src/source/tests.rs",
+        "source/crates/ejm-harness-packages/tests/installation.rs",
+        "source/crates/ejm-harness-packages/tests/registry_http.rs"
+      ],
+      "retained_source_inputs": 122,
+      "original_recorded_source_inputs": 130,
+      "measurement_records_changed": false,
+      "original_input_hashes_in_provenance": "historical; do not identify the revised subset as full original source"
+    }
+  },
+  "interpretation": [
+    "The final run supports simultaneous first-start progress for this exact workload and checkpoint.",
+    "The first observer recorded an SQLite busy rejection before it added diagnostic context; the failing SQL call is unproven.",
+    "The first observer also aborted automatic launch at two clients on an unrelated probe assertion; this is not eight-client cleanup evidence.",
+    "The corrected prior observer completed seven automatic participants; the eighth missed its existing command deadline before useful execution.",
+    "The selected-helper correction preserves still-valid sibling selections while retaining transactional checks.",
+    "Final helper discovery and identity checks are sampled; no simultaneous eight-helper lifetime is required.",
+    "General host activity was uncontrolled. These two cases do not establish performance improvement or automatic-default acceptance.",
+    "Startup/retained-state calibration, consumer costs, broad scale, Linux and Windows acceptance remain open.",
+    "Witness release does not certify arbitrary detached descendant cleanup.",
+    "The retained source bundle was revised after measurement to omit eight unrelated package-distribution members. It is a partial source snapshot, not byte-identical measured source or proof of a reproduced full build."
+  ]
+}

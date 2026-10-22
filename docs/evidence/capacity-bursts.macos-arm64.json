@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "date": "2026-10-20",
+  "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "scope": "Bounded managed-run dispatch, cancellation, deadlines and retained workspace mutation ownership; local correctness only",
+  "commands": [
+    "cargo test -p ejm-harness --test capacity_bursts --offline --locked -- --test-threads=1",
+    "cargo test -p ejm-harness --test capacity_bursts --offline --locked -- --ignored --test-threads=1",
+    "cargo clippy -p ejm-harness --all-targets --offline --locked -- -D warnings"
+  ],
+  "cargo_environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0",
+    "serialization": "/tmp/ejm-capacity-cargo.lock"
+  },
+  "result": {
+    "ordinary_tests_passed": 4,
+    "ordinary_duration_seconds": 2.37,
+    "explicit_target_scale_tests_passed": 2,
+    "scale_duration_seconds": 14.58,
+    "strict_all_target_clippy": "passed",
+    "managed_scale_cases": [1000, 4096],
+    "dispatch_slots": 1,
+    "job_slots": 1,
+    "executor_max_queue": 4,
+    "per_run_wait_bound_seconds": 120,
+    "checks": [
+      "complete every accepted tool effect exactly once without queue errors or retry loops",
+      "cancel all managed runs, retain exact governor accounting and start only explicit follow-up work",
+      "reject a managed run above its configured ceiling before effects",
+      "accept a 16384-byte UTF-8 prompt and reject 16385 bytes before effects",
+      "run deadline covers blocked governor and pending dispatch admission",
+      "canonical workspace aliases serialize writes under two job and dispatch slots",
+      "cancelled waiter cannot start; cancelled owner retains workspace exclusion through retained execution drain"
+    ]
+  },
+  "source_sha256": {
+    "crates/ejm-harness/tests/capacity_bursts.rs": "148f71dc680a0e41400ed1e2fd4f2a3cfdfd056c896ed63215e652980d66d399"
+  },
+  "binary": {
+    "path": "target/debug/deps/capacity_bursts-05ad2cc450899fc4",
+    "sha256": "3be39adefc92d86acc4467dfaadd0886ec5dda3767b102a17b819a7ebcb7da73",
+    "profile": "debug libtest"
+  },
+  "logs": {
+    "ejm-capacity-bursts-active-01a155dd.log": "075aba02e8c2480b2cab1edba5193b1a66fd8b1a8f055821396941a0d20818e5",
+    "ejm-capacity-bursts-scale-01a155dd.log": "a4392153b8c79e59af21a9b5ca00660b85452e68744a6f60e00739b29dd36cd6",
+    "ejm-capacity-bursts-clippy-01a155dd.log": "cd12b95406ac22cb8d44d3750a4965685edbe4acc1ca6ff9d6114023c8ed257e"
+  },
+  "limits": [
+    "In-process gated Provider and Tool fixtures use real local journals, registry and Governor leases",
+    "No paid provider, credentials, network, native helper or system-access escalation",
+    "Timing is a test result, not throughput, RSS, CPU or latency acceptance",
+    "The fixture and executable provenance precede later scheduling and telemetry edits; required final checks cover the combined source",
+    "Other native platforms and pressure/quota acceptance remain separate gates"
+  ],
+  "combined_source_revalidation": {
+    "command": "cargo test -p ejm-harness --test capacity_bursts --offline --locked -- --include-ignored --test-threads=1",
+    "tests_passed": 6,
+    "duration_seconds": 26.98,
+    "new_contract": "Cached scheduling counts distinguish 1000/4096 managed runs, one active tool callback and all remaining dispatch waiters, then return to zero after drain",
+    "source_sha256": {
+      "crates/ejm-harness/tests/capacity_bursts.rs": "c4e81ea6b14685a3fbae3064dcacd18ec11d0e6202c4ad06897a07d9bccf09f3",
+      "crates/ejm-harness/src/engine.rs": "280e8ea19292b2ddc2d7c8297720c170a35d5db75c79b390d23c46ffaa273e05",
+      "crates/ejm-harness/src/engine/driver.rs": "3e8293360baaf613c4edbf4a26c57f869755c6285434259ce97a15309d550fbb",
+      "crates/ejm-harness/src/engine/scheduling.rs": "263aeea2138ea756a3711678e49038dfb13306e1696d83a5835adba3b5bc1c8d",
+      "crates/ejm-harness/src/capacity.rs": "23533f67cac12ae24473567c4132b6c5af01969476c1a1e25e3ece7048b56c50"
+    },
+    "binary": {
+      "path": "target/debug/deps/capacity_bursts-58bf48b2e0cdf03c",
+      "sha256": "0d83a376a7b0aab3f1b0b77936a35a8b5f488c12d603917c5ff14bbda44eba27"
+    },
+    "log_sha256": "d92b0b9a84ce2401b8843d3eb7c2613d24dede9c4fc9ebbb94acab9d24715dc3",
+    "limits": "Concurrent development checks make duration unsuitable for a performance comparison; no native execution or platform acceptance claim"
+  }
+}

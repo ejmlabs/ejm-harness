@@ -1,0 +1,916 @@
+{
+  "recorded_at": "2026-10-19T21:30:30.214282+00:00",
+  "host": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64",
+    "logical_cpus": 12,
+    "model": "Mac16,8",
+    "physical_memory_bytes": 25769803776
+  },
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Homebrew)",
+  "profile": "release",
+  "binary_sha256": "724840f1801fc9398775905b65d2c6fa4b0492bb5532c9ee2830192643a10754",
+  "binary_bytes": 6580976,
+  "samples": [
+    {
+      "capacity_mode": "fixed",
+      "enqueue": {
+        "max_ns": 1291,
+        "p50_ns": 250,
+        "p95_ns": 458,
+        "samples": 100,
+        "total_ns": 28379
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 5,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 7258112,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 13500,
+        "p50_ns": 208,
+        "p95_ns": 333,
+        "samples": 100,
+        "total_ns": 33544
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 100,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "100",
+        "--admission-only",
+        "--capacity",
+        "fixed"
+      ],
+      "iteration": 1
+    },
+    {
+      "capacity_mode": "fixed",
+      "enqueue": {
+        "max_ns": 2083,
+        "p50_ns": 209,
+        "p95_ns": 500,
+        "samples": 100,
+        "total_ns": 28831
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 3,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 7241728,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 1750,
+        "p50_ns": 208,
+        "p95_ns": 291,
+        "samples": 100,
+        "total_ns": 21584
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 100,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "100",
+        "--admission-only",
+        "--capacity",
+        "fixed"
+      ],
+      "iteration": 2
+    },
+    {
+      "capacity_mode": "fixed",
+      "enqueue": {
+        "max_ns": 1375,
+        "p50_ns": 250,
+        "p95_ns": 500,
+        "samples": 100,
+        "total_ns": 28409
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 3,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 7241728,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 1750,
+        "p50_ns": 208,
+        "p95_ns": 250,
+        "samples": 100,
+        "total_ns": 21627
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 100,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "100",
+        "--admission-only",
+        "--capacity",
+        "fixed"
+      ],
+      "iteration": 3
+    },
+    {
+      "capacity_mode": "fixed",
+      "enqueue": {
+        "max_ns": 5250,
+        "p50_ns": 917,
+        "p95_ns": 1750,
+        "samples": 1000,
+        "total_ns": 961338
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 4,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 7962624,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 3500,
+        "p50_ns": 875,
+        "p95_ns": 1625,
+        "samples": 1000,
+        "total_ns": 906573
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 1000,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "1000",
+        "--admission-only",
+        "--capacity",
+        "fixed"
+      ],
+      "iteration": 1
+    },
+    {
+      "capacity_mode": "fixed",
+      "enqueue": {
+        "max_ns": 5541,
+        "p50_ns": 958,
+        "p95_ns": 1750,
+        "samples": 1000,
+        "total_ns": 962947
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 4,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 7913472,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 3458,
+        "p50_ns": 875,
+        "p95_ns": 1625,
+        "samples": 1000,
+        "total_ns": 891381
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 1000,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "1000",
+        "--admission-only",
+        "--capacity",
+        "fixed"
+      ],
+      "iteration": 2
+    },
+    {
+      "capacity_mode": "fixed",
+      "enqueue": {
+        "max_ns": 8208,
+        "p50_ns": 917,
+        "p95_ns": 1709,
+        "samples": 1000,
+        "total_ns": 953205
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 4,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 7962624,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 3792,
+        "p50_ns": 875,
+        "p95_ns": 1625,
+        "samples": 1000,
+        "total_ns": 897746
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 1000,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "1000",
+        "--admission-only",
+        "--capacity",
+        "fixed"
+      ],
+      "iteration": 3
+    },
+    {
+      "capacity_mode": "fixed",
+      "enqueue": {
+        "max_ns": 9542,
+        "p50_ns": 2584,
+        "p95_ns": 6208,
+        "samples": 4096,
+        "total_ns": 12114866
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 29,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 10043392,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 16833,
+        "p50_ns": 3583,
+        "p95_ns": 6584,
+        "samples": 4096,
+        "total_ns": 14495025
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 4096,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "4096",
+        "--admission-only",
+        "--capacity",
+        "fixed"
+      ],
+      "iteration": 1
+    },
+    {
+      "capacity_mode": "fixed",
+      "enqueue": {
+        "max_ns": 37625,
+        "p50_ns": 2625,
+        "p95_ns": 6084,
+        "samples": 4096,
+        "total_ns": 12195521
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 31,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 10027008,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 14084,
+        "p50_ns": 3625,
+        "p95_ns": 6916,
+        "samples": 4096,
+        "total_ns": 15019174
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 4096,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "4096",
+        "--admission-only",
+        "--capacity",
+        "fixed"
+      ],
+      "iteration": 2
+    },
+    {
+      "capacity_mode": "fixed",
+      "enqueue": {
+        "max_ns": 29458,
+        "p50_ns": 2583,
+        "p95_ns": 6375,
+        "samples": 4096,
+        "total_ns": 12269501
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 30,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 10108928,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 27334,
+        "p50_ns": 3583,
+        "p95_ns": 6583,
+        "samples": 4096,
+        "total_ns": 14566388
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 4096,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "4096",
+        "--admission-only",
+        "--capacity",
+        "fixed"
+      ],
+      "iteration": 3
+    },
+    {
+      "capacity_mode": "auto",
+      "enqueue": {
+        "max_ns": 2084,
+        "p50_ns": 333,
+        "p95_ns": 667,
+        "samples": 100,
+        "total_ns": 43289
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 3,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 7241728,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 2458,
+        "p50_ns": 292,
+        "p95_ns": 583,
+        "samples": 100,
+        "total_ns": 33375
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 100,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "100",
+        "--admission-only",
+        "--capacity",
+        "auto"
+      ],
+      "iteration": 1
+    },
+    {
+      "capacity_mode": "auto",
+      "enqueue": {
+        "max_ns": 9166,
+        "p50_ns": 375,
+        "p95_ns": 708,
+        "samples": 100,
+        "total_ns": 50252
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 3,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 7258112,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 2125,
+        "p50_ns": 333,
+        "p95_ns": 542,
+        "samples": 100,
+        "total_ns": 35177
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 100,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "100",
+        "--admission-only",
+        "--capacity",
+        "auto"
+      ],
+      "iteration": 2
+    },
+    {
+      "capacity_mode": "auto",
+      "enqueue": {
+        "max_ns": 1459,
+        "p50_ns": 334,
+        "p95_ns": 833,
+        "samples": 100,
+        "total_ns": 39250
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 3,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 7274496,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 1875,
+        "p50_ns": 292,
+        "p95_ns": 459,
+        "samples": 100,
+        "total_ns": 31836
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 100,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "100",
+        "--admission-only",
+        "--capacity",
+        "auto"
+      ],
+      "iteration": 3
+    },
+    {
+      "capacity_mode": "auto",
+      "enqueue": {
+        "max_ns": 41208,
+        "p50_ns": 1958,
+        "p95_ns": 3750,
+        "samples": 1000,
+        "total_ns": 2060307
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 7,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 7946240,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 13666,
+        "p50_ns": 1958,
+        "p95_ns": 3667,
+        "samples": 1000,
+        "total_ns": 1957123
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 1000,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "1000",
+        "--admission-only",
+        "--capacity",
+        "auto"
+      ],
+      "iteration": 1
+    },
+    {
+      "capacity_mode": "auto",
+      "enqueue": {
+        "max_ns": 11041,
+        "p50_ns": 2000,
+        "p95_ns": 3833,
+        "samples": 1000,
+        "total_ns": 2034238
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 7,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 7962624,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 8750,
+        "p50_ns": 1916,
+        "p95_ns": 3833,
+        "samples": 1000,
+        "total_ns": 1958046
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 1000,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "1000",
+        "--admission-only",
+        "--capacity",
+        "auto"
+      ],
+      "iteration": 2
+    },
+    {
+      "capacity_mode": "auto",
+      "enqueue": {
+        "max_ns": 14000,
+        "p50_ns": 2042,
+        "p95_ns": 3750,
+        "samples": 1000,
+        "total_ns": 2093379
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 7,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 7929856,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 12917,
+        "p50_ns": 1916,
+        "p95_ns": 3625,
+        "samples": 1000,
+        "total_ns": 1949714
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 1000,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "1000",
+        "--admission-only",
+        "--capacity",
+        "auto"
+      ],
+      "iteration": 3
+    },
+    {
+      "capacity_mode": "auto",
+      "enqueue": {
+        "max_ns": 26000,
+        "p50_ns": 7000,
+        "p95_ns": 14208,
+        "samples": 4096,
+        "total_ns": 29972868
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 65,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 10043392,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 29083,
+        "p50_ns": 7917,
+        "p95_ns": 14709,
+        "samples": 4096,
+        "total_ns": 32267477
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 4096,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "4096",
+        "--admission-only",
+        "--capacity",
+        "auto"
+      ],
+      "iteration": 1
+    },
+    {
+      "capacity_mode": "auto",
+      "enqueue": {
+        "max_ns": 76292,
+        "p50_ns": 6958,
+        "p95_ns": 14292,
+        "samples": 4096,
+        "total_ns": 30070298
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 67,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 10125312,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 50375,
+        "p50_ns": 7833,
+        "p95_ns": 15084,
+        "samples": 4096,
+        "total_ns": 33080065
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 4096,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "4096",
+        "--admission-only",
+        "--capacity",
+        "auto"
+      ],
+      "iteration": 2
+    },
+    {
+      "capacity_mode": "auto",
+      "enqueue": {
+        "max_ns": 31209,
+        "p50_ns": 7083,
+        "p95_ns": 14167,
+        "samples": 4096,
+        "total_ns": 29905237
+      },
+      "final": {
+        "heavy_running": 0,
+        "queued": 0,
+        "reserved_cpu_millis": 0,
+        "reserved_memory_bytes": 0,
+        "reserved_output_bytes": 0,
+        "reserved_processes": 0,
+        "running": 0
+      },
+      "mode": "admission",
+      "process_totals": {
+        "available": true,
+        "cached_io_may_not_appear": true,
+        "child_cpu_included": false,
+        "cpu_ms": 67,
+        "reported_read_bytes": 0,
+        "reported_written_bytes": 0,
+        "rss_bytes": 10108928,
+        "source": "sysinfo 0.39.6 own process"
+      },
+      "remote_api_calls": 0,
+      "reverse_drop_cancel": {
+        "max_ns": 38667,
+        "p50_ns": 7834,
+        "p95_ns": 15791,
+        "samples": 4096,
+        "total_ns": 33104892
+      },
+      "scope": "isolated local governor; no host grants",
+      "status": "completed",
+      "waiters": 4096,
+      "command": [
+        "/Users/everettmorgan/Desktop/ejm-harness/target/release/ejm-harness-bench",
+        "--agents",
+        "4096",
+        "--admission-only",
+        "--capacity",
+        "auto"
+      ],
+      "iteration": 3
+    }
+  ]
+}

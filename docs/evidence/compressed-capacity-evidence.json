@@ -1,0 +1,56 @@
+{
+  "format": "gzip",
+  "restore": "gzip -dk FILE.json.gz",
+  "records": [
+    {
+      "file": "docs/evidence/capacity-journal-groups.json.gz",
+      "uncompressed_sha256": "67247274cab6ae6b4355c4a0f21d3b56702e4519860c6efec20f68f55eaaf644",
+      "uncompressed_bytes": 155660
+    },
+    {
+      "file": "docs/evidence/native-helper-kernel-peaks-shared-pool.macos-arm64.json.gz",
+      "uncompressed_sha256": "59c1e525d79bc5a8ef4325457e15552e7a45b4bbcde9eb5c972618a56f75a12a",
+      "uncompressed_bytes": 1121818
+    },
+    {
+      "file": "docs/evidence/capacity-auto.json.gz",
+      "uncompressed_sha256": "1caad3da8d855ebcea4bdb4b46c607e7119d1e36a52c45ba17c690ccf9245bae",
+      "uncompressed_bytes": 205998
+    },
+    {
+      "file": "docs/evidence/capacity-auto.macos-arm64.zombie-aware-native.json.gz",
+      "uncompressed_sha256": "56d4515dc286a730e75b2f244a2ebba505978b382c537f05b061ad6e69f66703",
+      "uncompressed_bytes": 209974
+    },
+    {
+      "file": "docs/evidence/native-helper-embedding-memory.macos-arm64.json.gz",
+      "uncompressed_sha256": "a4f874a3286bd5beac40de0b43d8476244c45fdfb03b5401e2a0d4faf0e5c65e",
+      "uncompressed_bytes": 153996
+    },
+    {
+      "file": "docs/evidence/native-helper-current-image-memory.macos-arm64.json.gz",
+      "uncompressed_sha256": "4f233101be2d0e8ea9860d306e6f95b40529a1821746680b36020f76eb132630",
+      "uncompressed_bytes": 179317
+    },
+    {
+      "file": "docs/evidence/capacity-baseline.macos-arm64.json.gz",
+      "uncompressed_sha256": "ae1c89b0c7e9bde67dc1a01404e118efe9a4754db0a9437e630c2de5db67d788",
+      "uncompressed_bytes": 313906
+    },
+    {
+      "file": "docs/evidence/capacity-telemetry.macos-arm64.json.gz",
+      "uncompressed_sha256": "17ca14a5d36622183df4fd53f7803e62a77af17a7e23ad386721c838f607441e",
+      "uncompressed_bytes": 233155
+    },
+    {
+      "file": "docs/evidence/capacity-fixed.macos-arm64.zombie-aware-native.json.gz",
+      "uncompressed_sha256": "b2a383cc184f91706f72f8083eb5709ca4a8d6b1b69de674f7752470e5fcc36f",
+      "uncompressed_bytes": 209697
+    },
+    {
+      "file": "docs/evidence/capacity-fixed.json.gz",
+      "uncompressed_sha256": "390192b22e0199e45c63191cdf0cdc937714f5a20851d64f4f8a70fcb9fd3001",
+      "uncompressed_bytes": 205668
+    }
+  ]
+}

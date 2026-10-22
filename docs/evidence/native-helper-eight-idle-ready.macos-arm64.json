@@ -1,0 +1,1044 @@
+{
+  "schema": 1,
+  "checkpoint": "eight-isolated-idle-ready-helpers-earlier-staged-smoke-build",
+  "status": "passed",
+  "scope": "Eight independent isolated idle Ready helpers and eight fixture clients; no registry slot or active-scope capacity claim.",
+  "started_utc": "2026-10-20T18:44:55.626053+00:00",
+  "finished_utc": "2026-10-20T18:45:04.876041+00:00",
+  "raw_report": {
+    "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/report.json",
+    "sha256": "c357319bededf7ae9972ac5f1722dee107b19d3a3222fd36abdd6b9dff1c7462"
+  },
+  "runner": {
+    "local_path": "/private/tmp/ejm-eight-idle-ready-20261020-native-helper-accounting.py",
+    "sha256": "3637800ef79fe94da35b87647b9d260e6feded98a4868cc7953c02466270d62b",
+    "source_line_separator": "\n",
+    "source_has_final_newline": true,
+    "source_lines": [
+      "#!/usr/bin/env python3",
+      "\"\"\"Measure eight isolated Ready helpers with the existing frozen witness client.\"\"\"",
+      "",
+      "import datetime",
+      "import errno",
+      "import fcntl",
+      "import hashlib",
+      "import json",
+      "import os",
+      "import pathlib",
+      "import shutil",
+      "import stat",
+      "import subprocess",
+      "import time",
+      "import uuid",
+      "",
+      "",
+      "FROZEN = pathlib.Path('/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release')",
+      "EXPECTED_SHA = '67f1841051c62222c3967a76390b7ca6eb111d0b6a797dedb091eaea885d33c5'",
+      "PREVIOUS_REPORT = str(FROZEN.parent / 'report.json')",
+      "OUTPUT = pathlib.Path('/private/tmp/ejm-native-eight-idle-ready-20261020')",
+      "COUNT = 8",
+      "CADENCE = 0.25",
+      "SETTLE = 2.0",
+      "WINDOW = 5.0",
+      "DISK_FLOOR = 10 * 1024**3",
+      "",
+      "",
+      "def timestamp():",
+      "    return datetime.datetime.now(datetime.timezone.utc).isoformat()",
+      "",
+      "",
+      "def digest(path):",
+      "    hasher = hashlib.sha256()",
+      "    with path.open('rb') as source:",
+      "        for chunk in iter(lambda: source.read(1024 * 1024), b''):",
+      "            hasher.update(chunk)",
+      "    return hasher.hexdigest()",
+      "",
+      "",
+      "def disk_gate(report, phase):",
+      "    free = shutil.disk_usage('/private/tmp').free",
+      "    report['disk'].append({'phase': phase, 'free_bytes': free, 'timestamp_utc': timestamp()})",
+      "    if free < DISK_FLOOR:",
+      "        raise RuntimeError(f'disk floor at {phase}: {free} bytes free, require {DISK_FLOOR}')",
+      "",
+      "",
+      "def endpoint_ids(path):",
+      "    # Do not return, copy or log any other endpoint field.",
+      "    value = json.loads(path.read_text())",
+      "    pid, generation = value.get('pid'), value.get('epoch')",
+      "    if type(pid) is not int or not 0 < pid < 2**31:",
+      "        raise RuntimeError('invalid endpoint PID')",
+      "    return {'pid': pid, 'generation': str(uuid.UUID(generation))}",
+      "",
+      "",
+      "def witness_held(fd):",
+      "    try:",
+      "        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)",
+      "    except OSError as error:",
+      "        if error.errno in (errno.EAGAIN, errno.EWOULDBLOCK):",
+      "            return True",
+      "        raise",
+      "    fcntl.flock(fd, fcntl.LOCK_UN)",
+      "    return False",
+      "",
+      "",
+      "def process_exists(pid):",
+      "    try:",
+      "        os.kill(pid, 0)",
+      "        return True",
+      "    except ProcessLookupError:",
+      "        return False",
+      "",
+      "",
+      "def rss_sample(clients):",
+      "    ids = [item['process'].pid for item in clients] + [item['identity']['pid'] for item in clients]",
+      "    command = ['/bin/ps', '-o', 'pid=,ppid=,rss=,stat=', '-p', ','.join(map(str, ids))]",
+      "    start = time.monotonic()",
+      "    result = subprocess.run(command, capture_output=True, text=True, timeout=2, check=False)",
+      "    if result.returncode:",
+      "        raise RuntimeError(f'RSS probe exited {result.returncode}: {result.stderr.strip()}')",
+      "    rows = {}",
+      "    for line in result.stdout.splitlines():",
+      "        pid, parent, rss_kib, status = line.split()",
+      "        rows[int(pid)] = {'pid': int(pid), 'parent_pid': int(parent), 'rss_bytes': int(rss_kib) * 1024, 'status': status}",
+      "    helpers, parents = [], []",
+      "    for item in clients:",
+      "        process, identity = item['process'], item['identity']",
+      "        if process.poll() is not None:",
+      "            raise RuntimeError(f'client {item[\"index\"]} exited during the settled window')",
+      "        if endpoint_ids(item['endpoint']) != identity:",
+      "            raise RuntimeError(f'helper {item[\"index\"]} changed PID or generation')",
+      "        helper, parent = rows.get(identity['pid']), rows.get(process.pid)",
+      "        if helper is None or parent is None or 'Z' in helper['status'] or 'Z' in parent['status']:",
+      "            raise RuntimeError(f'client/helper {item[\"index\"]} was absent or a zombie')",
+      "        if helper['parent_pid'] != process.pid or parent['parent_pid'] != os.getpid():",
+      "            raise RuntimeError(f'client/helper {item[\"index\"]} changed ancestry')",
+      "        if not witness_held(item['witness']):",
+      "            raise RuntimeError(f'helper {item[\"index\"]} released its lifetime witness')",
+      "        helpers.append({'index': item['index'], 'generation': identity['generation'], **helper})",
+      "        parents.append({'index': item['index'], **parent})",
+      "    return {'timestamp_utc': timestamp(), 'probe_seconds': time.monotonic() - start, 'helpers': helpers, 'parents': parents,",
+      "            'helper_aggregate_rss_bytes': sum(row['rss_bytes'] for row in helpers),",
+      "            'parent_aggregate_rss_bytes': sum(row['rss_bytes'] for row in parents), 'command': command}",
+      "",
+      "",
+      "def cleanup(clients):",
+      "    result = []",
+      "    for item in clients:",
+      "        process = item['process']",
+      "        if process.poll() is None:",
+      "            try:",
+      "                process.kill()  # Only the Popen client created by this runner.",
+      "            except ProcessLookupError:",
+      "                pass",
+      "        try:",
+      "            process.wait(timeout=5)",
+      "        except subprocess.TimeoutExpired:",
+      "            result.append({'index': item['index'], 'client_pid': process.pid, 'client_reaped': False})",
+      "    deadline = time.monotonic() + 12",
+      "    pending = list(clients)",
+      "    while pending and time.monotonic() < deadline:",
+      "        for item in pending[:]:",
+      "            identity = item.get('identity')",
+      "            exited = identity is not None and not process_exists(identity['pid'])",
+      "            witness = item.get('witness')",
+      "            available = witness is not None and not witness_held(witness)",
+      "            if exited and available:",
+      "                result.append({'index': item['index'], 'client_pid': item['process'].pid, 'client_reaped': item['process'].poll() is not None,",
+      "                               'helper_pid': identity['pid'], 'generation': identity['generation'], 'helper_exited': True,",
+      "                               'lifetime_witness_available': True, 'confirmed_utc': timestamp()})",
+      "                pending.remove(item)",
+      "        if pending:",
+      "            time.sleep(0.05)",
+      "    for item in pending:",
+      "        identity = item.get('identity')",
+      "        result.append({'index': item['index'], 'client_pid': item['process'].pid, 'client_reaped': item['process'].poll() is not None,",
+      "                       'helper_pid': identity['pid'] if identity else None, 'generation': identity['generation'] if identity else None,",
+      "                       'helper_exited': identity is not None and not process_exists(identity['pid']),",
+      "                       'lifetime_witness_available': item.get('witness') is not None and not witness_held(item['witness']), 'timed_out': True})",
+      "    for item in clients:",
+      "        if item.get('witness') is not None:",
+      "            os.close(item['witness'])",
+      "    return result",
+      "",
+      "",
+      "def main():",
+      "    OUTPUT.mkdir(exist_ok=True)",
+      "    evidence = OUTPUT / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])",
+      "    evidence.mkdir(mode=0o700)",
+      "    report = {'schema': 1, 'profile': 'release', 'started_utc': timestamp(), 'runner': str(pathlib.Path(__file__).resolve()),",
+      "              'runner_sha256': digest(pathlib.Path(__file__)), 'frozen_executable': str(FROZEN), 'expected_executable_sha256': EXPECTED_SHA,",
+      "              'build_provenance': PREVIOUS_REPORT, 'count': COUNT, 'settle_seconds': SETTLE, 'window_seconds': WINDOW,",
+      "              'planned_sample_cadence_seconds': CADENCE, 'disk_floor_bytes': DISK_FLOOR, 'disk': [], 'commands': [], 'samples': [],",
+      "              'scope': 'Eight independent isolated idle Ready helpers and eight fixture clients; no registry slot or active-scope capacity claim.',",
+      "              'rss_source': '/bin/ps RSS in KiB, multiplied by 1024; aggregate is the sum of process RSS and can count shared pages more than once.',",
+      "              'limits': ['Sampled high-water RSS can miss peaks between samples.', 'Fixture clients are not CLI, worker or IDE hosts.',",
+      "                         'No active commands, descendants, saturated retained table, registry pool enforcement or physical-footprint peak is measured.']}",
+      "    clients = []",
+      "    print('EVIDENCE_DIRECTORY=' + str(evidence), flush=True)",
+      "    print('WAITING_FOR_GLOBAL_LOCK', flush=True)",
+      "    with open('/tmp/ejm-capacity-cargo.lock', 'a') as workload_lock:",
+      "        fcntl.flock(workload_lock, fcntl.LOCK_EX)",
+      "        print('GLOBAL_LOCK_ACQUIRED', flush=True)",
+      "        try:",
+      "            disk_gate(report, 'before_launch')",
+      "            report['executable_sha256_before'] = digest(FROZEN)",
+      "            if report['executable_sha256_before'] != EXPECTED_SHA:",
+      "                raise RuntimeError('frozen executable hash changed')",
+      "            report['host'] = {name: subprocess.check_output(command, text=True).strip() for name, command in [",
+      "                ('sw_vers', ['sw_vers']), ('uname', ['uname', '-a']), ('hardware', ['sysctl', '-n', 'hw.model', 'hw.ncpu', 'hw.memsize'])]}",
+      "            child_env = {key: value for key, value in os.environ.items() if not key.startswith('EJM_FIXTURE_')}",
+      "            for index in range(1, COUNT + 1):",
+      "                directory = evidence / f'client-{index:02d}'",
+      "                directory.mkdir(mode=0o700)",
+      "                state_root = directory / 'state'",
+      "                command = [str(FROZEN), 'witness-client', str(state_root), str(directory / 'unused-marker')]",
+      "                with (directory / 'stdout').open('wb') as out, (directory / 'stderr').open('wb') as err:",
+      "                    process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=out, stderr=err, env=child_env, start_new_session=True)",
+      "                clients.append({'index': index, 'process': process, 'endpoint': state_root / 'native/fixture/endpoint.json'})",
+      "                report['commands'].append({'index': index, 'command': command, 'client_pid': process.pid, 'stdout': str(directory / 'stdout'), 'stderr': str(directory / 'stderr')})",
+      "            deadline = time.monotonic() + 15",
+      "            while any('identity' not in item for item in clients):",
+      "                for item in clients:",
+      "                    if item['process'].poll() is not None:",
+      "                        raise RuntimeError(f'client {item[\"index\"]} exited before Ready')",
+      "                    if 'identity' not in item and item['endpoint'].exists():",
+      "                        item['identity'] = endpoint_ids(item['endpoint'])",
+      "                        witness_path = item['endpoint'].with_name('owner.lock')",
+      "                        fd = os.open(witness_path, os.O_RDONLY | os.O_NOFOLLOW)",
+      "                        item['witness'] = fd",
+      "                        details = os.fstat(fd)",
+      "                        if not stat.S_ISREG(details.st_mode) or details.st_uid != os.getuid() or not witness_held(fd):",
+      "                            raise RuntimeError(f'helper {item[\"index\"]} lacks a held owned lifetime witness')",
+      "                if time.monotonic() >= deadline:",
+      "                    raise RuntimeError('eight-helper readiness deadline exceeded')",
+      "                time.sleep(0.025)",
+      "            if len({item['identity']['pid'] for item in clients}) != COUNT or len({item['identity']['generation'] for item in clients}) != COUNT:",
+      "                raise RuntimeError('helpers did not have eight distinct PIDs and generations')",
+      "            report['all_ready_utc'] = timestamp()",
+      "            report['initial'] = rss_sample(clients)",
+      "            time.sleep(SETTLE)",
+      "            disk_gate(report, 'before_settled_window')",
+      "            started = time.monotonic()",
+      "            next_sample = started",
+      "            while next_sample < started + WINDOW:",
+      "                if time.monotonic() < next_sample:",
+      "                    time.sleep(next_sample - time.monotonic())",
+      "                if time.monotonic() >= started + WINDOW:",
+      "                    break",
+      "                offset = time.monotonic() - started",
+      "                sample = rss_sample(clients)",
+      "                sample['offset_seconds'] = offset",
+      "                report['samples'].append(sample)",
+      "                next_sample += CADENCE",
+      "            if time.monotonic() < started + WINDOW:",
+      "                time.sleep(started + WINDOW - time.monotonic())",
+      "            report['actual_window_seconds'] = time.monotonic() - started",
+      "            if not report['samples']:",
+      "                raise RuntimeError('no settled samples collected')",
+      "            report['sample_count'] = len(report['samples'])",
+      "            report['observed_sample_start_intervals_seconds'] = [",
+      "                later['offset_seconds'] - earlier['offset_seconds']",
+      "                for earlier, later in zip(report['samples'], report['samples'][1:])",
+      "            ]",
+      "            report['sampled_high_water'] = {key: max(sample[key] for sample in report['samples']) for key in ['helper_aggregate_rss_bytes', 'parent_aggregate_rss_bytes']}",
+      "            report['sampled_high_water']['combined_fixture_rss_bytes'] = max(sample['helper_aggregate_rss_bytes'] + sample['parent_aggregate_rss_bytes'] for sample in report['samples'])",
+      "            report['per_helper_sampled_high_water_rss_bytes'] = {str(item['index']): max(sample['helpers'][item['index'] - 1]['rss_bytes'] for sample in report['samples']) for item in clients}",
+      "            report['executable_sha256_after'] = digest(FROZEN)",
+      "            if report['executable_sha256_after'] != EXPECTED_SHA:",
+      "                raise RuntimeError('frozen executable changed during measurement')",
+      "            disk_gate(report, 'after_settled_window')",
+      "            report['status'] = 'passed'",
+      "        except Exception as error:",
+      "            report['status'] = 'failed'",
+      "            report['error'] = str(error)",
+      "        finally:",
+      "            try:",
+      "                report['cleanup'] = cleanup(clients)",
+      "            except Exception as error:",
+      "                report['status'] = 'failed'",
+      "                report['cleanup_error'] = str(error)",
+      "                report.setdefault('cleanup', [])",
+      "                for item in clients:",
+      "                    process = item['process']",
+      "                    try:",
+      "                        if process.poll() is None:",
+      "                            process.kill()",
+      "                        process.wait(timeout=5)",
+      "                    except Exception as remaining_error:",
+      "                        report.setdefault('remaining_client_cleanup_errors', []).append({'index': item['index'], 'error': str(remaining_error)})",
+      "                    if item.get('witness') is not None:",
+      "                        try:",
+      "                            os.close(item['witness'])",
+      "                        except OSError:",
+      "                            pass",
+      "            if len(report['cleanup']) != COUNT or any(not row.get('helper_exited') or not row.get('lifetime_witness_available') or not row.get('client_reaped') for row in report['cleanup']):",
+      "                report['status'] = 'failed'",
+      "                report.setdefault('error', 'cleanup did not prove every helper exit and lifetime witness release')",
+      "            report['finished_utc'] = timestamp()",
+      "            (evidence / 'report.json').write_text(json.dumps(report, indent=2) + '\\n')",
+      "            print(json.dumps({'status': report['status'], 'error': report.get('error'), 'sample_count': report.get('sample_count'),",
+      "                              'sampled_high_water': report.get('sampled_high_water'), 'report': str(evidence / 'report.json')}), flush=True)",
+      "    print('GLOBAL_LOCK_RELEASED', flush=True)",
+      "    return 0 if report['status'] == 'passed' else 1",
+      "",
+      "",
+      "if __name__ == '__main__':",
+      "    raise SystemExit(main())"
+    ]
+  },
+  "host": {
+    "sw_vers": "ProductName:\t\tmacOS\nProductVersion:\t\t26.5.2\nBuildVersion:\t\t25F84",
+    "uname": "Darwin Everetts-MacBook-Pro.local 25.5.0 Darwin Kernel Version 25.5.0: Tue Jun  9 22:28:34 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T6041 arm64",
+    "hardware": "Mac16,8\n12\n25769803776"
+  },
+  "profile": "release",
+  "executable": {
+    "local_path": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release",
+    "sha256": "67f1841051c62222c3967a76390b7ca6eb111d0b6a797dedb091eaea885d33c5",
+    "bytes": 1953232,
+    "mode": "0o555",
+    "expected_sha256": "67f1841051c62222c3967a76390b7ca6eb111d0b6a797dedb091eaea885d33c5",
+    "sha256_before": "67f1841051c62222c3967a76390b7ca6eb111d0b6a797dedb091eaea885d33c5",
+    "sha256_after": "67f1841051c62222c3967a76390b7ca6eb111d0b6a797dedb091eaea885d33c5",
+    "unchanged": true
+  },
+  "build_provenance": {
+    "raw_report": {
+      "local_path": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/report.json",
+      "sha256": "f75f1b99aaa3d932c6c09320e201f0b0ed757ec36352732667c1c873cb576df3"
+    },
+    "portable_build_report": "docs/evidence/native-helper-startup.macos-arm64.json",
+    "source_scope": "The earlier frozen staged smoke fixture predates bounded sampler diagnostics and the explicit exit-progress fix. This measurement did not rebuild it and is separate from the later fixed/auto matrix executable.",
+    "environment": {
+      "CARGO_BUILD_JOBS": "2",
+      "CARGO_INCREMENTAL": "0"
+    },
+    "dependency_package_count": 75,
+    "source_hashes_at_build": {
+      ".cargo/config.toml": "7af9ec6837490d1ca073d1db582eab96aff336a76a7fff3236d3dbad3bdd3756",
+      "Cargo.lock": "072a52712dd92466e59bd62c31a75bcfdaa430e4e7e66c1d45f33c0854df504a",
+      "Cargo.toml": "40ce94b31b2a3b82c0a503139beacfff1fbf1f4e165c0d0f466809fd67ff2d99",
+      "crates/ejm-harness-exec/Cargo.toml": "af00431b60bdc32f2323f2f94fbc0e9f0d70b014ace606fe39f753bef4f7482f",
+      "crates/ejm-harness-exec/examples/native_owner_helper.rs": "1d00dad2855ec36af3e461841ce56c99d86fbd7e007052ef5fed1759c6d48b1b",
+      "crates/ejm-harness-exec/examples/native_owner_smoke.rs": "504faeba4e5ec364f17dab9c4ec1deb4f64f8bd34fd9d726edefd7b3b84d03a8",
+      "crates/ejm-harness-exec/src/capacity.rs": "0d972f75ab8c6fe9e676fb27f9231d478defdc9507295415b903633b404f3f9a",
+      "crates/ejm-harness-exec/src/executor.rs": "5eb63df899ddf0d9c859f9bcc09fd66a2325962022e4911e0d1298859834b093",
+      "crates/ejm-harness-exec/src/governor.rs": "e00b0d4149b80692a5a880aae0d292d09c56f8f09f19f02c88332bdb411d6976",
+      "crates/ejm-harness-exec/src/lib.rs": "29614c341baaff1fddee074aba54a7752cb107e606f1de72bc9fd44dbd6bfe9e",
+      "crates/ejm-harness-exec/src/monitor.rs": "22c1c5a5c9f59bc325de122dfbfbd46da35124565c79d4c60c657756bdc7b122",
+      "crates/ejm-harness-exec/src/native/admission.rs": "d6b4556737c98acdda25ac7c1072cd74dc93459773dee00a39c3a5df924bebcf",
+      "crates/ejm-harness-exec/src/native/client.rs": "4926a6133d6dbf57b00056d1cd9dd44c3f5270404108770971e44fc02049c2b5",
+      "crates/ejm-harness-exec/src/native/owner.rs": "72a7936a0afee3071176d621ea82979363e7bcadb476536cdf2193e5269120b6",
+      "crates/ejm-harness-exec/src/native/placement.rs": "5585fa7f9e19ed49ea3380b389257f2a7331291b1d99ec5b621f019acc88d635",
+      "crates/ejm-harness-exec/src/native/recovery.rs": "ada62279e10867f53fd4401b46527a93a8eb51592b816ed9c9f9f965b23ffefb",
+      "crates/ejm-harness-exec/src/native/tests.rs": "3e518b6810bbf9ebb03c6bbe9ffb9d7f57d0c2f9f77372c74ff8a3f0226dfee8",
+      "crates/ejm-harness-exec/src/native/wire.rs": "14facaf3222ae03fd26063e3a32dedda92aa2076f168dbc1e745b33a09c3739f",
+      "crates/ejm-harness-exec/src/native.rs": "fb6cad1a4f80cf8d1037956405c47885b261e1a26d6bcc934de0405f50dfe875",
+      "crates/ejm-harness-exec/src/observations/linux.rs": "d9b6858499a44700ff9f31d52fa8388a966d07a7c5284fc50a8f6c3927e78637",
+      "crates/ejm-harness-exec/src/observations.rs": "7c5a015d7f0aa4d1a4b64bd5e08f8d98060f137c09cee4a3f148436c1ae5d43d",
+      "crates/ejm-harness-exec/src/process.rs": "49eccd29aef316295dd1b92de38e6e11b0b65d225af5fddaaadf3f7cf1bfaad6",
+      "crates/ejm-harness-exec/src/processes/macos.rs": "1c217ddd7e82e299998729e5f43608d0b019c00a35a77e5c2ca2f01c8c382f6c",
+      "crates/ejm-harness-exec/src/processes.rs": "d5f53b3a060dc930715cbd02c9a5b6cea4d42f2a9fb2f8fe14b6b916d1b5a02f",
+      "crates/ejm-harness-exec/tests/capacity.rs": "cb0eea98ce103b9625ea4dfc9c709ceb3bfada725b7719667c711e50ce29c8ed",
+      "crates/ejm-harness-exec/tests/executor.rs": "38d058f21127796ae7554d06ddea4ce89dda6c925c91de994cdab56d56e93979",
+      "crates/ejm-harness-exec/tests/governor.rs": "16570fdf96e35415048c190603c55e83bdbe64cee854726399e6612cf9bffe08",
+      "rust-toolchain.toml": "c979a7d4d66b770a4d59d6d56e3c078aeab1993af658480bfd1f89f90220457d"
+    },
+    "source_unchanged_during_original_build_and_smoke": true,
+    "build_unchanged_during_original_smoke": true,
+    "executable_unchanged_during_original_smoke": true
+  },
+  "measurement": {
+    "helper_count": 8,
+    "fixture_client_count": 8,
+    "state_roots": "Eight new independent protected state roots, one per witness-client fixture.",
+    "fixture_branch": "witness-client awaits owner.ready(), retains the returned guard and then waits forever; it launches no native commands.",
+    "all_endpoints_observed_utc": "2026-10-20T18:44:55.822820+00:00",
+    "settle_seconds": 2.0,
+    "planned_window_seconds": 5.0,
+    "actual_window_seconds": 5.0050204579602,
+    "planned_cadence_seconds": 0.25,
+    "settled_sample_count": 20,
+    "observed_sample_start_intervals_seconds": [
+      0.2505752499564551, 0.2503620420466177, 0.2540965409716591, 0.24589162500342354,
+      0.24998787499498576, 0.2541043339879252, 0.2500005830079317, 0.25001675001112744,
+      0.24998391699045897, 0.25000083300983533, 0.24999974999809638, 0.24999924999428913,
+      0.24587358301505446, 0.2499954589875415, 0.25413841602858156, 0.24585233395919204,
+      0.254148708016146, 0.24619754200102761, 0.2537894999841228
+    ],
+    "observed_interval_summary_seconds": {
+      "minimum": 0.24585233395919204,
+      "median": 0.2500005830079317,
+      "maximum": 0.254148708016146
+    },
+    "observer_probe_wall_summary_seconds": {
+      "minimum": 0.0043876669951714575,
+      "median": 0.004601666529197246,
+      "maximum": 0.010174708033446223
+    },
+    "rss_source": "/bin/ps RSS in KiB, multiplied by 1024; aggregate is the sum of process RSS and can count shared pages more than once.",
+    "rss_probe_argv_shape": [
+      "/bin/ps",
+      "-o",
+      "pid=,ppid=,rss=,stat=",
+      "-p",
+      "<all eight client and eight helper PIDs>"
+    ],
+    "identity_and_lifetime_checks": "Every sample requires live fixture clients, stable endpoint PID/generation, non-zombie helper/client rows, unchanged helper-to-client and client-to-runner ancestry, and held owner.lock lifetime witnesses.",
+    "endpoint_fields_retained": ["pid", "epoch"],
+    "capabilities_copied_or_logged": false,
+    "identities": [
+      {
+        "index": 1,
+        "helper_pid": 72149,
+        "helper_generation": "7f562dd3-2efa-463c-8acd-0cc1423e92d8",
+        "client_pid": 72135,
+        "runner_pid": 72131
+      },
+      {
+        "index": 2,
+        "helper_pid": 72146,
+        "helper_generation": "ec7247fb-3dd1-42bb-bc84-e6d19e949df1",
+        "client_pid": 72136,
+        "runner_pid": 72131
+      },
+      {
+        "index": 3,
+        "helper_pid": 72144,
+        "helper_generation": "a604690e-539b-44a0-b0ee-8e7bf180b33e",
+        "client_pid": 72137,
+        "runner_pid": 72131
+      },
+      {
+        "index": 4,
+        "helper_pid": 72145,
+        "helper_generation": "afee57a3-cb9c-4c8e-b885-979caf25ebaf",
+        "client_pid": 72138,
+        "runner_pid": 72131
+      },
+      {
+        "index": 5,
+        "helper_pid": 72150,
+        "helper_generation": "ed7ed790-3ac3-460a-8b2e-8012e87dad2e",
+        "client_pid": 72139,
+        "runner_pid": 72131
+      },
+      {
+        "index": 6,
+        "helper_pid": 72148,
+        "helper_generation": "613fa509-998f-43ac-b340-9334b3cfda85",
+        "client_pid": 72140,
+        "runner_pid": 72131
+      },
+      {
+        "index": 7,
+        "helper_pid": 72147,
+        "helper_generation": "ec177e20-5e60-4539-be65-1d882a33fd73",
+        "client_pid": 72141,
+        "runner_pid": 72131
+      },
+      {
+        "index": 8,
+        "helper_pid": 72143,
+        "helper_generation": "7719a1cc-79d8-4493-8b3d-bc02004fe62b",
+        "client_pid": 72142,
+        "runner_pid": 72131
+      }
+    ],
+    "sampled_high_water_rss_bytes": {
+      "helpers": 56262656,
+      "fixture_clients": 58064896,
+      "helpers_plus_fixture_clients": 114327552
+    },
+    "sampled_high_water_rss_mib": {
+      "helpers": 53.65625,
+      "fixture_clients": 55.375,
+      "helpers_plus_fixture_clients": 109.03125
+    },
+    "per_helper_sampled_high_water_rss_bytes": {
+      "1": 7028736,
+      "2": 7012352,
+      "3": 7061504,
+      "4": 7012352,
+      "5": 7061504,
+      "6": 7012352,
+      "7": 7028736,
+      "8": 7045120
+    },
+    "settled_samples": [
+      {
+        "timestamp_utc": "2026-10-20T18:44:57.837311+00:00",
+        "offset_seconds": 1.00000761449337e-6,
+        "observer_probe_wall_seconds": 0.0044057079940102994,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:44:58.089348+00:00",
+        "offset_seconds": 0.2505762499640696,
+        "observer_probe_wall_seconds": 0.0058477920247241855,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:44:58.338338+00:00",
+        "offset_seconds": 0.5009382920106873,
+        "observer_probe_wall_seconds": 0.004486334044486284,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:44:58.592646+00:00",
+        "offset_seconds": 0.7550348329823464,
+        "observer_probe_wall_seconds": 0.004674499970860779,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:44:58.838233+00:00",
+        "offset_seconds": 1.00092645798577,
+        "observer_probe_wall_seconds": 0.0043876669951714575,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:44:59.088430+00:00",
+        "offset_seconds": 1.2509143329807557,
+        "observer_probe_wall_seconds": 0.004592291021253914,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:44:59.342544+00:00",
+        "offset_seconds": 1.505018666968681,
+        "observer_probe_wall_seconds": 0.004611042037140578,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:44:59.592469+00:00",
+        "offset_seconds": 1.7550192499766126,
+        "observer_probe_wall_seconds": 0.0045306660467758775,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:44:59.845616+00:00",
+        "offset_seconds": 2.00503599998774,
+        "observer_probe_wall_seconds": 0.007641541946213692,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:45:00.092407+00:00",
+        "offset_seconds": 2.255019916978199,
+        "observer_probe_wall_seconds": 0.004466791986487806,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:45:00.342454+00:00",
+        "offset_seconds": 2.5050207499880344,
+        "observer_probe_wall_seconds": 0.004508415993768722,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:45:00.592840+00:00",
+        "offset_seconds": 2.7550204999861307,
+        "observer_probe_wall_seconds": 0.004898832994513214,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:45:00.843047+00:00",
+        "offset_seconds": 3.00501974998042,
+        "observer_probe_wall_seconds": 0.005102458002511412,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:45:01.088337+00:00",
+        "offset_seconds": 3.2508933329954743,
+        "observer_probe_wall_seconds": 0.004457083996385336,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:45:01.338265+00:00",
+        "offset_seconds": 3.500888791983016,
+        "observer_probe_wall_seconds": 0.004440749995410442,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:45:01.598160+00:00",
+        "offset_seconds": 3.7550272080115974,
+        "observer_probe_wall_seconds": 0.010174708033446223,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:45:01.838498+00:00",
+        "offset_seconds": 4.000879541970789,
+        "observer_probe_wall_seconds": 0.004683125007431954,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:45:02.096541+00:00",
+        "offset_seconds": 4.255028249986935,
+        "observer_probe_wall_seconds": 0.008560749993193895,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:45:02.339672+00:00",
+        "offset_seconds": 4.501225791987963,
+        "observer_probe_wall_seconds": 0.005485875008162111,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      },
+      {
+        "timestamp_utc": "2026-10-20T18:45:02.592358+00:00",
+        "offset_seconds": 4.755015291972086,
+        "observer_probe_wall_seconds": 0.004407082975376397,
+        "helper_rss_bytes_by_index": [
+          7028736, 7012352, 7061504, 7012352, 7061504, 7012352, 7028736, 7045120
+        ],
+        "client_rss_bytes_by_index": [
+          7274496, 7241728, 7290880, 7241728, 7274496, 7274496, 7225344, 7241728
+        ],
+        "helper_status_by_index": ["S", "S", "S", "S", "S", "S", "S", "S"],
+        "client_status_by_index": ["Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss", "Ss"],
+        "helper_aggregate_rss_bytes": 56262656,
+        "client_aggregate_rss_bytes": 58064896
+      }
+    ]
+  },
+  "controls": {
+    "global_workload_lock": {
+      "local_path": "/tmp/ejm-capacity-cargo.lock",
+      "mechanism": "exclusive fcntl.flock",
+      "released": true
+    },
+    "native_access": "Expanded native access was used for this measurement.",
+    "disk_floor_bytes": 10737418240,
+    "disk_samples": [
+      {
+        "phase": "before_launch",
+        "free_bytes": 25384550400,
+        "timestamp_utc": "2026-10-20T18:44:55.626497+00:00"
+      },
+      {
+        "phase": "before_settled_window",
+        "free_bytes": 25384529920,
+        "timestamp_utc": "2026-10-20T18:44:57.832892+00:00"
+      },
+      {
+        "phase": "after_settled_window",
+        "free_bytes": 25384472576,
+        "timestamp_utc": "2026-10-20T18:45:02.839249+00:00"
+      }
+    ],
+    "fixture_environment": "EJM_FIXTURE_ variables were removed before creating clients.",
+    "commands": [
+      {
+        "index": 1,
+        "argv": [
+          "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release",
+          "witness-client",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-01/state",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-01/unused-marker"
+        ],
+        "client_pid": 72135,
+        "stdout": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-01/stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-01/stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "index": 2,
+        "argv": [
+          "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release",
+          "witness-client",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-02/state",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-02/unused-marker"
+        ],
+        "client_pid": 72136,
+        "stdout": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-02/stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-02/stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "index": 3,
+        "argv": [
+          "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release",
+          "witness-client",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-03/state",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-03/unused-marker"
+        ],
+        "client_pid": 72137,
+        "stdout": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-03/stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-03/stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "index": 4,
+        "argv": [
+          "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release",
+          "witness-client",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-04/state",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-04/unused-marker"
+        ],
+        "client_pid": 72138,
+        "stdout": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-04/stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-04/stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "index": 5,
+        "argv": [
+          "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release",
+          "witness-client",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-05/state",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-05/unused-marker"
+        ],
+        "client_pid": 72139,
+        "stdout": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-05/stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-05/stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "index": 6,
+        "argv": [
+          "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release",
+          "witness-client",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-06/state",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-06/unused-marker"
+        ],
+        "client_pid": 72140,
+        "stdout": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-06/stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-06/stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "index": 7,
+        "argv": [
+          "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release",
+          "witness-client",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-07/state",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-07/unused-marker"
+        ],
+        "client_pid": 72141,
+        "stdout": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-07/stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-07/stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "index": 8,
+        "argv": [
+          "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release",
+          "witness-client",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-08/state",
+          "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-08/unused-marker"
+        ],
+        "client_pid": 72142,
+        "stdout": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-08/stdout",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "local_path": "/private/tmp/ejm-native-eight-idle-ready-20261020/20261020T184455Z-4418f51a/client-08/stderr",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ]
+  },
+  "cleanup": {
+    "method": "Kill and reap only the exact Popen client objects created by this runner; then observe every helper PID absent and every lifetime witness lock available.",
+    "clients_reaped": 8,
+    "helper_pids_absent": 8,
+    "lifetime_witnesses_available": 8,
+    "observations": [
+      {
+        "index": 1,
+        "client_pid": 72135,
+        "client_reaped": true,
+        "helper_pid": 72149,
+        "generation": "7f562dd3-2efa-463c-8acd-0cc1423e92d8",
+        "helper_exited": true,
+        "lifetime_witness_available": true,
+        "confirmed_utc": "2026-10-20T18:45:04.875897+00:00"
+      },
+      {
+        "index": 2,
+        "client_pid": 72136,
+        "client_reaped": true,
+        "helper_pid": 72146,
+        "generation": "ec7247fb-3dd1-42bb-bc84-e6d19e949df1",
+        "helper_exited": true,
+        "lifetime_witness_available": true,
+        "confirmed_utc": "2026-10-20T18:45:04.875937+00:00"
+      },
+      {
+        "index": 3,
+        "client_pid": 72137,
+        "client_reaped": true,
+        "helper_pid": 72144,
+        "generation": "a604690e-539b-44a0-b0ee-8e7bf180b33e",
+        "helper_exited": true,
+        "lifetime_witness_available": true,
+        "confirmed_utc": "2026-10-20T18:45:04.875952+00:00"
+      },
+      {
+        "index": 4,
+        "client_pid": 72138,
+        "client_reaped": true,
+        "helper_pid": 72145,
+        "generation": "afee57a3-cb9c-4c8e-b885-979caf25ebaf",
+        "helper_exited": true,
+        "lifetime_witness_available": true,
+        "confirmed_utc": "2026-10-20T18:45:04.875962+00:00"
+      },
+      {
+        "index": 5,
+        "client_pid": 72139,
+        "client_reaped": true,
+        "helper_pid": 72150,
+        "generation": "ed7ed790-3ac3-460a-8b2e-8012e87dad2e",
+        "helper_exited": true,
+        "lifetime_witness_available": true,
+        "confirmed_utc": "2026-10-20T18:45:04.875970+00:00"
+      },
+      {
+        "index": 6,
+        "client_pid": 72140,
+        "client_reaped": true,
+        "helper_pid": 72148,
+        "generation": "613fa509-998f-43ac-b340-9334b3cfda85",
+        "helper_exited": true,
+        "lifetime_witness_available": true,
+        "confirmed_utc": "2026-10-20T18:45:04.875978+00:00"
+      },
+      {
+        "index": 7,
+        "client_pid": 72141,
+        "client_reaped": true,
+        "helper_pid": 72147,
+        "generation": "ec177e20-5e60-4539-be65-1d882a33fd73",
+        "helper_exited": true,
+        "lifetime_witness_available": true,
+        "confirmed_utc": "2026-10-20T18:45:04.875986+00:00"
+      },
+      {
+        "index": 8,
+        "client_pid": 72142,
+        "client_reaped": true,
+        "helper_pid": 72143,
+        "generation": "7719a1cc-79d8-4493-8b3d-bc02004fe62b",
+        "helper_exited": true,
+        "lifetime_witness_available": true,
+        "confirmed_utc": "2026-10-20T18:45:04.875995+00:00"
+      }
+    ],
+    "timeout_did_not_count_as_success": true
+  },
+  "limits": [
+    "Sampled high-water RSS can miss peaks between samples.",
+    "Fixture clients are not CLI, worker or IDE hosts.",
+    "No active commands, descendants, saturated retained table, registry pool enforcement or physical-footprint peak is measured.",
+    "The eight helpers use separate isolated state roots and no shared helper registry. This does not test the eight-slot registry limit, committed generation reclamation or pool enforcement.",
+    "The first observation and 250 ms settled sampling do not measure an RSS startup peak. Sampled RSS high-water values can miss intervening peaks.",
+    "RSS sums can count shared pages more than once and are not aggregate physical footprint or private memory.",
+    "Only this earlier frozen smoke executable and this macOS arm64 host were measured. No other executable, real CLI/worker/IDE parent, hardware or operating-system result is established.",
+    "No helper allowance, automatic default or saturation gate is validated by these idle observations alone."
+  ]
+}

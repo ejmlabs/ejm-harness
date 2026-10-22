@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "recorded_utc": "2026-10-20T19:13:58.576166+00:00",
+  "status": "formatting-only",
+  "scope": "Four named historical capacity reports only. Original hashes identify bytes observed before formatting; formatted hashes identify repository copies. Parsed JSON is unchanged, including existing references to original raw-report hashes.",
+  "owner": "ejm-harness evidence; no runtime, public API, workload or measurement change",
+  "records": [
+    {
+      "path": "docs/evidence/capacity-fixed.macos-arm64.current-source.native.json",
+      "original_copy": "/private/tmp/ejm-capacity-historical-format-20261020-7nk3kfuj/capacity-fixed.macos-arm64.current-source.native.json",
+      "original_sha256": "6ae61c70e30ac93064850711025d2cd91303824ab2a9ccab4cef57572752050c",
+      "original_bytes": 16125,
+      "formatted_sha256": "eee8cb97c2f5e41d3ced7b351aa81374ccf7e201740a43317c6e826ea373668a",
+      "formatted_bytes": 13605,
+      "parsed_json_equal": true
+    },
+    {
+      "path": "docs/evidence/capacity-fixed.macos-arm64.staged-native.json",
+      "original_copy": "/private/tmp/ejm-capacity-historical-format-20261020-7nk3kfuj/capacity-fixed.macos-arm64.staged-native.json",
+      "original_sha256": "66ee4b1711afcaf7cd52fd358eab756e6dbacd530195e5478d4f0ee5bea03226",
+      "original_bytes": 16379,
+      "formatted_sha256": "3641b82b6f703638b209bd86e086c584f961559b6055ad252e66f07e2f009165",
+      "formatted_bytes": 13859,
+      "parsed_json_equal": true
+    },
+    {
+      "path": "docs/evidence/capacity-telemetry-summary.macos-arm64.json",
+      "original_copy": "/private/tmp/ejm-capacity-historical-format-20261020-7nk3kfuj/capacity-telemetry-summary.macos-arm64.json",
+      "original_sha256": "4085fc77cd465c79728e28a4d300745e27b7fdd4fb05b6ebf57c1fb529ef6d95",
+      "original_bytes": 8965,
+      "formatted_sha256": "b6a3766da0c9c1f26bd6455e95bcfbe405e81c6c01431cf4939856001a9af6b5",
+      "formatted_bytes": 8905,
+      "parsed_json_equal": true
+    },
+    {
+      "path": "docs/evidence/capacity-telemetry.macos-arm64.json",
+      "original_copy": "/private/tmp/ejm-capacity-historical-format-20261020-7nk3kfuj/capacity-telemetry.macos-arm64.json",
+      "original_sha256": "886aeb09d72a01391fdaafff01edefde45f389063953c97d687fb3c225e19f51",
+      "original_bytes": 269215,
+      "formatted_sha256": "17ca14a5d36622183df4fd53f7803e62a77af17a7e23ad386721c838f607441e",
+      "formatted_bytes": 233155,
+      "parsed_json_equal": true
+    }
+  ],
+  "reference_inventory": {
+    "searched_before_formatting": [
+      "rg",
+      "-n",
+      "--fixed-strings",
+      "-e",
+      "6ae61c70e30ac93064850711025d2cd91303824ab2a9ccab4cef57572752050c",
+      "-e",
+      "66ee4b1711afcaf7cd52fd358eab756e6dbacd530195e5478d4f0ee5bea03226",
+      "-e",
+      "4085fc77cd465c79728e28a4d300745e27b7fdd4fb05b6ebf57c1fb529ef6d95",
+      "-e",
+      "886aeb09d72a01391fdaafff01edefde45f389063953c97d687fb3c225e19f51",
+      "docs",
+      "site/content",
+      "openspec"
+    ],
+    "exit_code": 0,
+    "matches": [
+      {
+        "path": "docs/evidence/capacity-telemetry-summary.macos-arm64.json",
+        "line_before_formatting": 8,
+        "text": "    \"sha256\": \"886aeb09d72a01391fdaafff01edefde45f389063953c97d687fb3c225e19f51\",",
+        "original_sha256": ["886aeb09d72a01391fdaafff01edefde45f389063953c97d687fb3c225e19f51"]
+      }
+    ],
+    "interpretation": "Locations are from the original files. These references still identify original report bytes and can be resolved through the corresponding formatting record above."
+  },
+  "tooling": {
+    "node_version": "v26.12.0",
+    "prettier_version": "3.9.10",
+    "format": {
+      "argv": [
+        "/opt/homebrew/opt/node@26/bin/node",
+        "/Users/everettmorgan/Desktop/ejm-harness/node_modules/prettier/bin/prettier.cjs",
+        "--write",
+        "/Users/everettmorgan/Desktop/ejm-harness/docs/evidence/capacity-fixed.macos-arm64.current-source.native.json",
+        "/Users/everettmorgan/Desktop/ejm-harness/docs/evidence/capacity-fixed.macos-arm64.staged-native.json",
+        "/Users/everettmorgan/Desktop/ejm-harness/docs/evidence/capacity-telemetry-summary.macos-arm64.json",
+        "/Users/everettmorgan/Desktop/ejm-harness/docs/evidence/capacity-telemetry.macos-arm64.json"
+      ],
+      "exit_code": 0,
+      "stdout": "docs/evidence/capacity-fixed.macos-arm64.current-source.native.json 22ms\ndocs/evidence/capacity-fixed.macos-arm64.staged-native.json 4ms\ndocs/evidence/capacity-telemetry-summary.macos-arm64.json 2ms\ndocs/evidence/capacity-telemetry.macos-arm64.json 43ms\n",
+      "stderr": ""
+    }
+  },
+  "scope_check": {
+    "unrelated_evidence_json_files_checked": 29,
+    "unrelated_evidence_json_files_unchanged": true,
+    "report_write_allowlist": [
+      "docs/evidence/capacity-fixed.macos-arm64.current-source.native.json",
+      "docs/evidence/capacity-fixed.macos-arm64.staged-native.json",
+      "docs/evidence/capacity-telemetry-summary.macos-arm64.json",
+      "docs/evidence/capacity-telemetry.macos-arm64.json"
+    ],
+    "additional_repository_write": "docs/evidence/capacity-historical-formatting.macos-arm64.json",
+    "canonical_docs_tasks_baseline_and_new_matrices_not_written": true
+  },
+  "runner": {
+    "path": "/private/tmp/ejm-capacity-historical-format-20261020.py",
+    "sha256": "57a769df7b5a8ad79e8c46dac599c551daac41925d9cd8322dbafac79849342f",
+    "source_utf8": "#!/usr/bin/env python3\n\"\"\"Format four frozen JSON reports while preserving their original identities.\"\"\"\n\nimport datetime\nimport hashlib\nimport json\nfrom pathlib import Path\nimport subprocess\nimport tempfile\n\n\nROOT = Path('/Users/everettmorgan/Desktop/ejm-harness')\nOUTPUT = ROOT / 'docs/evidence/capacity-historical-formatting.macos-arm64.json'\nNODE = '/opt/homebrew/opt/node@26/bin/node'\nPRETTIER = ROOT / 'node_modules/prettier/bin/prettier.cjs'\nEXPECTED = {\n    'docs/evidence/capacity-fixed.macos-arm64.current-source.native.json': '6ae61c70e30ac93064850711025d2cd91303824ab2a9ccab4cef57572752050c',\n    'docs/evidence/capacity-fixed.macos-arm64.staged-native.json': '66ee4b1711afcaf7cd52fd358eab756e6dbacd530195e5478d4f0ee5bea03226',\n    'docs/evidence/capacity-telemetry-summary.macos-arm64.json': '4085fc77cd465c79728e28a4d300745e27b7fdd4fb05b6ebf57c1fb529ef6d95',\n    'docs/evidence/capacity-telemetry.macos-arm64.json': '886aeb09d72a01391fdaafff01edefde45f389063953c97d687fb3c225e19f51',\n}\n\n\ndef sha(data):\n    return hashlib.sha256(data).hexdigest()\n\n\ndef command(args):\n    result = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, check=True)\n    return {'argv': [str(arg) for arg in args], 'exit_code': result.returncode, 'stdout': result.stdout, 'stderr': result.stderr}\n\n\ndef unrelated_snapshots():\n    return {\n        path.relative_to(ROOT).as_posix(): sha(path.read_bytes())\n        for path in sorted((ROOT / 'docs/evidence').rglob('*.json'))\n        if path.is_file() and not path.is_symlink() and path.relative_to(ROOT).as_posix() not in EXPECTED and path != OUTPUT\n    }\n\n\nif OUTPUT.exists():\n    raise RuntimeError(f'Refusing to overwrite an existing provenance artifact: {OUTPUT}')\ncapture = Path(tempfile.mkdtemp(prefix='ejm-capacity-historical-format-20261020-', dir='/private/tmp'))\noriginals = {}\nfor relative, expected in EXPECTED.items():\n    path = ROOT / relative\n    original = path.read_bytes()\n    if sha(original) != expected:\n        raise RuntimeError(f'File changed before capture: {relative}')\n    json.loads(original)\n    (capture / path.name).write_bytes(original)\n    originals[relative] = original\n\nsearch_argv = ['rg', '-n', '--fixed-strings']\nfor expected in EXPECTED.values():\n    search_argv.extend(['-e', expected])\nsearch_argv.extend(['docs', 'site/content', 'openspec'])\nsearch = subprocess.run(search_argv, cwd=ROOT, capture_output=True, text=True)\nif search.returncode not in (0, 1):\n    raise RuntimeError(search.stderr)\n(capture / 'original-hash-references.stdout').write_text(search.stdout)\n(capture / 'original-hash-references.stderr').write_text(search.stderr)\nreferences = []\nfor line in search.stdout.splitlines():\n    path, before_line, text = line.split(':', 2)\n    references.append({'path': path, 'line_before_formatting': int(before_line), 'text': text, 'original_sha256': [digest for digest in EXPECTED.values() if digest in text]})\n\nunrelated_before = unrelated_snapshots()\nfor relative, original in originals.items():\n    if (ROOT / relative).read_bytes() != original:\n        raise RuntimeError(f'File changed before formatting: {relative}')\n\nformat_argv = [NODE, str(PRETTIER), '--write', *[str(ROOT / relative) for relative in EXPECTED]]\nformat_result = command(format_argv)\nrecords = []\nfor relative, original in originals.items():\n    final = (ROOT / relative).read_bytes()\n    if json.loads(original) != json.loads(final):\n        raise RuntimeError(f'Formatting changed parsed JSON: {relative}')\n    records.append({'path': relative, 'original_copy': str(capture / Path(relative).name), 'original_sha256': sha(original), 'original_bytes': len(original), 'formatted_sha256': sha(final), 'formatted_bytes': len(final), 'parsed_json_equal': True})\n\nunrelated_after = unrelated_snapshots()\nif unrelated_before != unrelated_after:\n    changed = sorted(path for path in unrelated_before.keys() | unrelated_after.keys() if unrelated_before.get(path) != unrelated_after.get(path))\n    raise RuntimeError(f'Unrelated evidence snapshots changed during the formatting window: {changed}')\n\nsource = Path(__file__).read_bytes()\nresult = {\n    'schema': 1,\n    'recorded_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),\n    'status': 'formatting-only',\n    'scope': 'Four named historical capacity reports only. Original hashes identify bytes observed before formatting; formatted hashes identify repository copies. Parsed JSON is unchanged, including existing references to original raw-report hashes.',\n    'owner': 'ejm-harness evidence; no runtime, public API, workload or measurement change',\n    'records': records,\n    'reference_inventory': {'searched_before_formatting': search_argv, 'exit_code': search.returncode, 'matches': references, 'interpretation': 'Locations are from the original files. These references still identify original report bytes and can be resolved through the corresponding formatting record above.'},\n    'tooling': {'node_version': command([NODE, '--version'])['stdout'].strip(), 'prettier_version': command([NODE, str(PRETTIER), '--version'])['stdout'].strip(), 'format': format_result},\n    'scope_check': {'unrelated_evidence_json_files_checked': len(unrelated_before), 'unrelated_evidence_json_files_unchanged': True, 'report_write_allowlist': list(EXPECTED), 'additional_repository_write': OUTPUT.relative_to(ROOT).as_posix(), 'canonical_docs_tasks_baseline_and_new_matrices_not_written': True},\n    'runner': {'path': str(Path(__file__)), 'sha256': sha(source), 'source_utf8': source.decode()},\n    'limits': ['This formatting record does not strengthen, replace or rerun the underlying measurement evidence.', 'The original byte copies remain at the recorded temporary paths; this portable record preserves their identities and the observed parsed-JSON equality.'],\n}\ntemporary_output = capture / 'portable-provenance.before-prettier.json'\ntemporary_output.write_text(json.dumps(result, indent=2) + '\\n')\nif OUTPUT.exists():\n    raise RuntimeError(f'Provenance output appeared during formatting: {OUTPUT}')\nOUTPUT.write_bytes(temporary_output.read_bytes())\ncommand([NODE, str(PRETTIER), '--write', str(OUTPUT)])\nif json.loads(OUTPUT.read_bytes()) != result:\n    raise RuntimeError('Formatting changed parsed provenance JSON')\ncheck_result = command([NODE, str(PRETTIER), '--check', *[str(ROOT / relative) for relative in EXPECTED], str(OUTPUT)])\nlocal_record = {'capture_directory': str(capture), 'portable_provenance': {'path': OUTPUT.relative_to(ROOT).as_posix(), 'sha256': sha(OUTPUT.read_bytes()), 'bytes': OUTPUT.stat().st_size}, 'format_check': check_result, 'records': records}\n(capture / 'provenance.json').write_text(json.dumps(local_record, indent=2) + '\\n')\nprint(json.dumps(local_record))\n"
+  },
+  "limits": [
+    "This formatting record does not strengthen, replace or rerun the underlying measurement evidence.",
+    "The original byte copies remain at the recorded temporary paths; this portable record preserves their identities and the observed parsed-JSON equality."
+  ]
+}
