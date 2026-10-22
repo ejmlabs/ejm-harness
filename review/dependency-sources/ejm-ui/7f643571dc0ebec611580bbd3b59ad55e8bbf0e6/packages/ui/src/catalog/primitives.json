@@ -1,0 +1,159 @@
+{
+  "Button": [
+    "default",
+    "hover",
+    "focus",
+    "pressed",
+    "disabled"
+  ],
+  "Input": [
+    "default",
+    "focus",
+    "invalid",
+    "disabled"
+  ],
+  "Textarea": [
+    "default",
+    "focus",
+    "invalid",
+    "disabled"
+  ],
+  "Select": [
+    "default",
+    "focus",
+    "invalid",
+    "disabled"
+  ],
+  "Switch": [
+    "off",
+    "on",
+    "focus",
+    "disabled"
+  ],
+  "Checkbox": [
+    "unchecked",
+    "checked",
+    "indeterminate",
+    "focus",
+    "disabled"
+  ],
+  "NativeCheckbox": [
+    "unchecked",
+    "checked",
+    "focus",
+    "invalid",
+    "disabled"
+  ],
+  "Badge": [
+    "default",
+    "strong",
+    "success",
+    "warn",
+    "danger",
+    "info"
+  ],
+  "Separator": [
+    "default"
+  ],
+  "Tooltip": [
+    "closed",
+    "open"
+  ],
+  "Tabs": [
+    "default",
+    "selected",
+    "focus"
+  ],
+  "Dialog": [
+    "closed",
+    "open"
+  ],
+  "Menu": [
+    "closed",
+    "open",
+    "highlighted",
+    "disabled"
+  ],
+  "Toast": [
+    "hidden",
+    "visible"
+  ],
+  "Table": [
+    "default",
+    "empty",
+    "loading",
+    "error"
+  ],
+  "KeyHints": [
+    "default"
+  ],
+  "Prompt": [
+    "idle",
+    "busy",
+    "error"
+  ],
+  "StateBlock": [
+    "empty",
+    "loading",
+    "error"
+  ],
+  "TerminalWorkspace": [
+    "pairing",
+    "session"
+  ],
+  "TerminalHeader": [
+    "default"
+  ],
+  "TerminalLink": [
+    "default"
+  ],
+  "TerminalOutput": [
+    "default"
+  ],
+  "TerminalPairing": [
+    "visible",
+    "hidden"
+  ],
+  "TerminalLog": [
+    "default"
+  ],
+  "TerminalEntry": [
+    "prompt",
+    "assistant",
+    "output",
+    "error"
+  ],
+  "TerminalStatus": [
+    "default"
+  ],
+  "TerminalComposer": [
+    "default"
+  ],
+  "TerminalTextarea": [
+    "default",
+    "focus",
+    "invalid",
+    "disabled"
+  ],
+  "TerminalSelect": [
+    "default",
+    "focus",
+    "invalid",
+    "disabled"
+  ],
+  "RadioGroup": [
+    "default",
+    "selected",
+    "focus",
+    "disabled"
+  ],
+  "Disclosure": [
+    "closed",
+    "open"
+  ],
+  "GameClock": [
+    "default",
+    "running",
+    "low"
+  ]
+}

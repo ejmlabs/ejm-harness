@@ -1,0 +1,129 @@
+{
+  "Art": [
+    "default"
+  ],
+  "ActionRows": [
+    "default"
+  ],
+  "ActionRow": [
+    "default"
+  ],
+  "Band": [
+    "default"
+  ],
+  "DocumentContent": [
+    "default"
+  ],
+  "Fact": [
+    "default"
+  ],
+  "Facts": [
+    "default"
+  ],
+  "Hero": [
+    "default"
+  ],
+  "Page": [
+    "default",
+    "application"
+  ],
+  "Illustration": [
+    "default"
+  ],
+  "ProductShot": [
+    "default"
+  ],
+  "ProductStage": [
+    "default"
+  ],
+  "ProductWindow": [
+    "default"
+  ],
+  "Row": [
+    "default",
+    "selected",
+    "disabled",
+    "focused"
+  ],
+  "Rows": [
+    "default"
+  ],
+  "Rule": [
+    "default"
+  ],
+  "SectionHead": [
+    "page",
+    "section",
+    "application"
+  ],
+  "Stat": [
+    "default",
+    "loading",
+    "error",
+    "empty"
+  ],
+  "Status": [
+    "ok",
+    "warn",
+    "error",
+    "info",
+    "pending"
+  ],
+  "Text": [
+    "default"
+  ],
+  "SectionBody": [
+    "default"
+  ],
+  "Columns": [
+    "default"
+  ],
+  "MetricGrid": [
+    "default"
+  ],
+  "ContentFlow": [
+    "default"
+  ],
+  "ContentGroup": [
+    "default"
+  ],
+  "ReadingColumn": [
+    "default"
+  ],
+  "Actions": [
+    "default"
+  ],
+  "Note": [
+    "default"
+  ],
+  "ContentHeading": [
+    "default"
+  ],
+  "InlineLink": [
+    "default"
+  ],
+  "InlineCode": [
+    "default"
+  ],
+  "CommandLines": [
+    "default"
+  ],
+  "VisuallyHidden": [
+    "default"
+  ],
+  "FileDetail": [
+    "default"
+  ],
+  "FocusRegion": [
+    "default"
+  ],
+  "AssetGrid": [
+    "default"
+  ],
+  "BrandAsset": [
+    "default"
+  ],
+  "PaletteSwatch": [
+    "default"
+  ]
+}

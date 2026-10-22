@@ -1,0 +1,255 @@
+{
+  "output": [
+    "provider: replay (offline)",
+    "resources: max_heavy_jobs=1",
+    "governor while two workspaces request heavy work:",
+    "{\"heavy_running\":1,\"queued\":1,\"reserved_cpu_millis\":1500,\"reserved_memory_bytes\":402653184,\"reserved_output_bytes\":131072,\"reserved_processes\":16,\"running\":1}",
+    "harness while work is admitted:",
+    "{\"active_agents\":2,\"model_requests\":0,\"tools\":{\"heavy_running\":1,\"queued\":1,\"reserved_cpu_millis\":1500,\"reserved_memory_bytes\":402653184,\"reserved_output_bytes\":131072,\"reserved_processes\":16,\"running\":1},\"waiting_model_requests\":0}",
+    "Harbor session journal:",
+    " 1 run_started",
+    " 2 model_started",
+    " 3 usage",
+    " 4 tool_queued  read_file",
+    " 5 tool_started  read_file",
+    " 6 tool_finished  1: # Harbor 2: A small order service. sha256: dd7a3937b2ec04bd4ab2a7e7ecf4d13d3dc26ecbf052333363396a76855321c0 | 2 lines",
+    " 7 model_started",
+    " 8 usage",
+    " 9 tool_queued  shell",
+    "10 tool_started  shell",
+    "16 tool_finished  exit: Some(0) | 2013 ms harbor-a checks complete",
+    "17 model_started",
+    "18 text_delta  The checks completed. The session journal keeps the tool results.",
+    "19 usage",
+    "20 run_finished  completed",
+    "runs: completed, completed",
+    "governor after completion:",
+    "{\"heavy_running\":0,\"queued\":0,\"reserved_cpu_millis\":0,\"reserved_memory_bytes\":0,\"reserved_output_bytes\":0,\"reserved_processes\":0,\"running\":0}",
+    "reopened saved session: Harbor checks",
+    "events(after=0, limit=4): run_started, model_started, usage, tool_queued"
+  ],
+  "events": [
+    {
+      "prompt": "Read the README and run the checks.",
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 1,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "timestamp_ms": 1792422066810,
+      "type": "run_started"
+    },
+    {
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 2,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "step": 1,
+      "timestamp_ms": 1792422066810,
+      "type": "model_started"
+    },
+    {
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 3,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "timestamp_ms": 1792422066811,
+      "type": "usage",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0
+      }
+    },
+    {
+      "call": {
+        "arguments": {
+          "path": "README.md"
+        },
+        "id": "call_9644e20609a542e8b94c987c081413e3",
+        "name": "read_file"
+      },
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 4,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "timestamp_ms": 1792422066811,
+      "type": "tool_queued"
+    },
+    {
+      "call": {
+        "arguments": {
+          "path": "README.md"
+        },
+        "id": "call_9644e20609a542e8b94c987c081413e3",
+        "name": "read_file"
+      },
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 5,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "timestamp_ms": 1792422066811,
+      "type": "tool_started"
+    },
+    {
+      "call_id": "call_9644e20609a542e8b94c987c081413e3",
+      "output": {
+        "content": "1: # Harbor\n2: A small order service.\n\nsha256: dd7a3937b2ec04bd4ab2a7e7ecf4d13d3dc26ecbf052333363396a76855321c0 | 2 lines",
+        "data": {
+          "lines": 2,
+          "offset": 1,
+          "path": "README.md",
+          "returned": 2,
+          "sha256": "dd7a3937b2ec04bd4ab2a7e7ecf4d13d3dc26ecbf052333363396a76855321c0",
+          "truncated": false
+        },
+        "is_error": false
+      },
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 6,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "timestamp_ms": 1792422066813,
+      "type": "tool_finished"
+    },
+    {
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 7,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "step": 2,
+      "timestamp_ms": 1792422066813,
+      "type": "model_started"
+    },
+    {
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 8,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "timestamp_ms": 1792422066813,
+      "type": "usage",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0
+      }
+    },
+    {
+      "call": {
+        "arguments": {
+          "command": "sleep 2; printf 'harbor-a checks complete\\n'",
+          "heavy": true
+        },
+        "id": "call_b57bf3a59e584cd5bfae0195bc5158cc",
+        "name": "shell"
+      },
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 9,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "timestamp_ms": 1792422066814,
+      "type": "tool_queued"
+    },
+    {
+      "call": {
+        "arguments": {
+          "command": "sleep 2; printf 'harbor-a checks complete\\n'",
+          "heavy": true
+        },
+        "id": "call_b57bf3a59e584cd5bfae0195bc5158cc",
+        "name": "shell"
+      },
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 10,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "timestamp_ms": 1792422066814,
+      "type": "tool_started"
+    },
+    {
+      "call_id": "call_b57bf3a59e584cd5bfae0195bc5158cc",
+      "output": {
+        "artifact": "/private/var/folders/y9/c5n5yzc14nxf2mc6fd4x45k40000gn/T/ejm-sdk-showcase-cu6sz7/state/artifacts/exec-c678cf63-5c29-4b3f-b6b8-4d6c724b78d4.log",
+        "content": "exit: Some(0) | 2013 ms\nharbor-a checks complete\n",
+        "data": {
+          "duration_ms": 2013,
+          "exit_code": 0,
+          "peak_memory_bytes": 3227648,
+          "peak_processes": 2,
+          "truncated": false
+        },
+        "is_error": false
+      },
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 16,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "timestamp_ms": 1792422068829,
+      "type": "tool_finished"
+    },
+    {
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 17,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "step": 3,
+      "timestamp_ms": 1792422068830,
+      "type": "model_started"
+    },
+    {
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 18,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "text": "The checks completed. The session journal keeps the tool results.",
+      "timestamp_ms": 1792422068830,
+      "type": "text_delta"
+    },
+    {
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 19,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "timestamp_ms": 1792422068831,
+      "type": "usage",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0
+      }
+    },
+    {
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "sequence": 20,
+      "session_id": "fdd3d558-3995-439e-93a7-d9355f70aa3a",
+      "summary": {
+        "error": null,
+        "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+        "status": "completed",
+        "steps": 3,
+        "text": "The checks completed. The session journal keeps the tool results.",
+        "usage": {
+          "input_tokens": 0,
+          "output_tokens": 0
+        }
+      },
+      "timestamp_ms": 1792422068831,
+      "type": "run_finished"
+    }
+  ],
+  "busy": {
+    "heavy_running": 1,
+    "queued": 1,
+    "reserved_cpu_millis": 1500,
+    "reserved_memory_bytes": 402653184,
+    "reserved_output_bytes": 131072,
+    "reserved_processes": 16,
+    "running": 1
+  },
+  "results": [
+    {
+      "error": null,
+      "run_id": "4ef991a3-6988-4457-9269-f23e81a58201",
+      "status": "completed",
+      "steps": 3,
+      "text": "The checks completed. The session journal keeps the tool results.",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0
+      }
+    },
+    {
+      "error": null,
+      "run_id": "365b0e34-ebdd-49c2-a243-143dbe845ec7",
+      "status": "completed",
+      "steps": 2,
+      "text": "The second workspace completed its checks.",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0
+      }
+    }
+  ]
+}
