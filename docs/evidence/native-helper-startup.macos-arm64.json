@@ -1,0 +1,348 @@
+{
+  "schema": 1,
+  "checkpoint": "staged-helper-startup-before-bounded-diagnostics-and-exit-transition-fix",
+  "scope": "macOS arm64 release executor smoke helper process only, 21 native operations, retained capacity not saturated",
+  "raw_report": {
+    "path": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/report.json",
+    "sha256": "f75f1b99aaa3d932c6c09320e201f0b0ed757ec36352732667c1c873cb576df3"
+  },
+  "summary_report": {
+    "path": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/summary.json",
+    "sha256": "66911a0530acf17e3297f1972ec78765c2ae76360414b43a36c777b2566f3ccc"
+  },
+  "host": {
+    "sw_vers": "ProductName:\t\tmacOS\nProductVersion:\t\t26.5.2\nBuildVersion:\t\t25F84",
+    "uname": "Darwin Everetts-MacBook-Pro.local 25.5.0 Darwin Kernel Version 25.5.0: Tue Jun  9 22:28:34 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T6041 arm64",
+    "hardware": "Mac16,8\n12\n25769803776",
+    "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13) (Homebrew)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: aarch64-apple-darwin\nrelease: 1.99.1\nLLVM version: 23.1.3",
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27) (Homebrew)\nrelease: 1.99.1\ncommit-hash: 5f94df4789f005f9a352888e8355ffc645b7ed0e\ncommit-date: 2026-08-27\nhost: aarch64-apple-darwin\nlibgit2: 1.9.7 (sys:0.21.0 system)\nlibcurl: 8.7.1 (sys:0.4.90+curl-8.21.0 system ssl:(SecureTransport) LibreSSL/3.3.6)\nos: Mac OS 26.5.2 [64-bit]"
+  },
+  "profile": "release",
+  "environment": {
+    "CARGO_BUILD_JOBS": "2",
+    "CARGO_INCREMENTAL": "0"
+  },
+  "executable": {
+    "built_path": "/Users/everettmorgan/Desktop/ejm-harness/target/release/examples/native_owner_smoke",
+    "frozen_path": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release",
+    "sha256": "67f1841051c62222c3967a76390b7ca6eb111d0b6a797dedb091eaea885d33c5",
+    "bytes": 1953232,
+    "built_sha256": "67f1841051c62222c3967a76390b7ca6eb111d0b6a797dedb091eaea885d33c5",
+    "final_sha256": "67f1841051c62222c3967a76390b7ca6eb111d0b6a797dedb091eaea885d33c5"
+  },
+  "source_hashes": {
+    ".cargo/config.toml": "7af9ec6837490d1ca073d1db582eab96aff336a76a7fff3236d3dbad3bdd3756",
+    "Cargo.lock": "072a52712dd92466e59bd62c31a75bcfdaa430e4e7e66c1d45f33c0854df504a",
+    "Cargo.toml": "40ce94b31b2a3b82c0a503139beacfff1fbf1f4e165c0d0f466809fd67ff2d99",
+    "crates/ejm-harness-exec/Cargo.toml": "af00431b60bdc32f2323f2f94fbc0e9f0d70b014ace606fe39f753bef4f7482f",
+    "crates/ejm-harness-exec/examples/native_owner_helper.rs": "1d00dad2855ec36af3e461841ce56c99d86fbd7e007052ef5fed1759c6d48b1b",
+    "crates/ejm-harness-exec/examples/native_owner_smoke.rs": "504faeba4e5ec364f17dab9c4ec1deb4f64f8bd34fd9d726edefd7b3b84d03a8",
+    "crates/ejm-harness-exec/src/capacity.rs": "0d972f75ab8c6fe9e676fb27f9231d478defdc9507295415b903633b404f3f9a",
+    "crates/ejm-harness-exec/src/executor.rs": "5eb63df899ddf0d9c859f9bcc09fd66a2325962022e4911e0d1298859834b093",
+    "crates/ejm-harness-exec/src/governor.rs": "e00b0d4149b80692a5a880aae0d292d09c56f8f09f19f02c88332bdb411d6976",
+    "crates/ejm-harness-exec/src/lib.rs": "29614c341baaff1fddee074aba54a7752cb107e606f1de72bc9fd44dbd6bfe9e",
+    "crates/ejm-harness-exec/src/monitor.rs": "22c1c5a5c9f59bc325de122dfbfbd46da35124565c79d4c60c657756bdc7b122",
+    "crates/ejm-harness-exec/src/native/admission.rs": "d6b4556737c98acdda25ac7c1072cd74dc93459773dee00a39c3a5df924bebcf",
+    "crates/ejm-harness-exec/src/native/client.rs": "4926a6133d6dbf57b00056d1cd9dd44c3f5270404108770971e44fc02049c2b5",
+    "crates/ejm-harness-exec/src/native/owner.rs": "72a7936a0afee3071176d621ea82979363e7bcadb476536cdf2193e5269120b6",
+    "crates/ejm-harness-exec/src/native/placement.rs": "5585fa7f9e19ed49ea3380b389257f2a7331291b1d99ec5b621f019acc88d635",
+    "crates/ejm-harness-exec/src/native/recovery.rs": "ada62279e10867f53fd4401b46527a93a8eb51592b816ed9c9f9f965b23ffefb",
+    "crates/ejm-harness-exec/src/native/tests.rs": "3e518b6810bbf9ebb03c6bbe9ffb9d7f57d0c2f9f77372c74ff8a3f0226dfee8",
+    "crates/ejm-harness-exec/src/native/wire.rs": "14facaf3222ae03fd26063e3a32dedda92aa2076f168dbc1e745b33a09c3739f",
+    "crates/ejm-harness-exec/src/native.rs": "fb6cad1a4f80cf8d1037956405c47885b261e1a26d6bcc934de0405f50dfe875",
+    "crates/ejm-harness-exec/src/observations/linux.rs": "d9b6858499a44700ff9f31d52fa8388a966d07a7c5284fc50a8f6c3927e78637",
+    "crates/ejm-harness-exec/src/observations.rs": "7c5a015d7f0aa4d1a4b64bd5e08f8d98060f137c09cee4a3f148436c1ae5d43d",
+    "crates/ejm-harness-exec/src/process.rs": "49eccd29aef316295dd1b92de38e6e11b0b65d225af5fddaaadf3f7cf1bfaad6",
+    "crates/ejm-harness-exec/src/processes/macos.rs": "1c217ddd7e82e299998729e5f43608d0b019c00a35a77e5c2ca2f01c8c382f6c",
+    "crates/ejm-harness-exec/src/processes.rs": "d5f53b3a060dc930715cbd02c9a5b6cea4d42f2a9fb2f8fe14b6b916d1b5a02f",
+    "crates/ejm-harness-exec/tests/capacity.rs": "cb0eea98ce103b9625ea4dfc9c709ceb3bfada725b7719667c711e50ce29c8ed",
+    "crates/ejm-harness-exec/tests/executor.rs": "38d058f21127796ae7554d06ddea4ce89dda6c925c91de994cdab56d56e93979",
+    "crates/ejm-harness-exec/tests/governor.rs": "16570fdf96e35415048c190603c55e83bdbe64cee854726399e6612cf9bffe08",
+    "rust-toolchain.toml": "c979a7d4d66b770a4d59d6d56e3c078aeab1993af658480bfd1f89f90220457d"
+  },
+  "full_input_snapshot_sha256": "c16687cbd714b24c65cf2a3643d0f967cbe8da7bb2249e69f15ed6768165b93e",
+  "full_input_count": 4563,
+  "sources_unchanged": true,
+  "build_unchanged": true,
+  "executable_unchanged": true,
+  "dependency_package_count": 75,
+  "helper_commitment_bytes": 33554432,
+  "observations": [
+    {
+      "iteration": 1,
+      "raw_json": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/observation_1.stdout",
+      "metrics": {
+        "busy_client_crash_progress": true,
+        "client_eof_cleanup_us": 709,
+        "cold_ready_us": 57550,
+        "detached_survived_owner_death": true,
+        "executor_cancel_retained_through_cleanup": true,
+        "executor_dropped_caller_retained_through_cleanup": true,
+        "executor_owner_death_parked_before_guard_release": true,
+        "executor_progress_after_fresh_grant": true,
+        "executor_spawn_failure_released_after_rejection": true,
+        "first_ready_echo_2mib_us": 14427,
+        "helper_exit_released_inherited_witness": true,
+        "idle_client_crash_progress": true,
+        "idle_exit_us": 2010187,
+        "idle_owner_crash_progress": true,
+        "local_echo_2mib_us": 5468,
+        "local_exit_us": 3033,
+        "owner_idle_descriptors": 13,
+        "owner_idle_rss_bytes": 8339456,
+        "owner_memory_scope": "helper_process_only",
+        "owner_ready_descriptors": 13,
+        "owner_ready_physical_footprint": {
+          "current_bytes": 1737040,
+          "lifetime_peak_bytes": 1737040,
+          "process_start_abstime": 9261628155992
+        },
+        "owner_ready_rss_bytes": 7028736,
+        "owner_retained_capacity_saturated": false,
+        "owner_retained_native_operations": 21,
+        "owner_retained_physical_footprint": {
+          "current_bytes": 2949480,
+          "lifetime_peak_bytes": 2982248,
+          "process_start_abstime": 9261628155992
+        },
+        "paused_owner_replaced": false,
+        "platform": "macos-aarch64",
+        "pre_dispatch_helper_retained_witness_after_launcher_death": true,
+        "pre_spawn_launcher_death_released_witness": true,
+        "profile": "release",
+        "stale_epoch_replayed": false,
+        "user_children_did_not_retain_helper_witness": true,
+        "warm_echo_2mib_us": 13000,
+        "warm_exit_us": 3399,
+        "warm_iterations": 4
+      },
+      "executable_sha256": "67f1841051c62222c3967a76390b7ca6eb111d0b6a797dedb091eaea885d33c5"
+    },
+    {
+      "iteration": 2,
+      "raw_json": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/observation_2.stdout",
+      "metrics": {
+        "busy_client_crash_progress": true,
+        "client_eof_cleanup_us": 595,
+        "cold_ready_us": 57110,
+        "detached_survived_owner_death": true,
+        "executor_cancel_retained_through_cleanup": true,
+        "executor_dropped_caller_retained_through_cleanup": true,
+        "executor_owner_death_parked_before_guard_release": true,
+        "executor_progress_after_fresh_grant": true,
+        "executor_spawn_failure_released_after_rejection": true,
+        "first_ready_echo_2mib_us": 14324,
+        "helper_exit_released_inherited_witness": true,
+        "idle_client_crash_progress": true,
+        "idle_exit_us": 2013355,
+        "idle_owner_crash_progress": true,
+        "local_echo_2mib_us": 5970,
+        "local_exit_us": 3018,
+        "owner_idle_descriptors": 13,
+        "owner_idle_rss_bytes": 8323072,
+        "owner_memory_scope": "helper_process_only",
+        "owner_ready_descriptors": 13,
+        "owner_ready_physical_footprint": {
+          "current_bytes": 1753424,
+          "lifetime_peak_bytes": 1753424,
+          "process_start_abstime": 9262080312841
+        },
+        "owner_ready_rss_bytes": 7045120,
+        "owner_retained_capacity_saturated": false,
+        "owner_retained_native_operations": 21,
+        "owner_retained_physical_footprint": {
+          "current_bytes": 2933096,
+          "lifetime_peak_bytes": 2965864,
+          "process_start_abstime": 9262080312841
+        },
+        "paused_owner_replaced": false,
+        "platform": "macos-aarch64",
+        "pre_dispatch_helper_retained_witness_after_launcher_death": true,
+        "pre_spawn_launcher_death_released_witness": true,
+        "profile": "release",
+        "stale_epoch_replayed": false,
+        "user_children_did_not_retain_helper_witness": true,
+        "warm_echo_2mib_us": 12646,
+        "warm_exit_us": 4175,
+        "warm_iterations": 4
+      },
+      "executable_sha256": "67f1841051c62222c3967a76390b7ca6eb111d0b6a797dedb091eaea885d33c5"
+    },
+    {
+      "iteration": 3,
+      "raw_json": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/observation_3.stdout",
+      "metrics": {
+        "busy_client_crash_progress": true,
+        "client_eof_cleanup_us": 643,
+        "cold_ready_us": 56897,
+        "detached_survived_owner_death": true,
+        "executor_cancel_retained_through_cleanup": true,
+        "executor_dropped_caller_retained_through_cleanup": true,
+        "executor_owner_death_parked_before_guard_release": true,
+        "executor_progress_after_fresh_grant": true,
+        "executor_spawn_failure_released_after_rejection": true,
+        "first_ready_echo_2mib_us": 15212,
+        "helper_exit_released_inherited_witness": true,
+        "idle_client_crash_progress": true,
+        "idle_exit_us": 2009571,
+        "idle_owner_crash_progress": true,
+        "local_echo_2mib_us": 5029,
+        "local_exit_us": 2753,
+        "owner_idle_descriptors": 13,
+        "owner_idle_rss_bytes": 8257536,
+        "owner_memory_scope": "helper_process_only",
+        "owner_ready_descriptors": 13,
+        "owner_ready_physical_footprint": {
+          "current_bytes": 1737040,
+          "lifetime_peak_bytes": 1737040,
+          "process_start_abstime": 9262533273713
+        },
+        "owner_ready_rss_bytes": 7028736,
+        "owner_retained_capacity_saturated": false,
+        "owner_retained_native_operations": 21,
+        "owner_retained_physical_footprint": {
+          "current_bytes": 2867560,
+          "lifetime_peak_bytes": 2900328,
+          "process_start_abstime": 9262533273713
+        },
+        "paused_owner_replaced": false,
+        "platform": "macos-aarch64",
+        "pre_dispatch_helper_retained_witness_after_launcher_death": true,
+        "pre_spawn_launcher_death_released_witness": true,
+        "profile": "release",
+        "stale_epoch_replayed": false,
+        "user_children_did_not_retain_helper_witness": true,
+        "warm_echo_2mib_us": 12420,
+        "warm_exit_us": 3360,
+        "warm_iterations": 4
+      },
+      "executable_sha256": "67f1841051c62222c3967a76390b7ca6eb111d0b6a797dedb091eaea885d33c5"
+    }
+  ],
+  "ranges": {
+    "cold_ready_us": {
+      "min": 56897,
+      "max": 57550,
+      "median": 57110
+    },
+    "owner_ready_rss_bytes": {
+      "min": 7028736,
+      "max": 7045120,
+      "median": 7028736
+    },
+    "owner_idle_rss_bytes": {
+      "min": 8257536,
+      "max": 8339456,
+      "median": 8323072
+    },
+    "ready_lifetime_peak_physical_footprint_bytes": {
+      "min": 1737040,
+      "max": 1753424,
+      "median": 1737040
+    },
+    "retained_lifetime_peak_physical_footprint_bytes": {
+      "min": 2900328,
+      "max": 2982248,
+      "median": 2965864
+    }
+  },
+  "comparison": {
+    "max_ready_rss_fraction_of_H": 0.2099609375,
+    "max_observed_lifetime_physical_footprint_fraction_of_H": 0.08887791633605957,
+    "H_minus_max_ready_rss_bytes": 26509312,
+    "H_minus_max_observed_lifetime_physical_footprint_bytes": 30572184,
+    "max_retained_rss_fraction_of_H": 0.24853515625,
+    "H_minus_max_retained_rss_bytes": 25214976
+  },
+  "commands": [
+    {
+      "label": "metadata",
+      "command": [
+        "cargo",
+        "metadata",
+        "--format-version",
+        "1",
+        "--filter-platform",
+        "aarch64-apple-darwin",
+        "--offline",
+        "--locked"
+      ],
+      "stdout": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/metadata.stdout",
+      "stderr": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/metadata.stderr",
+      "started_utc": "2026-10-20T17:16:46.940355+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 0.27856308297486976,
+      "stdout_sha256": "f9b9e3af6da1aec7363cdae8abb2ab3307bafa11bd54f1d5c7b06a7e5801a095",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "release_build",
+      "command": [
+        "cargo",
+        "build",
+        "--release",
+        "-p",
+        "ejm-harness-exec",
+        "--example",
+        "native_owner_smoke",
+        "--offline",
+        "--locked"
+      ],
+      "stdout": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/release_build.stdout",
+      "stderr": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/release_build.stderr",
+      "started_utc": "2026-10-20T17:16:47.857999+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 10.58418512501521,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "2dc46b70131454ffb446cc3821c79f3f17d1d4bf31119ff1d87b394e5ad6f0c6"
+    },
+    {
+      "label": "observation_1",
+      "command": [
+        "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release"
+      ],
+      "stdout": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/observation_1.stdout",
+      "stderr": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/observation_1.stderr",
+      "started_utc": "2026-10-20T17:16:58.907630+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 18.960488584009,
+      "stdout_sha256": "951b7b793f2c88d29c11599254718bb3e41b39f29c877bdf267e95c53a23aca2",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "observation_2",
+      "command": [
+        "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release"
+      ],
+      "stdout": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/observation_2.stdout",
+      "stderr": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/observation_2.stderr",
+      "started_utc": "2026-10-20T17:17:17.874262+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 18.869257083977573,
+      "stdout_sha256": "ab7d586ab15b78eb209d4043b9fa47f3a2dfd640a1b97c15c3e4dbb62e9c193b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "observation_3",
+      "command": [
+        "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/native_owner_smoke.release"
+      ],
+      "stdout": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/observation_3.stdout",
+      "stderr": "/private/tmp/ejm-native-staged-release-smoke-20261020/20261020T171623Z-e14b9e1d/observation_3.stderr",
+      "started_utc": "2026-10-20T17:17:36.750106+00:00",
+      "exit_code": 0,
+      "elapsed_seconds": 18.82737408403773,
+      "stdout_sha256": "b18ff502dd3b13e055d8d26b587e3b258a21dd787c5d63d789065d8f46a5ff6e",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "limits": [
+    "RSS readings are point samples, not RSS peaks.",
+    "Kernel lifetime maximum is physical footprint, a different memory measure from RSS.",
+    "Measurements cover this executor example helper process, not descendants or CLI/worker/IDE helper executables.",
+    "Retained state has 21 native operations, not saturated 256 retained entries or 8 simultaneous helper generations.",
+    "Three local runs do not establish other operating systems or hardware.",
+    "This checkpoint predates the bounded sampler diagnostics and the later macOS exit-transition fix. It is not final combined-source acceptance.",
+    "The full input snapshot includes cached dependency files and remains in the retained local raw report; workspace input hashes and all fixture observations are embedded here."
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "date": "2026-10-20",
+  "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "scope": "Additive local cached scheduling status; legacy status payload compatibility",
+  "api": {
+    "rust": "Harness::scheduling_snapshot() -> SchedulingSnapshot",
+    "worker_capability": "scheduling",
+    "worker_method": "scheduling.status",
+    "typescript": "schedulingStatus()",
+    "python_async_and_sync": "scheduling_status()"
+  },
+  "verification": {
+    "scheduling_integration_tests": 3,
+    "worker_tests": 12,
+    "typescript_actual_worker_tests": 2,
+    "python_actual_worker_tests": 3,
+    "core_and_worker_strict_all_target_clippy": "passed",
+    "protocol_freshness": "passed",
+    "typescript_build": "passed",
+    "python_ruff_and_strict_mypy": "passed",
+    "scoped_format_and_diff_checks": "passed"
+  },
+  "large_scale_verification": "capacity-bursts.macos-arm64.json combined_source_revalidation",
+  "source_sha256": {
+    "crates/ejm-harness/src/engine.rs": "280e8ea19292b2ddc2d7c8297720c170a35d5db75c79b390d23c46ffaa273e05",
+    "crates/ejm-harness/src/lib.rs": "70dceec5e342fcec19c9013e3b87fc71095739979f75c706e99a8f1ccb11b2e7",
+    "crates/ejm-harness/src/engine/driver.rs": "3e8293360baaf613c4edbf4a26c57f869755c6285434259ce97a15309d550fbb",
+    "crates/ejm-harness/src/engine/scheduling.rs": "263aeea2138ea756a3711678e49038dfb13306e1696d83a5835adba3b5bc1c8d",
+    "crates/ejm-harness/tests/scheduling_status.rs": "10716fca03f531a8568ae9e25b6c72729862422009b615a6d41e73555a6f5395",
+    "crates/ejm-harness-worker/src/protocol.rs": "66d7aef4f80d6185b16836ce31772158d2efcb4948f437f20a2f2ef4b0d0c309",
+    "crates/ejm-harness-worker/src/server.rs": "e912ca0c4462f997b0f5448e7f78e1b8e463979525c9e76acc584b515952725f",
+    "sdk/protocol.schema.json": "3b6ec9253bf5aa00eaf358d2d19031b2baa52a5dc75b9266c065d01d9eade9b6",
+    "sdk/typescript/src/index.ts": "f7975b3f53049d1107bd66830592303b1061edbe57399702549270be28bd78fc",
+    "sdk/typescript/src/protocol.ts": "eef9881d6d5afe3e95a78bd937ce3a899573974522fef67a5a350127bbaf58e2",
+    "sdk/typescript/test/sdk.test.mjs": "65a15fafcc02976e0d790108257a182f9bd2cfa3e34492df7eb2ee2e25d26335",
+    "sdk/python/ejm_harness/__init__.py": "41e7eddcefada9d2f2f94569ebc90959c207cb63f11103d953dc4d1ecdac0e5f",
+    "sdk/python/ejm_harness/client.py": "e0a2bef0b9e8b57bb8eaa57de18c905d6938398cd6f894bbce36a59080634e50",
+    "sdk/python/ejm_harness/protocol.py": "4dc164237e6e6eab72614b542d1041b2e94c6b1b8cbbda1c11154a9b9025f306",
+    "sdk/python/tests/test_sdk.py": "02b45411b5ca9cf6658b3ab55a145e4af7d1322ebc147aa15506ded1a5f5951d"
+  },
+  "limits": [
+    "Worker sandbox attempt passed9 tests and denied3 local loopback binds; allowed local rerun passed all12",
+    "Focused owner and SDK results are retained in the agent tool transcript; no separate raw logs were saved for those commands",
+    "Counters describe local engine phases, not OS runnable threads or host-wide totals",
+    "Callback lifetime can include internal admission/backpressure and cannot prove uncertain native or remote work ended",
+    "No new timers, native probes, journal I/O, per-agent scan, dependency, automatic default or legacy payload field was added",
+    "Full combined-source gates and other-platform execution evidence remain separate checks"
+  ]
+}
