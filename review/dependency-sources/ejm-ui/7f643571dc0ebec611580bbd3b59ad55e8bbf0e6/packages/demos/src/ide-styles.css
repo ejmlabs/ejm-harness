@@ -1,0 +1,12 @@
+/* Public passive product preview profile. */
+@import "@ejm/tokens/neutral.css";
+@import "./native-ide.css";
+@source "./previews/IdeView.tsx";
+@source "./previews/ide-parts.tsx";
+@source "./previews/ide-icons.tsx";
+@source "./previews/code.tsx";
+@source "./islands/ide-preview*.tsx";
+@source "./islands/Showcase.tsx";
+@source "./islands/LazyPreview.tsx";
+@source "./ShowcaseFrame.tsx";
+@source not "./**/*.test.{ts,tsx}";

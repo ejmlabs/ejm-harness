@@ -1,0 +1,139 @@
+{
+  "ejm-cli": [
+    {
+      "kind": "tool",
+      "name": "shell",
+      "source": "ejm-harness/crates/ejm-harness-coding/src/lib.rs",
+      "reason": "The native preview's shell calls use the public coding crate. CLI launch grants control permission to run them."
+    },
+    {
+      "kind": "tool",
+      "name": "read_file",
+      "source": "ejm-harness/crates/ejm-harness-coding/src/lib.rs",
+      "reason": "ejm-cli gets its native file tools from ejm-harness-coding. The README says only that native file tools are read only until write is granted."
+    },
+    {
+      "kind": "tool",
+      "name": "list_files",
+      "source": "ejm-harness/crates/ejm-harness-coding/src/lib.rs",
+      "reason": "Same crate, same reason as read_file."
+    },
+    {
+      "kind": "tool",
+      "name": "search",
+      "source": "ejm-harness/crates/ejm-harness-coding/src/lib.rs",
+      "reason": "Same crate, same reason as read_file."
+    },
+    {
+      "kind": "tool",
+      "name": "patch_file",
+      "source": "ejm-harness/crates/ejm-harness-coding/src/lib.rs",
+      "reason": "Same crate. This is the write tool the demo blocks until write is granted."
+    },
+    {
+      "kind": "command",
+      "name": "/new",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Listed in the slash command table of the CLI reference. The README links the reference and names only /help."
+    },
+    {
+      "kind": "command",
+      "name": "/sessions",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Same table in the CLI reference."
+    },
+    {
+      "kind": "command",
+      "name": "/stop",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Same table in the CLI reference."
+    },
+    {
+      "kind": "command",
+      "name": "/quit",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Same table in the CLI reference."
+    },
+    {
+      "kind": "command",
+      "name": "/resume",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Same table in the CLI reference. The demo answers that it is not part of the demo."
+    },
+    {
+      "kind": "command",
+      "name": "/queue",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Same table in the CLI reference. The demo answers that it is not part of the demo."
+    },
+    {
+      "kind": "command",
+      "name": "/steer",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Same table in the CLI reference. The demo answers that it is not part of the demo."
+    },
+    {
+      "kind": "key",
+      "name": "Alt+Enter",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Key table in the CLI reference: inserts a newline."
+    },
+    {
+      "kind": "key",
+      "name": "Ctrl+J",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Key table in the CLI reference: the newline fallback."
+    },
+    {
+      "kind": "key",
+      "name": "PageUp",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Key table in the CLI reference: scrolls the transcript."
+    },
+    {
+      "kind": "key",
+      "name": "PageDown",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Key table in the CLI reference: scrolls the transcript."
+    },
+    {
+      "kind": "flag",
+      "name": "--plain",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Documented in the CLI reference as ASCII symbols and borders. It is separate from --no-color and NO_COLOR, which the demo's single Plain switch stands in for together."
+    },
+    {
+      "kind": "env",
+      "name": "NO_COLOR",
+      "source": "ejm-cli/docs/ejm-cli.md",
+      "reason": "Documented in the CLI reference as selecting a monochrome TUI."
+    }
+  ],
+  "ejm-ide": [
+    {
+      "kind": "tool",
+      "name": "workbench_open_file",
+      "source": "ejm-ide/docs/agent-tools.md",
+      "reason": "The native preview opens a file through the public tool named in the agent tools table."
+    },
+    {
+      "kind": "tool",
+      "name": "workbench_search_code",
+      "source": "ejm-ide/docs/agent-tools.md",
+      "reason": "The tool table in the agent tools reference lists it. The README does not list the agent's tools."
+    },
+    {
+      "kind": "tool",
+      "name": "workbench_read_file",
+      "source": "ejm-ide/docs/agent-tools.md",
+      "reason": "Same table in the agent tools reference."
+    },
+    {
+      "kind": "tool",
+      "name": "workbench_write_file",
+      "source": "ejm-ide/docs/agent-tools.md",
+      "reason": "Same table. It proposes an exact file edit, which the demo shows as a diff to accept or reject."
+    }
+  ],
+  "ejm-harness": []
+}
