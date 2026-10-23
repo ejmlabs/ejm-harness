@@ -100,6 +100,9 @@ export class Harness {
         this.process.stderr.resume();
     }
     static async create(options = {}) {
+        if (process.platform === "darwin" && options.capacity === undefined) {
+            options = { ...options, capacity: { mode: "auto" } };
+        }
         const harness = new Harness(options);
         try {
             const hello = await harness.request("hello", { protocol: 1 });

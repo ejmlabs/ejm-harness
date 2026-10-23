@@ -226,9 +226,11 @@ are not OS thread counts or proof of native descendant cleanup. See
 
 ## Capacity and bounded session views
 
-Capacity coordination is opt-in in this source tree. Omit `capacity` to retain
-the original fixed limits within one worker. Automatic SDK defaults remain
-gated on native owner-crash recovery checks. Opted-in workers coordinate the
+On macOS, omitting `capacity` selects automatic shared host capacity. On other
+platforms, omission retains the original fixed limits within one worker pending
+native acceptance. Explicit TypeScript `capacity: null` or Python
+`config={"capacity": None}` preserves legacy composition on every platform.
+Coordinated workers share the
 same host budget through the public Rust capacity context, prepared before
 package imports and reused by the final harness. No separate scheduler runs
 inside either SDK.

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import sys
 import tempfile
 import threading
 import unittest
@@ -104,6 +105,7 @@ async def model(request, context):
 """)
     return {
         "state_dir": state,
+        "capacity": None,
         "packages": [{"root": str(root), "grants": {"providers": ["model"]}}],
         "provider": {"kind": "package", "package": "@fixture/sdk-recorded", "name": "model"},
     }
@@ -162,6 +164,20 @@ async def widget(args, ctx):
 
 
 class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
+    async def test_platform_capacity_default_and_explicit_fixed(self) -> None:
+        for explicit in (False, True):
+            with tempfile.TemporaryDirectory() as state:
+                config = provider_fixture(state)
+                config.pop("capacity", None)
+                if explicit:
+                    config["capacity"] = {"mode": "fixed"}
+                async with AsyncHarness(worker_path=WORKER, config=config) as harness:
+                    status = await harness.capacity_status()
+                    expected = (
+                        "fixed" if explicit else ("auto" if sys.platform == "darwin" else None)
+                    )
+                    self.assertEqual(status["mode"] if status else None, expected)
+
     async def test_missing_and_removed_providers_fail_before_packages_and_journals(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             state = Path(folder) / "state"
@@ -210,7 +226,9 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
                 config={"capacity": {"mode": "auto"}, "provider_capacity": quota},
             )
         with self.assertRaisesRegex(HarnessError, "explicit capacity mode"):
-            await AsyncHarness.create(worker_path=WORKER, config={"provider_capacity": quota})
+            await AsyncHarness.create(
+                worker_path=WORKER, config={"capacity": None, "provider_capacity": quota}
+            )
 
     async def test_capacity_opt_in_requires_worker_capability(self) -> None:
         request = AsyncHarness._request

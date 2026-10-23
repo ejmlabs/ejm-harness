@@ -289,3 +289,18 @@ Before readiness or any command submission, a clean helper exit may indicate idl
 ## Recovery after an inconclusive small probe
 
 The representative workload on 2026-10-22 completed safely but missed automatic throughput acceptance. A rejected one-slot probe repeats unchanged after every cooldown. Permit a larger subsequent probe only when comparable work misses the throughput gain threshold while still meeting the existing latency guard. Double the probe distance up to the existing eight-slot maximum and keep the same hard ceiling, full-grant evidence, one-lane attribution, pressure backoff and cooldown. Reset the distance after acceptance, latency regression, class change, grant refusal or pressure. The extension adds one bounded integer per lane and no persisted state. Verify a flat small step followed by useful larger growth, plus existing pressure and latency regressions; measure before activation.
+
+### Admitted review: native endpoint authentication
+
+Native protocol 3 adds a bounded server proof before Hello. The maintained
+RustCrypto HMAC-SHA256 implementation signs the fresh client nonce, role,
+protocol, epoch, domain and independently observed TCP endpoint ports with the
+private advertised capability. Constant-time verification precedes all client
+capability and launch data. Cached and discovered endpoints use the same check;
+a free stable owner lock makes discovery stale without contacting its port.
+The existing handshake semaphore and frame deadlines bound this exchange.
+This authenticates local endpoints, not an encrypted or general remote tunnel.
+Rustls would require certificate provisioning and a larger transport change;
+existing sha2 and transitive hmac meet this narrow local proof requirement.
+Relative cwd is made absolute in the caller before serialization, preserving
+symlink traversal. Existing admission and uncertain-effect rules remain intact.

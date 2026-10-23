@@ -90,6 +90,7 @@ export function model(request) {
 `,
   );
   return {
+    capacity: null,
     packages: [{ root, grants: { providers: ["model"] } }],
     provider: { kind: "package", package: "@fixture/sdk-recorded", name: "model" },
   };
@@ -196,7 +197,7 @@ test("configured provider quotas require worker support and explicit coordinated
   } finally {
     Harness.prototype.request = request;
   }
-  await assert.rejects(Harness.create({ workerPath, provider_capacity }), {
+  await assert.rejects(Harness.create({ workerPath, capacity: null, provider_capacity }), {
     code: "configuration",
     message: /explicit capacity mode/,
   });
@@ -885,5 +886,21 @@ test("malformed and oversized raw frames close the worker", async () => {
     child.stdin.end(frame);
     const [code] = await exit;
     assert.notEqual(code, 0);
+  }
+});
+
+// Omission selects the verified platform default; explicit fixed stays fixed.
+test("platform capacity default and explicit fixed mode", async () => {
+  for (const capacity of [undefined, { mode: "fixed" }]) {
+    const { harness, close } = await fixture({ capacity });
+    try {
+      const status = await harness.capacityStatus();
+      assert.equal(
+        status?.mode ?? null,
+        capacity?.mode ?? (process.platform === "darwin" ? "auto" : null),
+      );
+    } finally {
+      await close();
+    }
   }
 });
