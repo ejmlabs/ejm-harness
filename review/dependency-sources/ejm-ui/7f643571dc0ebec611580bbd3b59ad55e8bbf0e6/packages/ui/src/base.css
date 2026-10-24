@@ -1,0 +1,394 @@
+/* @ejm/ui styles: the ejmlabs design language as a Tailwind v4 theme. Sites import this one file:
+     @import "@ejm/ui/styles.css";
+   It loads Tailwind, the generated color theme from @ejm/tokens, the fonts, the type scale, the page column, motion and the base
+   styles. Every name it defines is listed in packages/ui/THEME.md, which is the contract for components, layouts and views.
+   Colors are never written here: they come from packages/tokens/theme.json through generated/tailwind.css and window.css. */
+
+@import "tailwindcss";
+@import "@ejm/tokens/tailwind.css";
+@import "@ejm/tokens/window.css";
+/* ---------- Variants ---------- */
+/* dark: follows [data-theme="dark"], or the system preference while the root has no data-theme. The semantic colors already
+   flip, so reach for dark: only for things a color token cannot express. */
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) { @slot; }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme]), :root:not([data-theme]) *) { @slot; }
+  }
+}
+/* band-sage:text-forest applies inside a [data-band="sage"] element, and the same for paper, mist and ink. */
+@custom-variant band-paper (&:where([data-band="paper"], [data-band="paper"] *));
+@custom-variant band-mist (&:where([data-band="mist"], [data-band="mist"] *));
+@custom-variant band-sage (&:where([data-band="sage"], [data-band="sage"] *));
+@custom-variant band-ink (&:where([data-band="ink"], [data-band="ink"] *));
+/* Extra breakpoints so layouts can follow the page column steps, up to a 5120px screen. */
+@theme {
+  --breakpoint-xs: 26.25rem;
+  --breakpoint-3xl: 120rem;
+  --breakpoint-4xl: 160rem;
+  --breakpoint-5xl: 200rem;
+  --breakpoint-6xl: 275rem;
+}
+
+/* ---------- Fonts ---------- */
+/* Latin subsets built by scripts/build-fonts.mjs from the full fonts in @ejm/tokens. Vite hashes and caches them. A page that
+   needs another script falls back to the system font, so the unicode-range keeps the download to what the page can use. */
+@font-face {
+  font-family: "Manrope";
+  src: url("./fonts/manrope-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("./fonts/ibm-plex-mono-500-latin.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD, U+2190-21FF, U+2500-259F, U+2713;
+}
+/* Metric-matched fallbacks. While a web font loads, text sets in Arial or Courier New scaled to the same widths and line
+   metrics, so the swap moves nothing. Values measured from the font files (from design-kit/tokens/brand.css). */
+@font-face {
+  font-family: "Manrope Fallback";
+  src: local("Arial"), local("ArialMT"), local("Helvetica Neue"), local("Helvetica");
+  font-weight: 200 500;
+  size-adjust: 104.27%;
+  ascent-override: 102.24%;
+  descent-override: 28.77%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Manrope Fallback";
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Helvetica Neue Bold"), local("Helvetica Bold");
+  font-weight: 600 800;
+  size-adjust: 99.73%;
+  ascent-override: 106.89%;
+  descent-override: 30.08%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "IBM Plex Mono Fallback";
+  src: local("Courier New"), local("CourierNewPSMT"), local("Menlo"), local("Courier");
+  font-weight: 500;
+  size-adjust: 99.98%;
+  ascent-override: 102.52%;
+  descent-override: 27.5%;
+  line-gap-override: 0%;
+}
+
+/* ---------- Theme: fonts, type, radius, spacing, containers, motion ---------- */
+@theme {
+  --font-*: initial;
+  --font-sans: "Manrope", "Manrope Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "IBM Plex Mono Fallback", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Type scale. Fluid with clamp(); the largest sizes grow with --ejm-scale on screens from 1920px (see the page column).
+     Ranges at the base scale: display-lg 44 to 140px, display 36 to 96px, title 28 to 56px, heading 20 to 32px,
+     lead 19 to 26px, stat 52 to 136px, body 16 to 20px (18px on a laptop). */
+  --text-display-lg: clamp(2.75rem, 0.7rem + 9.4vw, calc(8.75rem * var(--ejm-scale)));
+  --text-display-lg--line-height: 0.96;
+  --text-display-lg--letter-spacing: -0.045em;
+  --text-display-lg--font-weight: 600;
+  --text-display: clamp(2.25rem, 0.8rem + 6.2vw, calc(6rem * var(--ejm-scale)));
+  --text-display--line-height: 1;
+  --text-display--letter-spacing: -0.04em;
+  --text-display--font-weight: 600;
+  --text-title: clamp(1.75rem, 1rem + 2.8vw, calc(3.5rem * var(--ejm-scale)));
+  --text-title--line-height: 1.06;
+  --text-title--letter-spacing: -0.035em;
+  --text-title--font-weight: 600;
+  --text-heading: clamp(1.25rem, 1rem + 1.1vw, calc(2rem * var(--ejm-scale)));
+  --text-heading--line-height: 1.2;
+  --text-heading--letter-spacing: -0.02em;
+  --text-heading--font-weight: 600;
+  --text-lead: clamp(1.1875rem, 0.95rem + 0.8vw, 1.625rem);
+  --text-lead--line-height: 1.5;
+  --text-stat: clamp(3.25rem, 1rem + 8vw, calc(8.5rem * var(--ejm-scale)));
+  --text-stat--line-height: 0.95;
+  --text-stat--letter-spacing: -0.04em;
+  --text-stat--font-weight: 600;
+  --text-body: clamp(1rem, 0.9rem + 0.28vw, 1.25rem);
+  --text-body--line-height: 1.6;
+
+  /* Radius for controls only: buttons, inputs, tags and the theme toggle. There is no card or panel radius. window is for
+     product windows, menus and overlays. sm, md and lg are the control radius, so copied shadcn source keeps working.
+     compact (5px) is the control radius of the compact density that applications use (see THEME.md). */
+  --radius-*: initial;
+  --radius-control: 0.375rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.375rem;
+  --radius-pill: 999px;
+  --radius-compact: 0.3125rem;
+  --radius-window: 1rem;
+}
+
+@theme inline {
+  /* Application grouping uses the existing Tailwind spacing scale. */
+  --spacing-field: calc(var(--spacing) * 2);
+  --spacing-content: calc(var(--spacing) * 6);
+  /* Band rhythm and page geometry, defined as plain variables below so they can step with the screen. */
+  --spacing-rhythm: var(--ejm-rhythm);
+  --spacing-rhythm-sm: calc(var(--ejm-rhythm) * 0.4);
+  --spacing-gutter: var(--ejm-page-gutter);
+  --container-page: var(--ejm-page-max);
+  --container-measure: 68ch;
+}
+/* Easings: standard for state changes, enter for things arriving, exit for things leaving, emphasis for the one hero entrance. */
+@theme {
+  --ease-standard: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease-enter: cubic-bezier(0, 0, 0.2, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ---------- Page column, gutters, safe areas and motion tokens ---------- */
+/* One set of steps from a 320px phone to a 5120px super ultrawide. --ejm-page-max is the outer width of the column, gutters
+   included. Bands are full bleed; the column inside them grows with the screen and the headline scales up with --ejm-scale. */
+@layer base {
+  :root {
+    --ejm-scale: 1;
+    --ejm-gutter-step: 1rem;
+    --ejm-page-max: 75rem;
+    --ejm-page-gutter: max(calc(var(--ejm-gutter-step) * var(--ejm-scale)), env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+    --ejm-rhythm: calc(clamp(4.5rem, 1.5rem + 10vw, 10rem) * var(--ejm-scale));
+    --ejm-header-h: 4.5rem;
+
+    --ejm-duration-fast: 120ms;
+    --ejm-duration-base: 200ms;
+    --ejm-duration-slow: 320ms;
+    --ejm-duration-entrance: 640ms;
+    --ejm-duration-draw: 700ms;
+    --ejm-stagger: 60ms;
+    --ejm-draw-stagger: 40ms;
+  }
+  @media (min-width: 420px) { :root { --ejm-gutter-step: 1.5rem; } }
+  @media (min-width: 760px) { :root { --ejm-gutter-step: 3rem; } }
+  @media (min-width: 1600px) { :root { --ejm-gutter-step: 4rem; --ejm-page-max: 85rem; } }
+  @media (min-width: 1920px) { :root { --ejm-scale: 1.125; --ejm-page-max: 95rem; } }
+  @media (min-width: 2560px) { :root { --ejm-scale: 1.25; --ejm-page-max: 115rem; } }
+  @media (min-width: 3200px) { :root { --ejm-scale: 1.375; --ejm-page-max: 140rem; } }
+  @media (min-width: 4400px) { :root { --ejm-scale: 1.5; --ejm-page-max: 175rem; } }
+  /* Reduced motion: every duration collapses, so transitions and animations that use the tokens end at once. */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --ejm-duration-fast: 1ms;
+      --ejm-duration-base: 1ms;
+      --ejm-duration-slow: 1ms;
+      --ejm-duration-entrance: 1ms;
+      --ejm-duration-draw: 1ms;
+      --ejm-stagger: 0ms;
+      --ejm-draw-stagger: 0ms;
+    }
+    html { scroll-behavior: auto; }
+    ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  }
+}
+
+/* ---------- Utilities ---------- */
+/* band: paints the ground and text of the nearest [data-band] (or the page). Put it on the full-bleed element. */
+@utility band {
+  background-color: var(--ejm-ground);
+  color: var(--ejm-fg);
+}
+/* page: the centered content column. page-inset: padding that lines a full-bleed element's content up with that column. */
+@utility page {
+  box-sizing: border-box;
+  inline-size: 100%;
+  max-inline-size: var(--ejm-page-max);
+  margin-inline: auto;
+  padding-inline: var(--ejm-page-gutter);
+}
+@utility page-inset {
+  padding-inline: max(var(--ejm-page-gutter), calc((100% - var(--ejm-page-max)) / 2 + var(--ejm-page-gutter)));
+}
+/* text-meta: mono metadata, 13px growing to 14.4px. */
+@utility text-meta {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: clamp(0.8125rem, 0.78rem + 0.1vw, 0.9rem);
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+}
+/* hairline: a 1px rule in the line color, on the bottom edge (hairline-t: the top edge). */
+@utility hairline {
+  border-block-end: 1px solid var(--ejm-line);
+}
+@utility hairline-t {
+  border-block-start: 1px solid var(--ejm-line);
+}
+/* focus-ring: the 2px focus outline for custom controls. The global :focus-visible rule already does this for native ones. */
+@utility focus-ring {
+  &:focus-visible { outline: 2px solid var(--ejm-focus); outline-offset: 2px; }
+}
+/* touch-target: at least 44 by 44px on coarse pointers (phones, tablets). Use it on a block, flex or inline-flex element. */
+@utility touch-target {
+  @media (pointer: coarse) { min-block-size: 44px; min-inline-size: 44px; }
+}
+/* compact-target: at least 32 by 32px on a fine pointer (a mouse), for the compact density. On a coarse pointer touch-target makes it 44px; the two
+   media queries never apply together, so their order does not matter. Use both on a compact control. */
+@utility compact-target {
+  @media (pointer: fine) { min-block-size: 2rem; min-inline-size: 2rem; }
+}
+/* link: the inline link style for running text. Bare <a> elements in prose get it too. */
+@utility link {
+  color: var(--ejm-link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  &:hover { text-decoration-thickness: 2px; }
+}
+/* sr-inline: text for screen readers inside a link or a cell. Unlike sr-only it is not absolutely positioned, so inside a table or any scroll
+   region it cannot sit outside the region and widen the page (ExternalLink in a ParamTable did, by 3px at 320px). */
+@utility sr-inline {
+  display: inline-block;
+  inline-size: 1px;
+  block-size: 1px;
+  margin-inline-end: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: top;
+  clip-path: inset(50%);
+}
+/* skip-link: first focusable element on every page. Hidden above the viewport until it has focus. */
+@utility skip-link {
+  position: absolute;
+  z-index: 100;
+  inset-inline-start: var(--ejm-page-gutter);
+  inset-block-start: -10rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-pill);
+  background-color: var(--ejm-fg);
+  color: var(--ejm-ground);
+  font-weight: 600;
+  &:focus { inset-block-start: max(1rem, env(safe-area-inset-top, 0px)); }
+}
+/* scheme-page: an object (a product window, a code well) keeps the page theme even when it sits inside a Sage or Ink band. */
+@utility scheme-page {
+  color-scheme: var(--ejm-page-scheme);
+}
+/* duration-fast, duration-base, duration-slow: 120, 200 and 320ms. They are 1ms under reduced motion. */
+@utility duration-fast { --tw-duration: var(--ejm-duration-fast); transition-duration: var(--ejm-duration-fast); }
+@utility duration-base { --tw-duration: var(--ejm-duration-base); transition-duration: var(--ejm-duration-base); }
+@utility duration-slow { --tw-duration: var(--ejm-duration-slow); transition-duration: var(--ejm-duration-slow); }
+
+/* ---------- Motion: transform and opacity only, and nothing at all under reduced motion ---------- */
+@keyframes ejm-fade { from { opacity: 0; } }
+@keyframes ejm-reveal { from { opacity: 0; transform: translate3d(var(--ejm-reveal-x, 0px), var(--ejm-reveal-y, 1rem), 0) scale(var(--ejm-reveal-scale, 1)); } }
+@keyframes ejm-enter { from { opacity: 0; transform: translate3d(0, var(--ejm-enter-y, 0.75rem), 0); } }
+@keyframes ejm-slide { from { transform: translate3d(0, var(--ejm-enter-y, 0.75rem), 0); } }
+@keyframes ejm-draw { from { stroke-dashoffset: 1; } }
+
+/* Stagger: put style="--ejm-i: 3" on the Nth child. The index stops at 8, so a staged entrance is at most
+   8 x 60ms + 640ms = 1.12s, under the 1.2s limit. Optional --ejm-delay adds a fixed wait. */
+@utility animate-fade {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: ejm-fade var(--ejm-duration-slow) var(--ease-enter) calc(var(--ejm-delay, 0ms) + min(var(--ejm-i, 0), 8) * var(--ejm-stagger)) backwards;
+  }
+}
+@utility animate-reveal {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: ejm-reveal var(--ejm-duration-slow) var(--ease-enter) calc(var(--ejm-delay, 0ms) + min(var(--ejm-i, 0), 8) * var(--ejm-stagger)) backwards;
+  }
+}
+@utility animate-enter {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: ejm-enter var(--ejm-duration-entrance) var(--ease-emphasis) calc(var(--ejm-delay, 0ms) + min(var(--ejm-i, 0), 8) * var(--ejm-stagger)) backwards;
+  }
+}
+/* animate-slide: the entrance for text that can be the page's Largest Contentful Paint (the hero headline and lead). Transform only, so the
+   text is painted and counted at first paint instead of waiting for a fade; animate-enter fades, which delays LCP by its duration. */
+@utility animate-slide {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: ejm-slide var(--ejm-duration-entrance) var(--ease-emphasis) calc(var(--ejm-delay, 0ms) + min(var(--ejm-i, 0), 8) * var(--ejm-stagger)) backwards;
+  }
+}
+/* draw-on: on an inline <svg class="art">, draws every path (each has pathLength="1") once, in order. Without this class, or
+   under reduced motion, the art is simply fully drawn. */
+@utility draw-on {
+  @media (prefers-reduced-motion: no-preference) {
+    & path {
+      animation: ejm-draw var(--ejm-duration-draw) var(--ease-emphasis) calc(min(var(--ejm-i, 0), 11) * var(--ejm-draw-stagger)) backwards;
+    }
+    & path:nth-child(2) { --ejm-i: 1; }
+    & path:nth-child(3) { --ejm-i: 2; }
+    & path:nth-child(4) { --ejm-i: 3; }
+    & path:nth-child(5) { --ejm-i: 4; }
+    & path:nth-child(6) { --ejm-i: 5; }
+    & path:nth-child(7) { --ejm-i: 6; }
+    & path:nth-child(8) { --ejm-i: 7; }
+    & path:nth-child(9) { --ejm-i: 8; }
+    & path:nth-child(10) { --ejm-i: 9; }
+    & path:nth-child(11) { --ejm-i: 10; }
+    & path:nth-child(n+12) { --ejm-i: 11; }
+  }
+}
+
+/* ---------- Base ---------- */
+@layer base {
+  html {
+    background-color: var(--ejm-ground);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    font-synthesis: none;
+    font-kerning: normal;
+    scroll-padding-block-start: calc(var(--ejm-header-h) + 1.5rem + env(safe-area-inset-top, 0px));
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    html { scroll-behavior: smooth; }
+  }
+  body {
+    min-block-size: 100svh;
+    background-color: var(--ejm-ground);
+    color: var(--ejm-fg);
+    font-size: var(--text-body);
+    line-height: 1.6;
+    overflow-wrap: break-word;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  *, ::before, ::after { border-color: var(--ejm-line); }
+  ::selection { background-color: var(--ejm-fg); color: var(--ejm-ground); }
+  :where(h1, h2, h3, h4, h5, h6) { text-wrap: balance; }
+  :where(p, li, dd, blockquote) { text-wrap: pretty; }
+  /* Plain links in prose. Anything with a class (buttons, nav links, rows) styles itself. */
+  a:not([class]) {
+    color: var(--ejm-link);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+  }
+  a:not([class]):hover { text-decoration-thickness: 2px; }
+  :focus-visible { outline: 2px solid var(--ejm-focus); outline-offset: 2px; }
+  @media (forced-colors: active) {
+    :focus-visible { outline-color: Highlight; }
+  }
+
+  /* Symbol art (packages/ui/src/art/inline): lines take the link color, the accent ring and fills take the primary color. */
+  .art { display: block; inline-size: 100%; block-size: auto; overflow: hidden; color: var(--ejm-link); pointer-events: none; }
+  .art-accent { color: var(--ejm-primary); }
+  .art-fill { fill: var(--ejm-primary); }
+  .art path[pathLength] { stroke-dasharray: 1; stroke-dashoffset: 0; }
+
+  /* Scroll reveal, driven by the useReveal hook. An element carries data-reveal="pending" only while it is waiting below the
+     fold and the hook is running, then data-reveal="in" when it plays. Without scripts, or under reduced motion, no state
+     hides anything. data-reveal-from picks the direction: up (default), fade, scale or left. */
+  @media (prefers-reduced-motion: no-preference) {
+    [data-reveal="pending"] {
+      opacity: 0;
+      transform: translate3d(var(--ejm-reveal-x, 0px), var(--ejm-reveal-y, 1rem), 0) scale(var(--ejm-reveal-scale, 1));
+    }
+    [data-reveal="in"] {
+      animation: ejm-reveal var(--ejm-duration-slow) var(--ease-enter) calc(var(--ejm-delay, 0ms) + min(var(--ejm-i, 0), 8) * var(--ejm-stagger)) backwards;
+    }
+    [data-reveal-from="fade"] { --ejm-reveal-y: 0px; }
+    [data-reveal-from="scale"] { --ejm-reveal-y: 0px; --ejm-reveal-scale: 0.96; }
+    [data-reveal-from="left"] { --ejm-reveal-y: 0px; --ejm-reveal-x: -1rem; }
+  }
+  @media print {
+    [data-reveal] { opacity: 1 !important; transform: none !important; animation: none !important; }
+  }
+}

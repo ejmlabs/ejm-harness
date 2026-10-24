@@ -1,5 +1,5 @@
 {
-  "name": "@gerry/registry-development",
+  "name": "@ejm/registry-development",
   "private": true,
   "type": "module",
   "engines": {

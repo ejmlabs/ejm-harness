@@ -1,0 +1,392 @@
+{
+  "repository": "ejmlabs/ejm-ui",
+  "owner_commit": "c7bacfa0fd0558f257eee52c3547be02f696f4fa",
+  "owner_tree": "e753fae8a4d697dd952fed7459c12903b67c34f7",
+  "base_commit": "79a1aa8b1075f834717bc0c0299dc2c41a22b966",
+  "base_tree": "c18c74fd336dbad9515bff8ecf22ca980b889a51",
+  "status": "inert immutable owner snapshots; not an active pin or accepted consumer",
+  "part": 1,
+  "parts": 1,
+  "purpose": "Complete read-only source bytes for static review. Never import, execute, install or package these fixtures.",
+  "files": [
+    {
+      "path": "CHANGELOG.md",
+      "base": {
+        "mode": "100644",
+        "blob": "4eed33c02b098c3c0f8466a9744fdd0189e351e1",
+        "size": 4570,
+        "sha256": "251f11cd29c82f3f917c92950b344dcde3661606b6b42f95290e770e085b7190"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "5ea7a68eafc87a7083265d82d0521a8761c59b26",
+        "size": 7460,
+        "sha256": "3bb08feec82c22ba4245089ffc4d49c6647a59144fd1041017a77d0edaffb22f"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/CHANGELOG.md",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "LICENSE",
+      "base": {
+        "mode": "100644",
+        "blob": "5ccebb45cc1283299b5d8f0585de8f55c92cd5ae",
+        "size": 1678,
+        "sha256": "5cc41f9d34bcfbf8dd3b2120b50dab803eb90b5e8aae31563bd5e61d79c10825"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "5ccebb45cc1283299b5d8f0585de8f55c92cd5ae",
+        "size": 1678,
+        "sha256": "5cc41f9d34bcfbf8dd3b2120b50dab803eb90b5e8aae31563bd5e61d79c10825"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/LICENSE",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "apps/gallery/package.json",
+      "base": {
+        "mode": "100644",
+        "blob": "6cd09d7efc2ca95cd71de2efc091683e730a090c",
+        "size": 504,
+        "sha256": "757320dbc0624ae1e96fe983851aab15438adb95e499da0372d242ba74b6fe57"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "6cd09d7efc2ca95cd71de2efc091683e730a090c",
+        "size": 504,
+        "sha256": "757320dbc0624ae1e96fe983851aab15438adb95e499da0372d242ba74b6fe57"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/apps/gallery/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "apps/gallery/src/content/checks.tsx",
+      "base": {
+        "mode": "100644",
+        "blob": "39fa28ae5a22644300a234bb4042753d3be1ee93",
+        "size": 5666,
+        "sha256": "531ecfc09e26d307ff3f231cdf34eb47918a58c7f1b211519ffe6c1ccf36444d"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "cacd673a618d453a3767337f9e485f250173ef28",
+        "size": 7221,
+        "sha256": "5dc09767e4f91eba605cbbfa4772b4177b2948cbc785e33f2cce4b4a2cbb8aa5"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/apps/gallery/src/content/checks.tsx",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "examples/starter/package.json",
+      "base": {
+        "mode": "100644",
+        "blob": "a520268a6d1ca2b6089f63a976363bcd71dfdb65",
+        "size": 505,
+        "sha256": "1698651191cf44ee1209404c901fe106c6d56e3cce247e6e0b50fbf17e2af16f"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "a520268a6d1ca2b6089f63a976363bcd71dfdb65",
+        "size": 505,
+        "sha256": "1698651191cf44ee1209404c901fe106c6d56e3cce247e6e0b50fbf17e2af16f"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/examples/starter/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "package.json",
+      "base": {
+        "mode": "100644",
+        "blob": "3a1bd53cd855984968de79846f3fadbb874a1c4b",
+        "size": 1510,
+        "sha256": "f5a4b0e1f36181a3f5c63cedb9f54899bfc98341eb4746fda65c62805bf7ffae"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "3a1bd53cd855984968de79846f3fadbb874a1c4b",
+        "size": 1510,
+        "sha256": "f5a4b0e1f36181a3f5c63cedb9f54899bfc98341eb4746fda65c62805bf7ffae"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/core/package.json",
+      "base": {
+        "mode": "100644",
+        "blob": "15ab9abd876afa6d10ce75c0a892b7a1fd987c61",
+        "size": 653,
+        "sha256": "e206127fc1ea1b5f86630c9b45a0e1d4285a8996a13ea68b81ca740fcd024e9e"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "15ab9abd876afa6d10ce75c0a892b7a1fd987c61",
+        "size": 653,
+        "sha256": "e206127fc1ea1b5f86630c9b45a0e1d4285a8996a13ea68b81ca740fcd024e9e"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/core/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ink/package.json",
+      "base": {
+        "mode": "100644",
+        "blob": "897255d484ed0657c35ab31d33f856b1c38187a2",
+        "size": 840,
+        "sha256": "c158cf4ea464f1718f19bae6abb445a6643f2a6b301a3a5e57297cb565f0a4d5"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "897255d484ed0657c35ab31d33f856b1c38187a2",
+        "size": 840,
+        "sha256": "c158cf4ea464f1718f19bae6abb445a6643f2a6b301a3a5e57297cb565f0a4d5"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/ink/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/shots/package.json",
+      "base": {
+        "mode": "100644",
+        "blob": "35a8e45c2bacec00667f024b2a39b1a189fe885f",
+        "size": 930,
+        "sha256": "b6b2493b34e2c16f562a6df6c5a12454748c7a82b5ea7a36b1c9a3368196da9c"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "35a8e45c2bacec00667f024b2a39b1a189fe885f",
+        "size": 930,
+        "sha256": "b6b2493b34e2c16f562a6df6c5a12454748c7a82b5ea7a36b1c9a3368196da9c"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/shots/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/site/README.md",
+      "base": {
+        "mode": "100644",
+        "blob": "25c9e2c185a8b125e6a842e591751d51e6bf75f7",
+        "size": 7260,
+        "sha256": "f765b20195ff92b0b3fbd4494cf43b861336935dfc8d56b4e788d04c2a58714a"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "9701856b1560bc3e266193b0e1dc2baa8d3962ed",
+        "size": 17076,
+        "sha256": "0c669a189e11e551237d41923e0acb267ac031aa2591f779f45b0c42c089f8ac"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/site/README.md",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/site/native-html.md",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "ecfcf57b11726eb028e9eb76ae586f101cc1051b",
+        "size": 12336,
+        "sha256": "351449a6f2cd9b7004bb6c33f44f1678b713d6339b659d15d281d1c564e7bb06"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/site/native-html.md",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/site/src/design.test.mjs",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "c5110121dc49015aae890e998301bc9126d6d45f",
+        "size": 11932,
+        "sha256": "bf0f93e9e0827d698eb7e1aa55cbb7309b71c2f726b342c703714bc2d6ae82c8"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/site/src/design.test.mjs",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/site/src/vite.mjs",
+      "base": {
+        "mode": "100644",
+        "blob": "269e6eabc3a9652d1fa8c4412448fb2bff250165",
+        "size": 4263,
+        "sha256": "1d40fd1e83fd730ae3860f4810bc6832a4874ea6102521255cd5d5c7f90bb61a"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "56b290859ea2059127a918b9504e57617fe43503",
+        "size": 6030,
+        "sha256": "7a9c5bd282e21e7402c5a14a5e8c62972e1a62deb38194cc5f89f235665356ce"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/site/src/vite.mjs",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ssg/README.md",
+      "base": {
+        "mode": "100644",
+        "blob": "2970df98c483ae77e4bda358034dc7996ed54423",
+        "size": 11476,
+        "sha256": "8fff2ba2524870360756db2a2d49412bcc6f1ef26f06069ec2b99eef61fb7f49"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "3e423ed5d729fbd8a2fe25dde673a48a86202a82",
+        "size": 14736,
+        "sha256": "925846c4369710d7248a3812d2b53d19657c2df99d00d08db136e2b55e032bf5"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/ssg/README.md",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ssg/package.json",
+      "base": {
+        "mode": "100644",
+        "blob": "fcc9070ef2aa693ad717285bad05a052f69d288a",
+        "size": 1046,
+        "sha256": "40aaac9b27c713db25828cd5a0915522939e0ce5174da2a62331a8d3caba6f27"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "fcc9070ef2aa693ad717285bad05a052f69d288a",
+        "size": 1046,
+        "sha256": "40aaac9b27c713db25828cd5a0915522939e0ce5174da2a62331a8d3caba6f27"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/ssg/package.json",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ssg/src/client.test.tsx",
+      "base": {
+        "mode": "100644",
+        "blob": "8fe920be5f3c4400eb9891117c3d4a0a2ac1d83a",
+        "size": 7396,
+        "sha256": "605877edff2d7d7ef736b0773cf8a6d2cbc31ca46f6281c58a1c16f12b332971"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "b8a758de19bf9db159f4e2acf6c8a994deb87ce1",
+        "size": 20601,
+        "sha256": "61e0688a6baa258f025683555ca0e267bf163cb418c63243717c529d8ce921ce"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/ssg/src/client.test.tsx",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ssg/src/root.tsx",
+      "base": {
+        "mode": "100644",
+        "blob": "4e7fcb317d44f938490711b19bddd4376a63db5b",
+        "size": 9121,
+        "sha256": "4535c7968cfa2bfc611192fae76aaaa73696878cf2875212fb6e7afd72f0ce47"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "ffa7737b039729052ea133e6a7245940ecd3615c",
+        "size": 11262,
+        "sha256": "0ef334ad8cc1063657db18dae19066f63998914dec038b6c52541a1073a01546"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/ssg/src/root.tsx",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ui/public/static.css",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "20ffa95b3c3d2e62fe874fac155d3db0a311d277",
+        "size": 47588,
+        "sha256": "0b9f3ad00108ac4a9bc9ac830be5b59adc6cad2405c7fde674a8ea46947505b0"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/ui/public/static.css",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ui/scripts/build-static.mjs",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "476aab608dc79862cae7fca408dc456a3a3d113b",
+        "size": 3517,
+        "sha256": "344524cca2d0e2ed6d73cada429105c8bfeb1aa8dcd6216081e510564b2e7435"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/ui/scripts/build-static.mjs",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ui/src/static-touch.test.mjs",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "4175e1e6ed04f16ed591bbf8c2480355abccc79f",
+        "size": 2367,
+        "sha256": "1a0f194cd6ab59267227b66a4918a1f9d64ad83a0699815fe4fdcc1a80ed6817"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/ui/src/static-touch.test.mjs",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ui/src/styles-site.css",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "ce652961fed9676d048186a40e27a78e67c4791f",
+        "size": 973,
+        "sha256": "857b7119f672d8589ec2731859d5ef801af3b2d63642dd5c83572b0f84b08641"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/ui/src/styles-site.css",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "packages/ui/src/styles-site.test.ts",
+      "base": null,
+      "target": {
+        "mode": "100644",
+        "blob": "2e634735428cf25c3148dbcf23031c4a20e860c1",
+        "size": 2176,
+        "sha256": "b5aba5a5bcfb1a049ef52185dc8e82598a1f38d91e1c638b72daa8b7d4e123c4"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/packages/ui/src/styles-site.test.ts",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    },
+    {
+      "path": "scripts/perf.mjs",
+      "base": {
+        "mode": "100644",
+        "blob": "67785f5d3191819a51e54aebba0eadbb20647502",
+        "size": 22210,
+        "sha256": "ffc9247564ee33a6a7435cb2744220bde3688ba24f260b68d7b0592b2115709a"
+      },
+      "target": {
+        "mode": "100644",
+        "blob": "f30c84a6a3aef8252cdd861cf91f68392d66ac51",
+        "size": 22215,
+        "sha256": "70c01676d00b9e411969df3aab1600d47daefd94bd6e4a14789b0dbceff97c03"
+      },
+      "fixture": "c7bacfa0fd0558f257eee52c3547be02f696f4fa/scripts/perf.mjs",
+      "fixture_mode": "100644",
+      "current_source_bytes_match_fixture": true
+    }
+  ]
+}

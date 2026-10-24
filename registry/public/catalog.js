@@ -30,7 +30,7 @@ async function load(reset) {
             version.className = "version";
             version.textContent = `Last published: ${item.latest_version}`;
             const install = document.createElement("code");
-            install.textContent = `ejm-cli package install ${item.name}@${item.latest_version}`;
+            install.textContent = `${item.name}@${item.latest_version}`;
             details.append(title, description, version);
             row.append(details, install);
             packages.append(row);
