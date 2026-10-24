@@ -5,8 +5,8 @@
 A reusable Rust engine for coding agents. Run sessions through one resource
 governor, keep a durable event journal, and extend the engine from Rust,
 TypeScript, or Python. [ejm-cli](https://github.com/ejmlabs/ejm-cli) and
-[ejm-ide](https://github.com/ejmlabs/ejm-ide) are separate hosts. No Gerry
-Workspace account or server is required.
+[ejm-ide](https://github.com/ejmlabs/ejm-ide) are separate hosts. The engine runs
+locally without a hosted workspace account or server.
 
 ## Status
 

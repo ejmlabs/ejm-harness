@@ -22,6 +22,8 @@ mod tests;
 /// GitHub commit archives, public npm packages with SHA-512 integrity, and portable
 /// `PyPI` wheels are supported. Dependencies must be bundled or supplied by the host.
 /// Explicit remote references always take precedence over repository filenames.
+/// Registry references require an explicitly configured client. Other sources
+/// need no registry configuration.
 /// Blocking work retains admission until it stops, even after this future is dropped.
 /// Native file calls cannot be interrupted. Cancellation can race the final atomic
 /// registration; inspect the package list if the result is uncertain.
@@ -33,7 +35,7 @@ mod tests;
 pub async fn install_source(
     manager: &PackageManager,
     source: &str,
-    registry: &RegistryClient,
+    registry: Option<&RegistryClient>,
     governor: &Arc<Governor>,
     cancel: CancellationToken,
 ) -> Result<PackageRecord> {
@@ -43,10 +45,10 @@ pub async fn install_source(
     );
     let manager = manager.clone();
     let source = source.to_owned();
-    let registry = registry.clone();
+    let registry = registry.cloned();
     let runtime = tokio::runtime::Handle::current();
     admitted_install(governor, cancel, move |control| {
-        let bytes = runtime.block_on(control.run(resolve(&source, &registry, control)))?;
+        let bytes = runtime.block_on(control.run(resolve(&source, registry.as_ref(), control)))?;
         manager.install_checked(&bytes, &source, &|| control.check())
     })
     .await
@@ -116,7 +118,7 @@ impl InstallControl {
 
 async fn resolve(
     source: &str,
-    registry: &RegistryClient,
+    registry: Option<&RegistryClient>,
     control: &InstallControl,
 ) -> Result<Vec<u8>> {
     if let Some(spec) = source.strip_prefix("git:") {
@@ -131,6 +133,8 @@ async fn resolve(
             .await;
     }
     if source.starts_with('@') {
+        let registry =
+            registry.context("registry package source requires a configured registry")?;
         let (name, version) = source
             .rsplit_once('@')
             .context("registry source requires @publisher/package@exact-version")?;

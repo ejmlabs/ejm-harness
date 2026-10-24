@@ -30,7 +30,7 @@ fn archive(files: &[(&str, &[u8])]) -> Result<Vec<u8>> {
 #[test]
 fn archive_round_trip_uses_shared_manifest_contract() -> Result<()> {
     let bytes = archive(&[
-        ("gerry.package.json", &manifest()),
+        ("ejm.package.json", &manifest()),
         ("extension.ts", b"export const prepare = () => 'hello';"),
     ])?;
     let package = read_archive(&bytes)?;
@@ -61,12 +61,12 @@ fn rejects_portable_path_aliases_and_traversal() {
 #[test]
 fn rejects_duplicate_paths_missing_entry_and_links() -> Result<()> {
     let duplicate = archive(&[
-        ("gerry.package.json", &manifest()),
+        ("ejm.package.json", &manifest()),
         ("extension.ts", b"one"),
         ("EXTENSION.TS", b"two"),
     ])?;
     assert!(read_archive(&duplicate).is_err());
-    assert!(read_archive(&archive(&[("gerry.package.json", &manifest())])?).is_err());
+    assert!(read_archive(&archive(&[("ejm.package.json", &manifest())])?).is_err());
     let mut tar = tar::Builder::new(GzEncoder::new(Vec::new(), Compression::fast()));
     let mut header = tar::Header::new_gnu();
     header.set_entry_type(tar::EntryType::Symlink);

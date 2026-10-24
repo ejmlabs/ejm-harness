@@ -28,7 +28,7 @@ impl VaultKeyStore for Keys {
     }
 }
 
-const ORIGIN: &str = "https://registry.ejmlabs.com/";
+const ORIGIN: &str = "https://registry.example.invalid/";
 const RETIRED: &str = "https://harness.meetgerry.ai/";
 
 struct Fixture {
@@ -100,6 +100,31 @@ fn encrypted_registry_sessions_are_origin_bound_and_deletion_is_permanent() -> R
 }
 
 #[test]
+fn public_and_custom_registry_sessions_remain_origin_scoped() -> Result<()> {
+    let fixture = Fixture::new()?;
+    let public_origin = super::super::PUBLIC_REGISTRY_ORIGIN;
+    let public_token = SecretString::new("public-registry-fixture-token");
+    let custom_token = SecretString::new("custom-registry-fixture-token");
+    save(&fixture.vault, &fixture.root, ORIGIN, &custom_token)?;
+    save(&fixture.vault, &fixture.root, public_origin, &public_token)?;
+    assert_eq!(
+        load(&fixture.vault, &fixture.root, ORIGIN)?.expose_secret(),
+        custom_token.expose_secret()
+    );
+    assert_eq!(
+        load(&fixture.vault, &fixture.root, public_origin)?.expose_secret(),
+        public_token.expose_secret()
+    );
+    delete(&fixture.vault, public_origin)?;
+    assert!(load(&fixture.vault, &fixture.root, public_origin).is_err());
+    assert_eq!(
+        load(&fixture.vault, &fixture.root, ORIGIN)?.expose_secret(),
+        custom_token.expose_secret()
+    );
+    Ok(())
+}
+
+#[test]
 fn retired_sessions_are_not_imported_and_discard_is_local() -> Result<()> {
     let fixture = Fixture::new()?;
     let retired = SecretString::new("retired-fixture-token");
@@ -120,7 +145,7 @@ fn retired_sessions_are_not_imported_and_discard_is_local() -> Result<()> {
     };
     let retired_load = retired_load.to_string();
     ensure!(retired_load.contains(super::super::DISCARD_RETIRED_REGISTRY_COMMAND));
-    ensure!(retired_load.contains(super::super::DEFAULT_REGISTRY));
+    ensure!(retired_load.contains(super::super::PUBLIC_REGISTRY_ORIGIN));
     ensure!(!retired_load.contains("migrate-credentials"));
     let Err(refused) = migrate(&fixture.vault, &fixture.root, ORIGIN) else {
         bail!("retired legacy file is not imported");

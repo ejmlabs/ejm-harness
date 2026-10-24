@@ -1,0 +1,19 @@
+{
+  "name": "@ejm/starter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A small ejmlabs site on ejm-ui: the reference for adopting @ejm/tokens, @ejm/ui, @ejm/ssg and @ejm/site.",
+  "scripts": {
+    "dev": "ejm-ssg dev",
+    "build": "ejm-ssg build",
+    "budget": "ejm-ssg budget",
+    "typecheck": "tsc -p tsconfig.json --pretty false"
+  },
+  "dependencies": {
+    "@ejm/site": "0.1.0",
+    "@ejm/ssg": "0.1.0",
+    "@ejm/tokens": "0.1.0",
+    "@ejm/ui": "0.1.0"
+  }
+}

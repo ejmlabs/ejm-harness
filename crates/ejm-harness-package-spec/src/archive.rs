@@ -106,7 +106,7 @@ pub fn read_archive(bytes: &[u8]) -> Result<PackageArchive> {
     let manifest_bytes = &files
         .iter()
         .find(|file| file.path == MANIFEST_FILE)
-        .context("archive has no root gerry.package.json")?
+        .context("archive has no root ejm.package.json")?
         .bytes;
     let manifest = Manifest::from_bytes(manifest_bytes)?;
     let mut assets: Vec<&str> = manifest

@@ -3,8 +3,8 @@ use std::time::Duration;
 use anyhow::{Context, Result, bail, ensure};
 use ejm_harness_auth::SecretString;
 use ejm_harness_packages::{
-    DEFAULT_REGISTRY, DISCARD_RETIRED_REGISTRY_COMMAND, RegistryClient, pack_directory,
-    registry_origin_is_default,
+    DISCARD_RETIRED_REGISTRY_COMMAND, PUBLIC_REGISTRY_ORIGIN, RegistryClient, pack_directory,
+    registry_origin_is_public,
 };
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
@@ -57,7 +57,7 @@ async fn pinned_download_checks_identity_hash_and_does_not_follow_redirects() ->
     let source = tempfile::tempdir()?;
     let manifest = json!({"schema_version":1,"name":"@example/theme","version":"1.0.0","description":"Fixture","exports":{}});
     std::fs::write(
-        source.path().join("gerry.package.json"),
+        source.path().join("ejm.package.json"),
         serde_json::to_vec(&manifest)?,
     )?;
     let archive = pack_directory(source.path())?;
@@ -135,19 +135,22 @@ fn registry_origin_rejects_plain_http_credentials_paths_and_the_retired_host() -
         };
         let message = format!("{error:#}");
         ensure!(message.contains("retired"), "{origin}: {message}");
-        ensure!(message.contains(DEFAULT_REGISTRY), "{origin}: {message}");
+        ensure!(
+            message.contains(PUBLIC_REGISTRY_ORIGIN),
+            "{origin}: {message}"
+        );
         ensure!(
             message.contains(DISCARD_RETIRED_REGISTRY_COMMAND),
             "{origin}: {message}"
         );
     }
-    RegistryClient::new(DEFAULT_REGISTRY)?;
+    RegistryClient::new(PUBLIC_REGISTRY_ORIGIN)?;
     RegistryClient::new("http://127.0.0.1:8787")?;
     RegistryClient::new("http://localhost:8787")?;
     RegistryClient::new("http://[::1]:8787")?;
     RegistryClient::new("https://notmeetgerry.ai")?;
-    ensure!(registry_origin_is_default("https://registry.ejmlabs.com/")?);
-    ensure!(!registry_origin_is_default("https://notmeetgerry.ai")?);
+    ensure!(registry_origin_is_public("https://registry.ejmlabs.com/")?);
+    ensure!(!registry_origin_is_public("https://notmeetgerry.ai")?);
     Ok(())
 }
 

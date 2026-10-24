@@ -9,7 +9,7 @@ interface Bindings {
   REGISTRY_MIGRATIONS: { name: string; queries: string[] }[];
 }
 const bindings = env as unknown as Bindings;
-const origin = "https://registry.ejmlabs.com";
+const origin = "https://registry.example.invalid";
 const versionPath = "/v1/packages/alice/test/versions/1.0.0";
 const archive = Uint8Array.from(atob(fixture.base64), (character) => character.charCodeAt(0));
 const registry = exports as unknown as {

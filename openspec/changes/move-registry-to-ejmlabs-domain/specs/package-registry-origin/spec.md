@@ -6,24 +6,38 @@ Point hosts at a package registry Everett controls on `ejmlabs.com`, never trust
 
 ## ADDED Requirements
 
-### Requirement: Default registry origin is on ejmlabs.com
+### Requirement: The public registry origin is selected explicitly
 
-The harness MUST publish `https://registry.ejmlabs.com` as its default package registry origin. Everett confirmed this host on 2026-10-20. Every registry operation a host performs with the default MUST go to that origin. The hosted registry and auth Workers MUST be configured with the same origin, so the version records they return point downloads at it.
+Registry origins MUST be configured explicitly, with no implicit default. `PUBLIC_REGISTRY_ORIGIN` identifies `https://registry.ejmlabs.com` for hosts that choose the public registry. Both hosted Workers MUST use the same exact origin, so their version records point downloads at it.
 
-#### Scenario: Install from the default registry
+#### Scenario: Install from the explicitly selected public registry
 
-- **WHEN** a host installs `@publisher/package@1.2.3` using the default registry
+- **WHEN** a host installs `@publisher/package@1.2.3` using the explicitly selected public registry
 - **THEN** the version record and archive are fetched only from `https://registry.ejmlabs.com`
 
-#### Scenario: Device login on the default registry
+#### Scenario: Device login on the explicitly selected public registry
 
-- **WHEN** a host starts registry sign-in with the default registry
+- **WHEN** a host starts registry sign-in with the explicitly selected public registry
 - **THEN** the device code request, the verification URL and the token polling all use `https://registry.ejmlabs.com`
 
 #### Scenario: Server origin mismatch
 
 - **WHEN** the registry returns a version record whose `download_url` is on a different origin
 - **THEN** the harness rejects the record and downloads nothing
+
+### Requirement: Other package sources need no registry configuration
+
+`install_source` MUST require `Some(&client)` for registry sources. Local, npm, PyPI, and Git sources MUST accept `None` without constructing a registry client.
+
+#### Scenario: Registry source without a client
+
+- **WHEN** a host installs an exact registry reference with `None`
+- **THEN** installation fails without contacting any registry
+
+#### Scenario: Local source without a client
+
+- **WHEN** a host installs a valid local package with `None`
+- **THEN** installation uses the local source without selecting a registry
 
 ### Requirement: Registry origins are plain HTTPS origins
 
@@ -61,16 +75,16 @@ A registry origin MUST be a plain origin with no path, credentials, query or fra
 
 ### Requirement: The retired meetgerry registry is never trusted
 
-The harness MUST NOT contain the retired `meetgerry.ai` registry as a default or fallback. It MUST reject any registry origin whose host is `meetgerry.ai` or a subdomain of it, including a path, userinfo, or `http` scheme, with an error that names the current default. When the default registry is unavailable, the harness MUST NOT try any other origin.
+The harness MUST NOT contain the retired `meetgerry.ai` registry as a default or fallback. It MUST reject any registry origin whose host is `meetgerry.ai` or a subdomain of it, including a path, userinfo, or `http` scheme, with an error that names the public registry and requires an explicit origin. When the explicitly selected public registry is unavailable, the harness MUST NOT try any other origin.
 
 #### Scenario: Old origin requested explicitly
 
 - **WHEN** a host creates a registry client for `https://harness.meetgerry.ai`, `http://harness.meetgerry.ai`, `https://user:pw@harness.meetgerry.ai`, or `https://harness.meetgerry.ai/registry`
-- **THEN** creation fails with a message that the meetgerry registry is retired and that `https://registry.ejmlabs.com` is the default
+- **THEN** creation fails with a message that the meetgerry registry is retired and that `https://registry.ejmlabs.com` is the public registry
 
-#### Scenario: Default registry unreachable
+#### Scenario: Selected registry unreachable
 
-- **WHEN** a request to the default registry fails to connect
+- **WHEN** a request to the explicitly selected public registry fails to connect
 - **THEN** the operation fails without contacting any other origin
 
 ### Requirement: Saved sessions for the retired origin are never sent
@@ -79,18 +93,18 @@ The harness MUST NOT send a registry session saved for the retired origin to any
 
 #### Scenario: Legacy session file for the retired origin
 
-- **WHEN** the package store holds a legacy registry session for `https://harness.meetgerry.ai` and the user signs in to the default registry
+- **WHEN** the package store holds a legacy registry session for `https://harness.meetgerry.ai` and the user signs in to the explicitly selected public registry
 - **THEN** sign-in is not silently blocked: the user is told that the old session belongs to a retired registry and how to discard it, and the old token is never transmitted
 
 #### Scenario: Discarding the retired session
 
 - **WHEN** the host asks the harness to discard the retired-origin session
-- **THEN** the legacy file or vault record is removed locally without any network request, and sign-in to the default registry can proceed
+- **THEN** the legacy file or vault record is removed locally without any network request, and sign-in to the explicitly selected public registry can proceed
 
 #### Scenario: Vault record for the retired origin
 
 - **WHEN** the encrypted vault holds a session for the retired origin
-- **THEN** loading a session for the default origin does not return it
+- **THEN** loading a session for the explicitly selected origin does not return it
 
 ### Requirement: Unsafe legacy registry files are discarded without being followed
 
@@ -107,7 +121,7 @@ For registry installs, the harness MUST keep verifying the exact archive size, S
 
 #### Scenario: Digest mismatch
 
-- **WHEN** an archive from the default registry does not match the version record's size or SHA-256
+- **WHEN** an archive from the explicitly selected public registry does not match the version record's size or SHA-256
 - **THEN** installation fails and nothing is registered
 
 #### Scenario: Same version reinstalled from the new registry

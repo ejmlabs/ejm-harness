@@ -4,7 +4,7 @@ use serde_json::json;
 
 fn fixture(root: &std::path::Path, version: &str) -> Result<()> {
     std::fs::write(
-        root.join("gerry.package.json"),
+        root.join("ejm.package.json"),
         serde_json::to_vec(&json!({
             "schema_version":1,"name":"@example/test","version":version,"description":"Installation fixture",
             "runtime":{"kind":"node","entry":"extension.mjs"},

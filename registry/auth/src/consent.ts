@@ -2,7 +2,7 @@ import { APIError, type BetterAuthPlugin, type DBAdapter } from "better-auth";
 
 // Better Auth 1.7.10 consent handlers need a guarded transition under concurrent requests.
 export const atomicDeviceConsent: BetterAuthPlugin = {
-  id: "gerry-atomic-device-consent",
+  id: "ejm-atomic-device-consent",
   init(context) {
     const adapter = context.adapter;
     const update: DBAdapter["update"] = async <T>(

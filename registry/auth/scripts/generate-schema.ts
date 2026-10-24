@@ -6,7 +6,7 @@ import { authOptions } from "../src/auth.js";
 
 const options = authOptions(
   {
-    REGISTRY_ORIGIN: "https://registry.ejmlabs.com",
+    REGISTRY_ORIGIN: "https://registry.example.invalid",
     BETTER_AUTH_SECRET: "schema-generation-only-not-a-deployment-secret",
     GITHUB_CLIENT_ID: "schema-generation",
     GITHUB_CLIENT_SECRET: "schema-generation",

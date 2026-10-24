@@ -1,9 +1,12 @@
 # ejm-harness
 
 Reusable open source Rust engine, coding tools, executor, worker, and language
-SDKs. ejm-cli lives in its own sibling repository. No Gerry Workspace dependency.
+SDKs. ejm-cli lives in its own sibling repository.
 
 - Never use em dashes. Use plain, direct prose.
+- Keep this open source project independent of unrelated proprietary products.
+  Do not include their names, domains, credentials, contracts, assets, or metadata
+  in source, docs, fixtures, generated files, or distributed archives.
 - Read [the contributor contract](docs/contributing.md) before changing architecture or quality policy.
 - Keep Rust ownership and admission in the harness. SDKs adapt the same public worker protocol.
 - Use one shared governor for every tool, command, and child agent in a harness instance.
@@ -55,7 +58,7 @@ SDKs. ejm-cli lives in its own sibling repository. No Gerry Workspace dependency
 | Public page            | "harness by ejmlabs" at harness.ejmlabs.com                                               |
 | Hosts                  | `ejm-cli` at `../ejm-cli` and `ejm-ide` at `../ejm-ide`, not part of this repo            |
 | Package registry       | `https://registry.ejmlabs.com`                                                            |
-| Unchanged on purpose   | the manifest file `gerry.package.json`, until the user decides                            |
+| Package manifest       | `ejm.package.json`; registry clients require an explicit origin                           |
 
 ## Commands
 

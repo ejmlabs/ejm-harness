@@ -1,0 +1,80 @@
+{
+  "project": "harbor.json",
+  "label": "ejm-ide demo",
+  "name": "ejm-ide",
+  "caption": "Pick a prompt for Edi, then accept or reject the proposed change. Use the Commands button for the command list.",
+  "note": "Simulated demo. Nothing runs on your machine and nothing is sent anywhere. Edi's replies are scripted, and the editor is read only here.",
+  "reviewNote": "Demo only: the real ejm-ide checks each proposed write automatically and shows its diff inside the tool call. These buttons let you see both outcomes.",
+  "agent": "Edi",
+  "openFiles": ["src/retry.rs"],
+  "models": ["Sample model 1", "Sample model 2"],
+  "chips": [
+    { "id": "explain", "label": "Explain this repository", "prompt": "Explain this repository" },
+    { "id": "fix", "label": "Fix the flaky retry test", "prompt": "Fix the flaky retry test" },
+    { "id": "port", "label": "Validate the port", "prompt": "Validate the port in config.ts" }
+  ],
+  "match": [
+    { "id": "fix", "words": ["flaky", "retry", "fix", "test", "clock"] },
+    { "id": "port", "words": ["port", "config", "validate", "validation"] },
+    { "id": "explain", "words": ["explain", "repository", "repo", "readme", "overview", "what"] }
+  ],
+  "scenarios": {
+    "explain": {
+      "title": "Explain this repository",
+      "steps": [
+        { "say": "I will read the README and search for the public functions." },
+        { "tool": "workbench_read_file", "args": "README.md", "read": { "path": "README.md" } },
+        { "tool": "workbench_search_code", "args": "pub fn", "search": "pub fn" },
+        { "say": "harbor is a small order library. src/lib.rs exports order_total, src/retry.rs holds the retry backoff and window check, and web/config.ts reads the host and port. The test in src/retry.rs reads the wall clock, which is the first thing I would fix." }
+      ]
+    },
+    "fix": {
+      "title": "Fix the flaky retry test",
+      "steps": [
+        { "say": "I will read the retry module and find where it reads the clock." },
+        { "tool": "workbench_read_file", "args": "src/retry.rs", "read": { "path": "src/retry.rs" } },
+        { "tool": "workbench_search_code", "args": "Instant::now", "search": "Instant::now" },
+        {
+          "write": {
+            "path": "src/retry.rs",
+            "edits": [
+              {
+                "find": "pub fn window_open(started: Instant, budget: Duration) -> bool {\n    let now = Instant::now();\n    now.duration_since(started) < budget\n}",
+                "replace": "pub fn window_open(started: Instant, now: Instant, budget: Duration) -> bool {\n    now.duration_since(started) < budget\n}"
+              },
+              {
+                "find": "        let started = Instant::now();\n        assert!(window_open(started, Duration::from_millis(1)));",
+                "replace": "        let started = Instant::now();\n        let now = started + Duration::from_millis(1);\n        assert!(window_open(started, now, Duration::from_millis(5)));"
+              }
+            ]
+          },
+          "intro": "window_open reads the wall clock, so a slow machine can pass the 1 ms budget before the assertion runs. This change passes the time in, so the test controls it.",
+          "applied": "Applied. window_open now takes the time as an argument.",
+          "rejected": "Rejected. The file is unchanged."
+        }
+      ]
+    },
+    "port": {
+      "title": "Validate the port in config.ts",
+      "steps": [
+        { "say": "I will read the config loader." },
+        { "tool": "workbench_read_file", "args": "web/config.ts", "read": { "path": "web/config.ts" } },
+        {
+          "write": {
+            "path": "web/config.ts",
+            "edits": [
+              {
+                "find": "  const port = Number(env.HARBOR_PORT ?? \"8080\");",
+                "replace": "  const port = Number(env.HARBOR_PORT ?? \"8080\");\n  if (!Number.isInteger(port) || port < 1 || port > 65535) {\n    throw new Error(`HARBOR_PORT must be 1 to 65535, got ${env.HARBOR_PORT}`);\n  }"
+              }
+            ]
+          },
+          "intro": "Number() turns bad input into NaN and the loader returns it. This change fails early with a clear message.",
+          "applied": "Applied. loadConfig now rejects a port outside 1 to 65535.",
+          "rejected": "Rejected. The file is unchanged."
+        }
+      ]
+    }
+  },
+  "fallback": "This demo only knows a few prompts; try one of the chips."
+}

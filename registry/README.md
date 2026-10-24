@@ -1,8 +1,9 @@
-# Gerry extension registry
+# ejm extension registry
 
-The registry serves immutable Gerry extension packages at
-`https://registry.ejmlabs.com`. The Rust Worker owns publication and catalog
-policy. A separate Better Auth Worker handles GitHub sign-in and first-party CLI
+The registry source implements immutable ejm extension packages for
+`https://registry.ejmlabs.com`. Deployment remains unverified. The Rust
+Worker owns publication and catalog policy. A separate Better Auth Worker
+handles GitHub sign-in and first-party CLI
 device authorization through a private service binding. D1 stores metadata and
 auth in separate databases. A private R2 bucket stores `.tar.gz` archives.
 
@@ -45,6 +46,16 @@ Local development uses both Wrangler configurations:
 cd registry
 npm run dev
 ```
+
+Set `REGISTRY_ORIGIN` in each Worker's ignored `.dev.vars` file to the same local
+HTTPS origin before browser sign-in, overriding the checked-in
+`https://registry.ejmlabs.com` origin. Automated fixtures supply a reserved
+example origin, which is a test value and cannot serve as a public endpoint. Packages use `ejm.package.json`;
+rename earlier manifests and repack them to refresh their sizes and hashes.
+
+The current protected CLI needs its coordinated explicit-origin update before
+using this service contract. A browser example or package reference does not
+configure the CLI. Keep credentials isolated by origin.
 
 Secure cookies and the fixed HTTPS auth origin are intentional. A local browser
 sign-in needs an explicit local HTTPS origin and a matching test OAuth
@@ -238,13 +249,17 @@ arguments, source, fixture files, or logs.
 
 Remote changes require explicit owner authorization. Before a deployment:
 
-1. Create separate `ejm-registry` and `ejm-registry-auth` D1 databases and
+1. Confirm authorization for `https://registry.ejmlabs.com` and ensure
+   `REGISTRY_ORIGIN` matches that exact origin in both Worker configurations.
+   For another deployment, update both origins and the public custom domain
+   together. Create separate `ejm-registry` and `ejm-registry-auth` D1 databases and
    replace placeholder UUIDs in their Wrangler files. Apply the reviewed registry
    and generated auth migrations to the matching databases.
 2. Create `ejm-registry-packages` as a private R2 bucket. Disable public bucket
    access and public custom domains. Restrict deployment and storage credentials
    to the required Workers, D1 databases, and bucket.
-3. Register a GitHub OAuth application with callback
+3. Register a GitHub OAuth application with a callback at
+   `/api/auth/callback/github` on the chosen registry origin, such as
    `https://registry.ejmlabs.com/api/auth/callback/github`. Store
    `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, and a fresh high-entropy
    `BETTER_AUTH_SECRET` through Wrangler's hidden secret prompt or the Cloudflare

@@ -4,6 +4,45 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking:** packages require `ejm.package.json` with no legacy alias. Rename
+  earlier manifests and repack archives; their sizes and hashes change.
+- **Breaking:** remove the default registry export. `install_source` now accepts
+  `Option<&RegistryClient>`: registry sources need `Some`, while local, npm, PyPI
+  and Git sources accept `None`. Hosts must coordinate the API update and select
+  registry origins explicitly. Credentials remain isolated by exact origin.
+- Give registry source its own identity and resource placeholders. No registry,
+  package, worker binary or site is published by this source change.
+- Retain immutable UI install metadata for static dependency review. This
+  preparation selects no UI dependency and changes no product behavior.
+
+- The public package registry is `https://registry.ejmlabs.com`. Hosts must
+  explicitly select a registry origin. Both Workers' `REGISTRY_ORIGIN` and the
+  GitHub OAuth callback use the public origin.
+  `meetgerry.ai` and its subdomains are rejected, redirects are not followed, and
+  sessions saved for the retired origin are not sent or reused. Discard a leftover
+  session with `ejm-cli package discard-retired-session` and sign in again. These
+  notes do not deploy a registry, and they do not create or replace a tag or
+  GitHub release. Builds from the earlier v0.1.0 tag (commit 8d3dc39) default
+  to a retired registry domain and must not be used for registry commands.
+  Upgrade to the reissued v0.1.0.
+
+### Fixed
+
+- Check authenticated HTTP loopback registry requests against the direct-route
+  proxy fixture, with a synthetic bearer and bounded child cleanup. The
+  harness-owned client disables proxies for these origins; HTTPS keeps proxy
+  support. Older host pins need a temporary configuration guard until they
+  adopt and verify this transport contract.
+
+### Security
+
+- Update the locked TLS dependencies to rustls-webpki 0.103.16 and
+  webpki-root-certs 1.0.10 for RUSTSEC-2026-0382 and RUSTSEC-2026-0383.
+  Source builds use the corrected certificate trust data. Public APIs and the
+  existing install workflow are unchanged; no package or binary is published.
+
 ## [0.1.0] - 2026-10-19
 
 Prepared development source for the first `0.1.0` release. These notes do not
@@ -24,25 +63,8 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
 - Uniform repository guidance, explicit human admission, protected merge gates,
   two complete Codex reviews, and independent SemVer source-draft preparation.
 
-### Changed
-
-- The default package registry is `https://registry.ejmlabs.com`. The client,
-  both Workers' `REGISTRY_ORIGIN`, and the GitHub OAuth callback use that origin.
-  `meetgerry.ai` and its subdomains are rejected, redirects are not followed, and
-  sessions saved for the retired origin are not sent or reused. Discard a leftover
-  session with `ejm-cli package discard-retired-session` and sign in again. These
-  notes do not deploy a registry, and they do not create or replace a tag or
-  GitHub release. Builds from the earlier v0.1.0 tag (commit 8d3dc39) default
-  to a retired registry domain and must not be used for registry commands.
-  Upgrade to the reissued v0.1.0.
-
 ### Fixed
 
-- Check authenticated HTTP loopback registry requests against the direct-route
-  proxy fixture, with a synthetic bearer and bounded child cleanup. The
-  harness-owned client disables proxies for these origins; HTTPS keeps proxy
-  support. Older host pins need a temporary configuration guard until they
-  adopt and verify this transport contract.
 - Align registry device login with the registered `ejm-cli` client. Deny protected
   repository and harness-state reads through file-tool paths and symlink aliases.
 - Include the MIT license in both SDK distributions and keep owned Rust, registry

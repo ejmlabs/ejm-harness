@@ -41,7 +41,8 @@ pub fn valid_handle(value: &str) -> bool {
         && ![
             "admin",
             "api",
-            "gerry",
+            "ejm",
+            "ejmlabs",
             "harness",
             "help",
             "moderator",
@@ -112,61 +113,66 @@ mod tests {
 
     #[test]
     fn mutation_auth_rejects_csrf_and_invalid_bearer_cookie_fallback() {
-        let origin = "https://registry.ejmlabs.com";
-        assert!(!mutation_credentials_allowed(
-            None,
-            Some("session=secret"),
-            None,
-            origin
-        ));
-        assert!(!mutation_credentials_allowed(
-            None,
-            Some("session=secret"),
-            Some("https://evil.example"),
-            origin
-        ));
-        assert!(!mutation_credentials_allowed(
-            Some("Basic forged"),
-            Some("session=secret"),
-            Some(origin),
-            origin
-        ));
-        assert!(!mutation_credentials_allowed(
-            Some("Bearer "),
-            None,
-            None,
-            origin
-        ));
-        assert!(!mutation_credentials_allowed(
-            Some("Bearer bad token"),
-            None,
-            None,
-            origin
-        ));
-        assert!(!mutation_credentials_allowed(
-            Some("Bearer valid"),
-            None,
-            Some("null"),
-            origin
-        ));
-        assert!(mutation_credentials_allowed(
-            None,
-            Some("session=secret"),
-            Some(origin),
-            origin
-        ));
-        assert!(mutation_credentials_allowed(
-            Some("Bearer token"),
-            None,
-            None,
-            origin
-        ));
+        for origin in [
+            "https://registry.example.invalid",
+            "https://registry.ejmlabs.com",
+        ] {
+            assert!(!mutation_credentials_allowed(
+                None,
+                Some("session=secret"),
+                None,
+                origin
+            ));
+            assert!(!mutation_credentials_allowed(
+                None,
+                Some("session=secret"),
+                Some("https://evil.example"),
+                origin
+            ));
+            assert!(!mutation_credentials_allowed(
+                Some("Basic forged"),
+                Some("session=secret"),
+                Some(origin),
+                origin
+            ));
+            assert!(!mutation_credentials_allowed(
+                Some("Bearer "),
+                None,
+                None,
+                origin
+            ));
+            assert!(!mutation_credentials_allowed(
+                Some("Bearer bad token"),
+                None,
+                None,
+                origin
+            ));
+            assert!(!mutation_credentials_allowed(
+                Some("Bearer valid"),
+                None,
+                Some("null"),
+                origin
+            ));
+            assert!(mutation_credentials_allowed(
+                None,
+                Some("session=secret"),
+                Some(origin),
+                origin
+            ));
+            assert!(mutation_credentials_allowed(
+                Some("Bearer token"),
+                None,
+                None,
+                origin
+            ));
+        }
     }
 
     #[test]
     fn identifiers_cannot_escape_keys_or_claim_reserved_names() {
         for handle in [
-            "gerry",
+            "ejm",
+            "ejmlabs",
             "admin",
             "a",
             "Evil",

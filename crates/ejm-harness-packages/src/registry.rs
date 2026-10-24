@@ -20,7 +20,8 @@ pub use credentials::{
     migrate_registry_token, retired_registry_session_notice, save_registry_token,
 };
 
-pub const DEFAULT_REGISTRY: &str = "https://registry.ejmlabs.com";
+/// Public registry origin. Hosts must select it explicitly; there is no default or fallback.
+pub const PUBLIC_REGISTRY_ORIGIN: &str = "https://registry.ejmlabs.com";
 /// Command the CLI implements for a leftover `meetgerry.ai` session. This crate does not run it.
 pub const DISCARD_RETIRED_REGISTRY_COMMAND: &str = "ejm-cli package discard-retired-session";
 const MAX_JSON_BYTES: usize = 64 * 1024;
@@ -345,17 +346,17 @@ pub fn validate_registry_origin(value: &str) -> Result<Url> {
     normalize_origin(value)
 }
 
-/// Whether a validated origin is [`DEFAULT_REGISTRY`].
+/// Whether a validated, explicitly selected origin is [`PUBLIC_REGISTRY_ORIGIN`].
 ///
 /// # Errors
 /// Returns the same errors as [`validate_registry_origin`].
-pub fn registry_origin_is_default(value: &str) -> Result<bool> {
-    Ok(validate_registry_origin(value)? == validate_registry_origin(DEFAULT_REGISTRY)?)
+pub fn registry_origin_is_public(value: &str) -> Result<bool> {
+    Ok(validate_registry_origin(value)? == validate_registry_origin(PUBLIC_REGISTRY_ORIGIN)?)
 }
 
 pub(crate) fn retired_registry_message() -> String {
     format!(
-        "the meetgerry.ai registry is retired; the default registry is {DEFAULT_REGISTRY}. The old session is not sent or reused. Discard it with `{DISCARD_RETIRED_REGISTRY_COMMAND}` and sign in again"
+        "the meetgerry.ai registry is retired; the public registry is {PUBLIC_REGISTRY_ORIGIN}. Select a registry origin explicitly. The old session is not sent or reused. Discard it with `{DISCARD_RETIRED_REGISTRY_COMMAND}` and sign in again"
     )
 }
 

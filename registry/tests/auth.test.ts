@@ -9,7 +9,7 @@ interface Bindings {
   AUTH_MIGRATIONS: { name: string; queries: string[] }[];
 }
 const bindings = env as unknown as Bindings;
-const origin = "https://registry.ejmlabs.com";
+const origin = "https://registry.example.invalid";
 const authEnv: Env = {
   DB: bindings.AUTH_DB,
   REGISTRY_ORIGIN: origin,
@@ -85,7 +85,7 @@ describe("private Better Auth boundary", () => {
       device_code: grant.device_code,
       grant_type: "urn:ietf:params:oauth:grant-type:device_code",
     };
-    for (const clientId of ["attacker", "gerry-cli"])
+    for (const clientId of ["attacker", "unsupported-cli"])
       expect(
         (await call("/api/auth/device/token", "POST", { ...body, client_id: clientId })).status,
       ).toBe(400);
@@ -203,7 +203,7 @@ describe("private Better Auth boundary", () => {
   it("allows only the first-party device client and known access label", async () => {
     for (const body of [
       { client_id: "attacker", scope: "registry" },
-      { client_id: "gerry-cli", scope: "registry" },
+      { client_id: "unsupported-cli", scope: "registry" },
       { client_id: "ejm-cli", scope: "admin" },
       { client_id: "ejm-cli", scope: "registry", user_id: "victim" },
     ])

@@ -112,7 +112,7 @@ test("trusted packages share tools, hooks, provider, commands, and widgets throu
       widgets: [{ name: "status", handler: "widget" }],
     },
   };
-  await writeFile(path.join(root, "gerry.package.json"), JSON.stringify(manifest));
+  await writeFile(path.join(root, "ejm.package.json"), JSON.stringify(manifest));
   await writeFile(
     path.join(root, "entry.mjs"),
     `
@@ -192,7 +192,7 @@ export function widget() { return {kind:'text',content:'calls:'+calls}; }
       2000,
     );
     await writeFile(
-      path.join(root, "gerry.package.json"),
+      path.join(root, "ejm.package.json"),
       JSON.stringify({ ...manifest, version: "1.0.1" }),
     );
     await assert.rejects(harness.reloadPackage(manifest.name), /manifest changed/);
