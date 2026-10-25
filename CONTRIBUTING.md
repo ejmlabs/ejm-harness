@@ -8,7 +8,7 @@ Opening or updating a PR does not authorize CI or AI spending. A current human m
 
 After reviewing that commit, a maintainer posts `/approve FULL_HEAD_SHA`. Maintainers may explicitly approve their own work. GitHub cannot record an author's native approval, so trusted automation records the human comment as a bot approval and a required **Maintainer approval** status. The comment and all checks remain required. Native review alone does not replace this explicit gate. Keep both readiness and approval comments unchanged. Editing or deleting one revokes the decisions. `/revoke FULL_HEAD_SHA` cancels the admitted run and blocks merge. To retry a failed run, revoke, investigate, and post a fresh ready comment. Do not use Actions rerun to replay an admission.
 
-The required statuses are **Human readiness**, **Maintainer approval**, **Quality**, **Repository standards**, and **AI review**. AI review uses `gpt-6.1-sol`, medium reasoning, in two independent passes. A missing key, incomplete output, or blocking finding fails the gate. Address findings in a new commit and request fresh admission. Do not bypass the requirements as an administrator.
+The required statuses are **Human readiness**, **Maintainer approval**, **Quality**, **Repository standards**, and **AI review**. Automated review uses high reasoning effort in two independent passes. A missing key, incomplete output, or blocking finding fails the gate. Address findings in a new commit and request fresh admission. Do not bypass the requirements as an administrator.
 
 ## Changes and reporting
 
