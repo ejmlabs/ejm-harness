@@ -461,14 +461,13 @@ fn classify_legacy(root: &Path) -> Result<LegacyRead> {
     if !directory.exists(LEGACY)? {
         return Ok(LegacyRead::Missing);
     }
-    let file = match directory.open_read(
+    let Ok(file) = directory.open_read(
         LEGACY,
         &rightkit_fs::handle::ReadOptions::new()
             .require_single_link(true)
             .share_read_only(true),
-    ) {
-        Ok(file) => file,
-        Err(_) => return Ok(LegacyRead::Unusable),
+    ) else {
+        return Ok(LegacyRead::Unusable);
     };
     if rightkit_fs::private::verify_owner_only(&root.join(LEGACY)).is_err() {
         return Ok(LegacyRead::Unusable);
