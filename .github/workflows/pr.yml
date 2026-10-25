@@ -11,7 +11,7 @@ jobs:
       pull-requests: write
       statuses: write
       actions: write
-    uses: ejmlabs/.github/.github/workflows/governance.yml@7d1a404e4f555606ad92046ee9675f6339722966
+    uses: ejmlabs/.github/.github/workflows/governance.yml@8e3e8375ab55a9582857ccc30c79276d821d00ca
     secrets:
       XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
       EJM_HARNESS_TOKEN: ${{ secrets.EJM_HARNESS_TOKEN }}
