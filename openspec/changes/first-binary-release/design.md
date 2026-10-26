@@ -24,8 +24,10 @@ repository.
   `SHA256SUMS`. Targets use the `releases.json` names `linux-x86_64` and
   `darwin-aarch64`.
 - **Linux baseline.** The Linux job runs on the oldest hosted image the project
-  accepts (`ubuntu-22.04`, glibc 2.35) and installs `libdbus-1-dev`. The notes
-  name `libdbus-1` and the glibc floor.
+  accepts (`ubuntu-22.04`, glibc 2.35). The worker links only libc, libm and
+  libgcc_s (checked with `ldd` on a local build), so it needs no `libdbus-1`; the
+  credential-store libraries belong to ejm-cli. The notes name the glibc floor
+  only after a hosted build confirms it.
 - **macOS held.** The macOS job builds and smokes the worker so evidence exists,
   but its artifact is named for evidence only. Notes and the future site list no
   macOS file until a notarization run is recorded. Worker command-line archives

@@ -1,0 +1,105 @@
+name: Build and smoke worker
+# Read-only build of the worker archives. Nothing here can write to the
+# repository, publish, or read a secret. A separate attach job in the shared
+# workflow repository, which runs no project code, attaches files to a draft release.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions: {}
+concurrency:
+  group: worker-build-${{ github.sha }}
+  cancel-in-progress: false
+env:
+  CARGO_TERM_COLOR: never
+  EJM_HARNESS_WORKER_PATH: ${{ github.workspace }}/smoke/ejm-harness-worker
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The oldest hosted Linux image sets the glibc floor.
+          - target: linux-x86_64
+            runner: ubuntu-22.04
+            artifact: worker-linux-x86_64
+          # Held: built for evidence only. No macOS file is offered until a
+          # notarization run for the release is recorded.
+          - target: darwin-aarch64
+            runner: macos-14
+            artifact: held-worker-darwin-aarch64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Build the worker
+        run: cargo build --release --locked -p ejm-harness-worker
+      - name: Archive and hash
+        run: |
+          version=$(cat VERSION)
+          python3 scripts/package-worker.py target/release/ejm-harness-worker \
+            --version "$version" --target "${{ matrix.target }}" --out-dir out
+          (cd out && cat ./*.sha256 > SHA256SUMS)
+          cat out/SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.artifact }}
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
+  smoke:
+    name: Smoke ${{ matrix.target }}
+    needs: build
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x86_64
+            runner: ubuntu-22.04
+            artifact: worker-linux-x86_64
+            sdk: true
+          - target: darwin-aarch64
+            runner: macos-14
+            artifact: held-worker-darwin-aarch64
+            sdk: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ matrix.artifact }}
+          path: out
+      - name: Verify the archive digest and unpack it
+        run: |
+          cd out
+          if command -v sha256sum >/dev/null 2>&1; then sha256sum -c SHA256SUMS; else shasum -a 256 -c SHA256SUMS; fi
+          mkdir -p ../smoke
+          tar -xzf ./*.tar.gz --strip-components=1 -C ../smoke
+      - name: Worker handshake
+        run: python3 scripts/smoke-worker.py "$EJM_HARNESS_WORKER_PATH" --version "$(cat VERSION)"
+      - if: matrix.sdk
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+      - if: matrix.sdk
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: TypeScript SDK finds the worker through EJM_HARNESS_WORKER_PATH
+        if: matrix.sdk
+        run: |
+          npm ci --ignore-scripts
+          npm --workspace ejm-harness test
+      - name: Python SDK finds the worker through EJM_HARNESS_WORKER_PATH
+        if: matrix.sdk
+        run: uv run --project sdk/python --group dev --locked python -m unittest discover -s sdk/python/tests

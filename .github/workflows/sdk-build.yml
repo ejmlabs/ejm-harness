@@ -1,0 +1,43 @@
+name: Build SDK packages
+# Read-only build of the npm tarball and the Python distributions. It publishes
+# nothing. sdk-publish.yml takes these files and runs no project code.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions: {}
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: Build the worker the SDK tests need
+        run: cargo build --locked -p ejm-harness-worker
+      - name: Test the SDKs
+        run: |
+          npm ci --ignore-scripts
+          npm --workspace ejm-harness test
+          uv run --project sdk/python --group dev --locked python -m unittest discover -s sdk/python/tests
+      - name: Pack
+        run: |
+          mkdir -p out/npm out/python
+          npm --workspace ejm-harness pack --pack-destination out/npm
+          uv build --project sdk/python --no-sources --out-dir out/python
+          (cd out && find npm python -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+          cat out/SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sdk-packages
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
