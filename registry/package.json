@@ -17,11 +17,11 @@
     "build": "wrangler deploy --dry-run"
   },
   "dependencies": {
-    "better-auth": "1.7.10"
+    "better-auth": "1.7.11"
   },
   "devDependencies": {
     "@cloudflare/vitest-plugin": "1.4.4",
-    "@cloudflare/workers-types": "5.20261018.1",
+    "@cloudflare/workers-types": "5.20261019.1",
     "@types/node": "26.6.5",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
