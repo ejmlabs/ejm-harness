@@ -516,7 +516,7 @@ checksum = "d0881ea181b1df73ff77ffaaf9c7544ecc11e82fba9b5f27b262a3c73a332555"
 
 [[package]]
 name = "ejm-harness"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -539,7 +539,7 @@ dependencies = [
 
 [[package]]
 name = "ejm-harness-auth"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "apple-native-keyring-store",
@@ -572,7 +572,7 @@ dependencies = [
 
 [[package]]
 name = "ejm-harness-bench"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -587,7 +587,7 @@ dependencies = [
 
 [[package]]
 name = "ejm-harness-coding"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -606,7 +606,7 @@ dependencies = [
 
 [[package]]
 name = "ejm-harness-exec"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "processkit",
@@ -624,7 +624,7 @@ dependencies = [
 
 [[package]]
 name = "ejm-harness-package-spec"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "flate2",
@@ -638,7 +638,7 @@ dependencies = [
 
 [[package]]
 name = "ejm-harness-packages"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -670,7 +670,7 @@ dependencies = [
 
 [[package]]
 name = "ejm-harness-worker"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "async-trait",

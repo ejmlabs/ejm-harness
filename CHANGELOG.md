@@ -4,6 +4,20 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-26
+
+First public release of the worker and SDK sources. The `0.1.0` source notes below
+stay as written. Nothing is signed or notarized, and no package is published by
+these notes; see [RELEASING.md](RELEASING.md) and the known limits under
+"Verification and limits" in the `0.1.0` section.
+
+### Added
+
+- Read-only CI jobs that build and smoke-test the `ejm-harness-worker` archive for
+  Linux x86_64 and macOS Apple silicon, and build the TypeScript and Python SDK
+  packages, each with SHA-256 values. A separate publish workflow is disabled until
+  package names and registry trust settings are confirmed.
+
 ### Changed
 
 - **Breaking:** packages require `ejm.package.json` with no legacy alias. Rename
