@@ -1,25 +1,23 @@
-name: Build and smoke worker
-# Read-only build of the worker archives. Nothing here can write to the
-# repository, publish, or read a secret. A separate attach job in the shared
-# workflow repository, which runs no project code, attaches files to a draft release.
+name: Build and smoke native release files
 on:
   workflow_dispatch:
   push:
     branches: [main]
-permissions: {}
+permissions:
+  contents: read
 concurrency:
-  group: worker-build-${{ github.sha }}
+  group: build-${{ github.sha }}
   cancel-in-progress: false
 env:
-  CARGO_TERM_COLOR: never
   EJM_HARNESS_WORKER_PATH: ${{ github.workspace }}/smoke/ejm-harness-worker
+# Project code runs only in this read-only workflow. The shared release workflow
+# verifies this run, then a separate job that runs no project code attaches the
+# files in the single release-files artifact to a draft release.
 jobs:
   build:
     name: Build ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
-    permissions:
-      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -27,12 +25,12 @@ jobs:
           # The oldest hosted Linux image sets the glibc floor.
           - target: linux-x86_64
             runner: ubuntu-22.04
-            artifact: worker-linux-x86_64
-          # Held: built for evidence only. No macOS file is offered until a
-          # notarization run for the release is recorded.
+            artifact: build-linux-x86_64
+          # Held until a notarization run is recorded: built for evidence only
+          # and never collected into the release files.
           - target: darwin-aarch64
             runner: macos-14
-            artifact: held-worker-darwin-aarch64
+            artifact: held-darwin-aarch64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,13 +43,10 @@ jobs:
           sudo apt-get install --no-install-recommends --yes libdbus-1-dev pkg-config
       - name: Build the worker
         run: cargo build --release --locked -p ejm-harness-worker
-      - name: Archive and hash
+      - name: Archive
         run: |
-          version=$(cat VERSION)
           python3 scripts/package-worker.py target/release/ejm-harness-worker \
-            --version "$version" --target "${{ matrix.target }}" --out-dir out
-          (cd out && cat ./*.sha256 > SHA256SUMS)
-          cat out/SHA256SUMS >> "$GITHUB_STEP_SUMMARY"
+            --version "$(cat VERSION)" --target "${{ matrix.target }}" --out-dir out
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ${{ matrix.artifact }}
@@ -63,19 +58,17 @@ jobs:
     needs: build
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
-    permissions:
-      contents: read
     strategy:
       fail-fast: false
       matrix:
         include:
           - target: linux-x86_64
             runner: ubuntu-22.04
-            artifact: worker-linux-x86_64
+            artifact: build-linux-x86_64
             sdk: true
           - target: darwin-aarch64
             runner: macos-14
-            artifact: held-worker-darwin-aarch64
+            artifact: held-darwin-aarch64
             sdk: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -86,12 +79,10 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: out
-      - name: Verify the archive digest and unpack it
+      - name: Unpack the archive that will be released
         run: |
-          cd out
-          if command -v sha256sum >/dev/null 2>&1; then sha256sum -c SHA256SUMS; else shasum -a 256 -c SHA256SUMS; fi
-          mkdir -p ../smoke
-          tar -xzf ./*.tar.gz --strip-components=1 -C ../smoke
+          mkdir smoke
+          tar -xzf out/*.tar.gz --strip-components=1 -C smoke
       - name: Worker handshake
         run: python3 scripts/smoke-worker.py "$EJM_HARNESS_WORKER_PATH" --version "$(cat VERSION)"
       - if: matrix.sdk
@@ -108,3 +99,55 @@ jobs:
       - name: Python SDK finds the worker through EJM_HARNESS_WORKER_PATH
         if: matrix.sdk
         run: uv run --project sdk/python --group dev --locked python -m unittest discover -s sdk/python/tests
+  sdk-packages:
+    name: Build SDK packages
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: Pack
+        run: |
+          npm ci --ignore-scripts
+          mkdir out
+          npm --workspace ejm-harness pack --pack-destination out
+          uv build --project sdk/python --no-sources --out-dir out
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: build-sdk-packages
+          path: out/
+          if-no-files-found: error
+          retention-days: 14
+  collect:
+    name: Collect release files
+    needs: [build, smoke, sdk-packages]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: build-linux-x86_64
+          path: files
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: build-sdk-packages
+          path: files
+      - name: Write the combined checksum list
+        run: |
+          cd files
+          find . -mindepth 1 \( -type l -o -type d \) -print -quit | grep -q . && { echo "only regular files at the root" >&2; exit 1; }
+          sha256sum -- * > ../build-sha256.txt
+          mv ../build-sha256.txt .
+          cat build-sha256.txt
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-files
+          path: files/
+          if-no-files-found: error
+          retention-days: 14

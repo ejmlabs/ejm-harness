@@ -6,8 +6,8 @@
 
 ## 2. Build, smoke and package jobs
 
-- [x] 2.1 Add `scripts/smoke-worker.py` and a build and smoke workflow for Linux x86_64 and macOS Apple silicon with `contents: read`, no secrets, `--locked`, archives and SHA-256 files. Verify the workflow has no write permission and no secret, and that every action is pinned by SHA.
-- [x] 2.2 Add the SDK build workflow and the disabled publish workflow. Verify the publish workflow runs no project code and is disabled.
+- [x] 2.1 Add `scripts/smoke-worker.py`, `scripts/package-worker.py` and `build.yml` following the shared native build contract, plus the canonical native `release.yml`. Verify the shared `native_build` lint accepts `build.yml`, no write permission, secret or tag-pinned action exists, and only one `release-files` artifact is uploaded.
+- [x] 2.2 Park a draft SDK publish workflow outside the repository, disabled, until names are confirmed and the shared standard allows it.
 - [x] 2.3 Build the Linux worker locally, smoke the handshake, and run both SDKs against it through `EJM_HARNESS_WORKER_PATH`. Build both SDK packages locally and record SHA-256 values.
 
 ## 3. Notes and routes

@@ -13,13 +13,12 @@ routes.
 ## What Changes
 
 - Set every owned version to `0.1.1` and date a changelog section.
-- Add a read-only build and smoke workflow for the worker (Linux x86_64 and macOS
-  Apple silicon), producing archives and a SHA-256 list as workflow artifacts.
-- Add a read-only SDK build workflow (npm tarball, Python sdist and wheel) and a
-  separate publish workflow that runs no project code and stays disabled until
-  the owner confirms package names and registry trust settings.
+- Add the opt-in `build.yml` (read-only build and smoke for the worker on Linux
+  x86_64 and macOS Apple silicon, SDK package builds, one `release-files` artifact
+  with a combined `build-sha256.txt`) and the canonical native `release.yml` and
+  pin from the shared standard.
 - Hold macOS downloads until notarization (owner choice, Decision 8 option b).
-  The macOS build job runs for evidence only and the notes offer no macOS file.
+  The macOS build job runs for evidence only and its archive is not collected into the release files.
 - Draft `0.1.1` release notes with the unsigned statement, the Linux runtime
   baseline and the open native-evidence items as known limits.
 - Add the issue form links and the private advisory link where missing.

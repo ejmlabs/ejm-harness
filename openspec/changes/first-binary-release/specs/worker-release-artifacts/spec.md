@@ -26,12 +26,12 @@ A worker archive SHALL be offered only after its binary completes the protocol h
 
 ### Requirement: Publication stays gated
 
-SDK publication SHALL use a separate job that runs no project code and SHALL remain disabled until the owner confirms the package names and registry trust settings.
+SDK registry publication SHALL use a separate job that runs no project code and SHALL NOT be enabled until the owner confirms the package names and registry trust settings.
 
-#### Scenario: Publish workflow before confirmation
+#### Scenario: Names unconfirmed
 
-- **WHEN** the publish workflow is triggered before confirmation
-- **THEN** no package is published
+- **WHEN** the owner has not confirmed the package names
+- **THEN** no workflow in this repository publishes a package
 
 ### Requirement: Honest release notes
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Archive a built ejm-harness-worker with its licence and write SHA-256 files."""
+"""Archive a built ejm-harness-worker with its licence and print its SHA-256."""
 
 from __future__ import annotations
 
@@ -53,10 +53,7 @@ def main() -> int:
         gzip.GzipFile(fileobj=raw, mode="wb", mtime=MTIME, filename="") as compressed,
     ):
         compressed.write(buffer.getvalue())
-    digest = sha256(archive_path)
-    line = f"{digest}  {archive_path.name}\n"
-    (args.out_dir / f"{archive_path.name}.sha256").write_text(line)
-    print(line, end="")
+    print(f"{sha256(archive_path)}  {archive_path.name}")
     return 0
 
 
