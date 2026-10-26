@@ -38,6 +38,11 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Install the D-Bus headers the credential store crate needs
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes libdbus-1-dev pkg-config
       - name: Build the worker
         run: cargo build --release --locked -p ejm-harness-worker
       - name: Archive and hash
