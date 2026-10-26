@@ -50,6 +50,14 @@ repository.
   platform by query parameter, so no form field is added. Add the private advisory
   link to `feature.yml`-adjacent config only if missing.
 
+## Placeholder pin
+
+`pr.yml` and `release.yml` pin the unmerged shared standards branch head
+`9a902c7489151b7562263ffbcdbed0a5008f398d` so the canonical native caller could be
+generated and checked. This is a placeholder. After the shared change merges, re-pin
+both files to the merged SHA and sync `.github/review-context` in the same PR as
+`build.yml`. Do not push before that.
+
 ## Risks
 
 - Hosted runners may differ from local builds. Local builds record evidence;

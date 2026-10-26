@@ -86,7 +86,7 @@ jobs:
       - name: Worker handshake
         run: python3 scripts/smoke-worker.py "$EJM_HARNESS_WORKER_PATH" --version "$(cat VERSION)"
       - if: matrix.sdk
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       - if: matrix.sdk
@@ -108,12 +108,13 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
       - name: Pack
         run: |
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
           npm ci --ignore-scripts
           mkdir out
           npm --workspace ejm-harness pack --pack-destination out
@@ -126,7 +127,10 @@ jobs:
           retention-days: 14
   collect:
     name: Collect release files
-    needs: [build, smoke, sdk-packages]
+    needs:
+      - build
+      - smoke
+      - sdk-packages
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:

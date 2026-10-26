@@ -13,10 +13,12 @@ these notes; see [RELEASING.md](RELEASING.md) and the known limits under
 
 ### Added
 
-- Read-only CI jobs that build and smoke-test the `ejm-harness-worker` archive for
-  Linux x86_64 and macOS Apple silicon, and build the TypeScript and Python SDK
-  packages, each with SHA-256 values. A separate publish workflow is disabled until
-  package names and registry trust settings are confirmed.
+- A read-only CI workflow that builds and smoke-tests the `ejm-harness-worker`
+  archive for Linux x86_64 and builds the TypeScript and Python SDK packages, each
+  with SHA-256 values. A macOS Apple silicon build runs for evidence only; no
+  macOS file is offered until it is notarized. The Linux archive is not signed or
+  notarized, and its glibc baseline is recorded in the release notes after a hosted
+  build. Registry publication of the SDKs is not set up yet.
 
 ### Changed
 

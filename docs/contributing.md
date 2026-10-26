@@ -142,7 +142,7 @@ deployment. Harness PR #16 supplies the separate installed-caller evidence.
 
 The dated `0.1.1` [source notes](../CHANGELOG.md) are prepared for review.
 No harness draft is announced. After their normal protected merge, freeze the
-resulting main commit before requesting a source-only draft. Review both source
+resulting main commit before requesting a draft release. Review both source
 archives, original notice bytes, checksums and provenance before any publication.
 
 A release dispatch permits only its first attempt. If it fails after reserving
