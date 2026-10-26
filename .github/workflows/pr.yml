@@ -2,10 +2,12 @@ name: Human-admitted PR checks
 on:
   issue_comment:
     types: [created, edited, deleted]
+  pull_request_target:
+    types: [unlabeled]
 permissions: {}
 jobs:
   governance:
-    if: ${{ github.event.issue.pull_request }}
+    if: ${{ github.event.issue.pull_request || github.event_name == 'pull_request_target' }}
     permissions:
       contents: read
       pull-requests: write

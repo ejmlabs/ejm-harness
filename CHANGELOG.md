@@ -19,6 +19,10 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ### Security
 
+- Override the registry's transitive undici to 7.30.1 (development and test
+  tooling) and zod to 4.6.7 (also used by the auth worker through better-auth)
+  for GHSA-4qv8-2p9j-2685, GHSA-f72v-6w45-q472, GHSA-xjj6-f33q-929c and
+  GHSA-mrhx-c7xc-m3w5. No package, worker or site is published.
 - Update the locked TLS dependencies to rustls-webpki 0.103.16 and
   webpki-root-certs 1.0.10 for RUSTSEC-2026-0382 and RUSTSEC-2026-0383.
   Source builds use the corrected certificate trust data. Public APIs and the
