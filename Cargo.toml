@@ -28,7 +28,7 @@ procfs-core = { version = "0.18.0", default-features = false }
 futures-util = { version = "0.3", features = ["sink"] }
 wiremock = "0.6.5"
 semver = "1"
-sha2 = "0.10"
+sha2 = "0.11"
 tar = { version = "0.4", default-features = false }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 reqwest = { version = "0.13.5", default-features = false, features = ["json", "rustls", "stream"] }
