@@ -21,7 +21,7 @@ from ejm_harness import (
     ToolOutput,
     tool_output,
 )
-from ejm_harness.protocol import ConfigureParams, ProviderConfig, ToolDefinition
+from ejm_harness.protocol import ConfigureParams, ModelResponse, ProviderConfig, ToolDefinition
 
 WORKER = os.environ.get(
     "EJM_HARNESS_WORKER_PATH",
@@ -40,19 +40,15 @@ DEFINITION: ToolDefinition = {
 }
 
 
-def replay(state: str) -> ConfigureParams:
+def replay(state: str, tool_rounds: int = 1) -> ConfigureParams:
+    tool_round: ModelResponse = {
+        "tool_calls": [{"id": "python-call", "name": "sdk_lookup", "arguments": {"value": "hello"}}]
+    }
     return {
         "state_dir": state,
         "provider": {
             "kind": "replay",
-            "responses": [
-                {
-                    "tool_calls": [
-                        {"id": "python-call", "name": "sdk_lookup", "arguments": {"value": "hello"}}
-                    ]
-                },
-                {"content": "finished"},
-            ],
+            "responses": [*([tool_round] * tool_rounds), {"content": "finished"}],
         },
     }
 
@@ -351,10 +347,7 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
             return "finished"
 
         with tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state:
-            config = replay(state)
-            provider = config["provider"]
-            assert provider["kind"] == "replay"
-            provider["responses"].insert(0, provider["responses"][0])
+            config = replay(state, tool_rounds=2)
             definition: ToolDefinition = {**DEFINITION, "effect": "write"}
             async with AsyncHarness(
                 worker_path=WORKER, config=config, tools=[Tool(definition, execute)]
@@ -406,10 +399,7 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
                     active -= 1
 
         with tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state:
-            config = replay(state)
-            provider = config["provider"]
-            assert provider["kind"] == "replay"
-            provider["responses"] = [provider["responses"][0]] * 5 + [{"content": "done"}]
+            config = replay(state, tool_rounds=5)
             async with AsyncHarness(
                 worker_path=WORKER, config=config, tools=[Tool(DEFINITION, execute)]
             ) as harness:

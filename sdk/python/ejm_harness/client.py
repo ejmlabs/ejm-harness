@@ -14,7 +14,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Iterator, Sequen
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, Self, TypeVar, cast
 from uuid import uuid4
 
 from .protocol import (
@@ -86,6 +86,11 @@ class ToolContext:
         self._async_cancelled.set()
 
 
+def _cancel_context(context: ToolContext) -> None:
+    # The harness owns cancellation; the method stays off the tool-facing surface.
+    context._cancel()  # noqa: SLF001 -- same-module owner of the tool context
+
+
 @dataclass(frozen=True)
 class Tool(Generic[T]):
     """A host-owned effect grant with a JSON Schema and a sync or async handler."""
@@ -147,45 +152,48 @@ class AsyncHarness:
         )
         return await harness.__aenter__()
 
-    async def __aenter__(self) -> AsyncHarness:
+    async def __aenter__(self) -> Self:
         if self._process is not None:
             self._assert_open()
             return self
         try:
-            self._process = await asyncio.create_subprocess_exec(
-                self._worker_path,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                limit=MAX_FRAME,
-            )
-            self._track(self._read())
-            self._track(self._drain_stderr())
-            hello = _object(await self._request("hello", {"protocol": 1}))
-            if hello.get("protocol") != 1:
-                raise HarnessError("protocol", "worker protocol 1 is required")
-            provider = self._config.get("provider")
-            packages_requested = self._config.get("packages") or (
-                isinstance(provider, dict) and provider.get("kind") == "package"
-            )
-            capabilities = hello.get("capabilities")
-            if packages_requested and (
-                not isinstance(capabilities, list) or "packages" not in capabilities
-            ):
-                raise HarnessError(
-                    "protocol", "update ejm-harness-worker to a version that supports packages"
-                )
-            await self._request(
-                "configure",
-                {
-                    **self._config,
-                    "tools": [tool.definition for tool in self._tools.values()],
-                },
-            )
-            return self
+            await self._start()
         except BaseException:
             await self.close()
             raise
+        return self
+
+    async def _start(self) -> None:
+        self._process = await asyncio.create_subprocess_exec(
+            self._worker_path,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            limit=MAX_FRAME,
+        )
+        self._track(self._read())
+        self._track(self._drain_stderr())
+        hello = _object(await self._request("hello", {"protocol": 1}))
+        if hello.get("protocol") != 1:
+            raise HarnessError("protocol", "worker protocol 1 is required")
+        provider = self._config.get("provider")
+        packages_requested = self._config.get("packages") or (
+            isinstance(provider, dict) and provider.get("kind") == "package"
+        )
+        capabilities = hello.get("capabilities")
+        if packages_requested and (
+            not isinstance(capabilities, list) or "packages" not in capabilities
+        ):
+            raise HarnessError(
+                "protocol", "update ejm-harness-worker to a version that supports packages"
+            )
+        await self._request(
+            "configure",
+            {
+                **self._config,
+                "tools": [tool.definition for tool in self._tools.values()],
+            },
+        )
 
     async def __aexit__(self, *_exc: object) -> None:
         await self.close()
@@ -409,59 +417,58 @@ class AsyncHarness:
         if process is None or process.stdout is None:
             return
         try:
-            while True:
-                line = await process.stdout.readline()
-                if self._failure is not None:
-                    return
-                if not line:
-                    raise HarnessError("disconnected", "worker output closed")
-                if len(line) > MAX_FRAME or not line.endswith(b"\n"):
-                    raise HarnessError("frame_limit", "worker frame exceeds 1 MiB or is truncated")
-                value = _object(json.loads(line))
-                method = value.get("method")
-                if method == "tool.invoke":
-                    invocation = cast("ToolInvocation", value["params"])
-                    call_id = invocation["call_id"]
-                    if len(self._callbacks) >= MAX_PENDING or call_id in self._callbacks:
-                        raise HarnessError(
-                            "busy", "callback capacity or unique call_id limit reached"
-                        )
-                    context = self._tool_context(invocation)
-                    task = self._track(self._invoke(str(value["id"]), invocation, context))
-                    self._callbacks[call_id] = context, task
-                    self._track(self._watch_callback(context, task))
-                elif method == "tool.cancel":
-                    callback = self._callbacks.get(str(value["params"]["call_id"]))
-                    if callback:
-                        callback[0]._cancel()
-                elif method == "event":
-                    event = cast("Event", value["params"])
-                    session_id = event["session_id"]
-                    if session_id not in self._cursors and len(self._cursors) >= 1000:
-                        raise HarnessError("protocol", "session capacity exceeded")
-                    self._cursors[session_id] = max(
-                        self._cursors.get(session_id, 0), event["sequence"]
-                    )
-                    if session_id in self._changes:
-                        self._changes[session_id].set()
-                elif isinstance(value.get("id"), str):
-                    future = self._pending.get(value["id"])
-                    if future is not None and not future.done():
-                        if "error" in value:
-                            error = _object(value["error"])
-                            future.set_exception(
-                                HarnessError(str(error["code"]), str(error["message"]))
-                            )
-                        elif "result" in value:
-                            future.set_result(value["result"])
-                        else:
-                            raise HarnessError("protocol", "response has no result or error")
-                else:
-                    raise HarnessError("protocol", "unknown worker message")
+            await self._read_frames(process.stdout)
         except asyncio.CancelledError:
             raise
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 -- any reader failure fails the whole harness
             self._fail(error)
+
+    async def _read_frames(self, stdout: asyncio.StreamReader) -> None:
+        while True:
+            line = await stdout.readline()
+            if self._failure is not None:
+                return
+            if not line:
+                raise HarnessError("disconnected", "worker output closed")
+            if len(line) > MAX_FRAME or not line.endswith(b"\n"):
+                raise HarnessError("frame_limit", "worker frame exceeds 1 MiB or is truncated")
+            value = _object(json.loads(line))
+            method = value.get("method")
+            if method == "tool.invoke":
+                invocation = cast("ToolInvocation", value["params"])
+                call_id = invocation["call_id"]
+                if len(self._callbacks) >= MAX_PENDING or call_id in self._callbacks:
+                    raise HarnessError("busy", "callback capacity or unique call_id limit reached")
+                context = self._tool_context(invocation)
+                task = self._track(self._invoke(str(value["id"]), invocation, context))
+                self._callbacks[call_id] = context, task
+                self._track(self._watch_callback(context, task))
+            elif method == "tool.cancel":
+                callback = self._callbacks.get(str(value["params"]["call_id"]))
+                if callback:
+                    _cancel_context(callback[0])
+            elif method == "event":
+                event = cast("Event", value["params"])
+                session_id = event["session_id"]
+                if session_id not in self._cursors and len(self._cursors) >= 1000:
+                    raise HarnessError("protocol", "session capacity exceeded")
+                self._cursors[session_id] = max(self._cursors.get(session_id, 0), event["sequence"])
+                if session_id in self._changes:
+                    self._changes[session_id].set()
+            elif isinstance(value.get("id"), str):
+                future = self._pending.get(value["id"])
+                if future is not None and not future.done():
+                    if "error" in value:
+                        error = _object(value["error"])
+                        future.set_exception(
+                            HarnessError(str(error["code"]), str(error["message"]))
+                        )
+                    elif "result" in value:
+                        future.set_result(value["result"])
+                    else:
+                        raise HarnessError("protocol", "response has no result or error")
+            else:
+                raise HarnessError("protocol", "unknown worker message")
 
     async def _drain_stderr(self) -> None:
         process = self._process
@@ -492,32 +499,36 @@ class AsyncHarness:
             _loop=asyncio.get_running_loop(),
         )
 
+    async def _execute(self, invocation: ToolInvocation, context: ToolContext) -> object:
+        tool = self._tools.get(invocation["name"])
+        if tool is None:
+            raise HarnessError("tool", f"unregistered tool {invocation['name']}")
+        remaining = max(0, context.deadline_ms / 1000 - time.time())
+        if remaining <= 0 or context.cancelled:
+            raise HarnessError("timeout", "tool deadline exceeded before execution")
+        result: object
+        if inspect.iscoroutinefunction(tool.execute):
+            result = tool.execute(invocation["arguments"], context)
+        else:
+
+            def execute_sync() -> object:
+                if context.cancelled or time.time() * 1000 >= context.deadline_ms:
+                    raise HarnessError("cancelled", "tool cancelled before execution")
+                return tool.execute(invocation["arguments"], context)
+
+            result = await asyncio.get_running_loop().run_in_executor(
+                self._pool,
+                execute_sync,
+            )
+        if inspect.isawaitable(result):
+            result = await result
+        return result
+
     async def _invoke(
         self, request_id: str, invocation: ToolInvocation, context: ToolContext
     ) -> None:
         try:
-            tool = self._tools.get(invocation["name"])
-            if tool is None:
-                raise HarnessError("tool", f"unregistered tool {invocation['name']}")
-            remaining = max(0, context.deadline_ms / 1000 - time.time())
-            if remaining <= 0 or context.cancelled:
-                raise HarnessError("timeout", "tool deadline exceeded before execution")
-            result: object
-            if inspect.iscoroutinefunction(tool.execute):
-                result = tool.execute(invocation["arguments"], context)
-            else:
-
-                def execute_sync() -> object:
-                    if context.cancelled or time.time() * 1000 >= context.deadline_ms:
-                        raise HarnessError("cancelled", "tool cancelled before execution")
-                    return tool.execute(invocation["arguments"], context)
-
-                result = await asyncio.get_running_loop().run_in_executor(
-                    self._pool,
-                    execute_sync,
-                )
-            if inspect.isawaitable(result):
-                result = await result
+            result = await self._execute(invocation, context)
             if self._failure is None:
                 await self._send(
                     {
@@ -525,15 +536,15 @@ class AsyncHarness:
                         "result": {"content": result} if isinstance(result, str) else result,
                     }
                 )
-        except (Exception, asyncio.CancelledError) as error:
+        except (Exception, asyncio.CancelledError) as error:  # noqa: BLE001 -- any tool failure is reported to the worker
             if isinstance(error, asyncio.CancelledError):
-                context._cancel()
+                _cancel_context(context)
             if self._failure is None:
                 try:
                     await self._send(
                         {"id": request_id, "error": {"code": "tool", "message": str(error)[:4096]}}
                     )
-                except Exception as send_error:
+                except Exception as send_error:  # noqa: BLE001 -- a failed error report fails the harness
                     self._fail(send_error)
         finally:
             self._callbacks.pop(invocation["call_id"], None)
@@ -547,7 +558,7 @@ class AsyncHarness:
             )
             if task.done():
                 return
-            context._cancel()
+            _cancel_context(context)
             done, _ = await asyncio.wait({task}, timeout=CLEANUP_TIMEOUT)
             if not done:
                 self._fail(
@@ -566,7 +577,7 @@ class AsyncHarness:
             if not future.done():
                 future.set_exception(error)
         for context, task in list(self._callbacks.values()):
-            context._cancel()
+            _cancel_context(context)
             task.cancel()
         for change in self._changes.values():
             change.set()
@@ -588,6 +599,14 @@ class AsyncHarness:
         self._assert_open()
 
 
+async def _harness_request(harness: AsyncHarness, method: str, params: object) -> object:
+    return await harness._request(method, params)  # noqa: SLF001 -- same-module transport owner
+
+
+def _harness_call(harness: Harness, awaitable: Awaitable[T]) -> T:
+    return harness._call(awaitable)  # noqa: SLF001 -- same-module owner of the private event loop
+
+
 @dataclass
 class AsyncSession:
     _harness: AsyncHarness = field(repr=False)
@@ -598,10 +617,11 @@ class AsyncSession:
         return self.info["id"]
 
     async def start(self, prompt: str) -> AsyncRun:
-        after = self._harness._cursors.get(self.id, 0)
+        after = self._harness._cursors.get(self.id, 0)  # noqa: SLF001 -- same-module cursor owner
         started = cast(
             "RunStarted",
-            await self._harness._request(
+            await _harness_request(
+                self._harness,
                 "run.start",
                 {
                     "session_id": self.id,
@@ -638,7 +658,7 @@ class AsyncRun:
         while True:
             events = await self._harness.events(self.session_id, after)
             if not events:
-                await self._harness._changed(self.session_id)
+                await self._harness._changed(self.session_id)  # noqa: SLF001 -- same-module change notifier
                 continue
             for event in events:
                 after = event["sequence"]
@@ -660,18 +680,22 @@ class AsyncRun:
 
     async def cancel(self) -> None:
         if self._summary is None:
-            await self._harness._request(
-                "run.cancel", {"session_id": self.session_id, "run_id": self.id}
+            await _harness_request(
+                self._harness, "run.cancel", {"session_id": self.session_id, "run_id": self.id}
             )
 
     async def steer(self, text: str) -> None:
-        await self._harness._request(
-            "run.steer", {"session_id": self.session_id, "run_id": self.id, "text": text}
+        await _harness_request(
+            self._harness,
+            "run.steer",
+            {"session_id": self.session_id, "run_id": self.id, "text": text},
         )
 
     async def queue(self, text: str) -> None:
-        await self._harness._request(
-            "run.queue", {"session_id": self.session_id, "run_id": self.id, "text": text}
+        await _harness_request(
+            self._harness,
+            "run.queue",
+            {"session_id": self.session_id, "run_id": self.id, "text": text},
         )
 
 
@@ -722,7 +746,7 @@ class Harness:
             )
         return asyncio.run_coroutine_threadsafe(run(), self._loop).result()
 
-    def __enter__(self) -> Harness:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_exc: object) -> None:
@@ -785,16 +809,20 @@ class Session:
         return self._async.info
 
     def start(self, prompt: str) -> Run:
-        return Run(self._harness, self._harness._call(self._async.start(prompt)))
+        return Run(self._harness, _harness_call(self._harness, self._async.start(prompt)))
 
     def events(self, after: int = 0, limit: int = 64) -> list[Event]:
-        return self._harness._call(self._async.events(after, limit))
+        return _harness_call(self._harness, self._async.events(after, limit))
 
     def invoke_package_command(self, package: str, name: str, arguments: object = None) -> object:
-        return self._harness._call(self._async.invoke_package_command(package, name, arguments))
+        return _harness_call(
+            self._harness, self._async.invoke_package_command(package, name, arguments)
+        )
 
     def render_package_widget(self, package: str, name: str, arguments: object = None) -> object:
-        return self._harness._call(self._async.render_package_widget(package, name, arguments))
+        return _harness_call(
+            self._harness, self._async.render_package_widget(package, name, arguments)
+        )
 
 
 @dataclass
@@ -814,21 +842,21 @@ class Run:
         iterator = self._async.__aiter__()
         while True:
             try:
-                yield self._harness._call(iterator.__anext__())
+                yield _harness_call(self._harness, iterator.__anext__())
             except StopAsyncIteration:
                 return
 
     def wait(self) -> RunSummary:
-        return self._harness._call(self._async.wait())
+        return _harness_call(self._harness, self._async.wait())
 
     def cancel(self) -> None:
-        self._harness._call(self._async.cancel())
+        _harness_call(self._harness, self._async.cancel())
 
     def steer(self, text: str) -> None:
-        self._harness._call(self._async.steer(text))
+        _harness_call(self._harness, self._async.steer(text))
 
     def queue(self, text: str) -> None:
-        self._harness._call(self._async.queue(text))
+        _harness_call(self._harness, self._async.queue(text))
 
 
 def _object(value: object) -> dict[str, Any]:

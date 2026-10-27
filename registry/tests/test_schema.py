@@ -36,8 +36,10 @@ class RegistrySchema(unittest.TestCase):
             "UPDATE versions SET version='2.0.0'",
             "DELETE FROM versions",
             "INSERT INTO publishers(handle,user_id,display_name) VALUES ('alice','bob','Bob')",
-            "INSERT INTO publishers(handle,user_id,display_name) "
-            "VALUES ('another','alice','Alice')",
+            (
+                "INSERT INTO publishers(handle,user_id,display_name) "
+                "VALUES ('another','alice','Alice')"
+            ),
         ]:
             with self.subTest(statement=statement), self.assertRaises(sqlite3.IntegrityError):
                 self.db.execute(statement)
@@ -49,14 +51,22 @@ class RegistrySchema(unittest.TestCase):
             self.db.execute(
                 "INSERT INTO publishers(handle,user_id,display_name) VALUES ('bob','bob','Bob')"
             )
-        for target in ["publishers WHERE handle='alice'", "registry_accounts WHERE id='alice'"]:
-            table, where = target.split(" WHERE ")
-            self.db.execute(f"UPDATE {table} SET suspended=1 WHERE {where}")
+        for suspend, restore in [
+            (
+                "UPDATE publishers SET suspended=1 WHERE handle='alice'",
+                "UPDATE publishers SET suspended=0 WHERE handle='alice'",
+            ),
+            (
+                "UPDATE registry_accounts SET suspended=1 WHERE id='alice'",
+                "UPDATE registry_accounts SET suspended=0 WHERE id='alice'",
+            ),
+        ]:
+            self.db.execute(suspend)
             with self.assertRaises(sqlite3.IntegrityError):
                 self.reserve(version="2.0.0")
             with self.assertRaises(sqlite3.IntegrityError):
                 self.db.execute("UPDATE versions SET ready=1")
-            self.db.execute(f"UPDATE {table} SET suspended=0 WHERE {where}")
+            self.db.execute(restore)
         self.db.execute("UPDATE versions SET quarantined=1")
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute("UPDATE versions SET ready=1")
@@ -112,16 +122,16 @@ class RegistrySchema(unittest.TestCase):
     def test_global_limits_are_positive_and_cannot_be_removed(self) -> None:
         with self.assertRaises(sqlite3.IntegrityError):
             self.db.execute("DELETE FROM registry_limits")
-        for column in [
-            "reserved_bytes",
-            "versions",
-            "accounts",
-            "publishers",
-            "daily_upload_bytes",
-            "daily_upload_count",
+        for statement in [
+            "UPDATE registry_limits SET reserved_bytes=0",
+            "UPDATE registry_limits SET versions=0",
+            "UPDATE registry_limits SET accounts=0",
+            "UPDATE registry_limits SET publishers=0",
+            "UPDATE registry_limits SET daily_upload_bytes=0",
+            "UPDATE registry_limits SET daily_upload_count=0",
         ]:
-            with self.subTest(column=column), self.assertRaises(sqlite3.IntegrityError):
-                self.db.execute(f"UPDATE registry_limits SET {column}=0")
+            with self.subTest(statement=statement), self.assertRaises(sqlite3.IntegrityError):
+                self.db.execute(statement)
 
     def test_global_account_and_publisher_caps_allow_existing_identity_retry(self) -> None:
         self.db.execute("UPDATE registry_limits SET accounts=3,publishers=1")

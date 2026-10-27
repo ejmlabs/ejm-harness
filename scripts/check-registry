@@ -4,7 +4,8 @@ set -euo pipefail
 project_root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$project_root"
 registry_rustc=$(rustup which rustc)
-export PATH="$(dirname "$registry_rustc"):$PATH"
+registry_bin=$(dirname "$registry_rustc")
+export PATH="$registry_bin:$PATH"
 export CARGO_BUILD_JOBS=2
 export CARGO_INCREMENTAL=0
 export CARGO_PROFILE_DEV_DEBUG=line-tables-only

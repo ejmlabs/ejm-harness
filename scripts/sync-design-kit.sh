@@ -16,5 +16,5 @@ done
 for file in "$kit"/favicon/*; do copy "favicon/$(basename "$file")"; done
 for css in tokens/brand.css components/brand-components.css web/site.css ui/theme.css; do
   grep -ohE "url\(['\"]?\.\./[^'\")#]+" "$kit/$css" | sed -E "s/url\(['\"]?\.\.\///" || true
-done | sort -u | while read -r file; do [ -f "$kit/$file" ] && copy "$file"; done
+done | sort -u | while read -r file; do [[ -f "$kit/$file" ]] && copy "$file"; done
 echo "Copied the design kit into $out"

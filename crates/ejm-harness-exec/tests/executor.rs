@@ -1,6 +1,7 @@
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
+    clippy::panic,
     reason = "Test fixtures and assertions must fail at their call site."
 )]
 
@@ -605,6 +606,6 @@ fn fixture() {
                 }
             }
         }
-        _ => std::process::exit(2),
+        unknown => panic!("unknown fixture mode {unknown}"),
     }
 }

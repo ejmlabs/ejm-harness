@@ -124,7 +124,7 @@ class Client:
         return value
 
     def load(self, request_id: str = "load", **overrides: object) -> dict[str, Any]:
-        params = {
+        params: dict[str, object] = {
             "package_id": "fixture",
             "root": str(self.root),
             "entry": self.entry,

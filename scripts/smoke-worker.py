@@ -15,7 +15,8 @@ TIMEOUT_SECONDS = 20
 
 def request(worker: subprocess.Popen[str], frame: dict[str, object]) -> dict[str, object]:
     """Send one frame and return the matching response."""
-    assert worker.stdin is not None and worker.stdout is not None
+    if worker.stdin is None or worker.stdout is None:
+        raise RuntimeError("worker pipes are not open")
     worker.stdin.write(json.dumps(frame) + "\n")
     worker.stdin.flush()
     line = worker.stdout.readline()
@@ -27,6 +28,23 @@ def request(worker: subprocess.Popen[str], frame: dict[str, object]) -> dict[str
     if "error" in response:
         raise RuntimeError(f"worker error: {response['error']}")
     return response
+
+
+def handshake_and_shutdown(worker: subprocess.Popen[str], version: str) -> None:
+    """Check the handshake, then stop the worker cleanly."""
+    hello = request(worker, {"id": "1", "method": "hello", "params": {"protocol": PROTOCOL}})
+    result = hello.get("result")
+    if not isinstance(result, dict):
+        raise TypeError(f"no handshake result: {hello}")
+    if result.get("protocol") != PROTOCOL or result.get("version") != version:
+        raise RuntimeError(f"unexpected handshake: {result}")
+    print(f"handshake ok: protocol {result['protocol']} version {result['version']}")
+    request(worker, {"id": "2", "method": "shutdown", "params": {}})
+    if worker.stdin is not None:
+        worker.stdin.close()
+    if worker.wait(timeout=TIMEOUT_SECONDS) != 0:
+        raise RuntimeError(f"worker exited with status {worker.returncode}")
+    print("shutdown ok")
 
 
 def main() -> int:
@@ -47,22 +65,8 @@ def main() -> int:
         return 1
     with worker:
         try:
-            hello = request(
-                worker, {"id": "1", "method": "hello", "params": {"protocol": PROTOCOL}}
-            )
-            result = hello.get("result")
-            if not isinstance(result, dict):
-                raise RuntimeError(f"no handshake result: {hello}")
-            if result.get("protocol") != PROTOCOL or result.get("version") != args.version:
-                raise RuntimeError(f"unexpected handshake: {result}")
-            print(f"handshake ok: protocol {result['protocol']} version {result['version']}")
-            request(worker, {"id": "2", "method": "shutdown", "params": {}})
-            if worker.stdin is not None:
-                worker.stdin.close()
-            if worker.wait(timeout=TIMEOUT_SECONDS) != 0:
-                raise RuntimeError(f"worker exited with status {worker.returncode}")
-            print("shutdown ok")
-        except (RuntimeError, subprocess.TimeoutExpired, ValueError) as error:
+            handshake_and_shutdown(worker, args.version)
+        except (RuntimeError, TypeError, subprocess.TimeoutExpired, ValueError) as error:
             worker.kill()
             print(f"smoke failed: {error}", file=sys.stderr)
             return 1

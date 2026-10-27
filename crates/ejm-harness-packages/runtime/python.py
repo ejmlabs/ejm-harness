@@ -30,7 +30,7 @@ sys.stdout = sys.stderr
 
 def object_value(value: object, name: str) -> dict[str, Any]:
     if not isinstance(value, dict):
-        raise ValueError(f"{name} must be an object")
+        raise TypeError(f"{name} must be an object")
     return value
 
 
@@ -239,21 +239,23 @@ class Host:
             for name in handlers:
                 handler = getattr(module, name, None)
                 if not callable(handler):
-                    raise ValueError(f"handler is not callable: {name}")
+                    raise TypeError(f"handler is not callable: {name}")
                 exported[name] = handler
             return exported
 
-        try:
-            package.handlers = await asyncio.get_running_loop().run_in_executor(
-                self.pool, import_entry
-            )
+        async def import_checked() -> dict[str, Callable[..., Any]]:
+            exported = await asyncio.get_running_loop().run_in_executor(self.pool, import_entry)
             if request.cancelled.is_set():
                 raise RuntimeError("request cancelled")
-            return {"package_id": package_id, "handlers": handlers}
+            return exported
+
+        try:
+            package.handlers = await import_checked()
         except BaseException:
             self.packages.pop(package_id, None)
             remove_namespace(package.namespace)
             raise
+        return {"package_id": package_id, "handlers": handlers}
 
     def unload(self, params: dict[str, Any]) -> None:
         package_id = text(params.get("package_id"), "package_id")
@@ -310,6 +312,26 @@ class Host:
             self.close_task = asyncio.create_task(wait())
         await self.close_task
 
+    async def respond(self, frame: dict[str, Any], request: Request) -> dict[str, Any]:
+        params = object_value(frame.get("params", {}), "params")
+        if request.cancelled.is_set():
+            raise RuntimeError("request cancelled")
+        method = frame.get("method")
+        result: object
+        if method == "load":
+            result = await self.load(params, request)
+        elif method == "unload":
+            self.unload(params)
+            result = None
+        elif method == "invoke":
+            result = await self.invoke(params, request)
+        else:
+            raise ValueError("unknown method")
+        response = {"id": request.id, "result": result}
+        if len(json.dumps(response, ensure_ascii=True, allow_nan=False).encode()) > MAX_FRAME:
+            raise ValueError("output frame exceeds 1 MiB")
+        return response
+
     def start(self, frame: dict[str, Any]) -> asyncio.Task[None]:
         request = Request(frame["id"])
         self.active[request.id] = request
@@ -317,27 +339,8 @@ class Host:
         async def run() -> None:
             try:
                 try:
-                    params = object_value(frame.get("params", {}), "params")
-                    if request.cancelled.is_set():
-                        raise RuntimeError("request cancelled")
-                    method = frame.get("method")
-                    result: object
-                    if method == "load":
-                        result = await self.load(params, request)
-                    elif method == "unload":
-                        self.unload(params)
-                        result = None
-                    elif method == "invoke":
-                        result = await self.invoke(params, request)
-                    else:
-                        raise ValueError("unknown method")
-                    response = {"id": request.id, "result": result}
-                    if (
-                        len(json.dumps(response, ensure_ascii=True, allow_nan=False).encode())
-                        > MAX_FRAME
-                    ):
-                        raise ValueError("output frame exceeds 1 MiB")
-                except (Exception, asyncio.CancelledError) as error:
+                    response = await self.respond(frame, request)
+                except (Exception, asyncio.CancelledError) as error:  # noqa: BLE001 -- every failure is a protocol error response
                     response = {"id": request.id, "error": {"message": error_message(error)}}
                 await self.output.send(response, terminal=True)
             finally:
@@ -362,13 +365,16 @@ async def main() -> None:
 
     def read() -> None:
         while not reader_stopped.is_set():
+            value: bytes | BaseException | None
             try:
                 line = sys.stdin.buffer.readline(MAX_FRAME + 2)
-                if line and (len(line) > MAX_FRAME + 1 or not line.endswith(b"\n")):
-                    raise ValueError("input frame exceeds 1 MiB or is incomplete")
-                value: bytes | BaseException | None = line or None
-            except (OSError, ValueError) as error:
+            except OSError as error:
                 value = error
+            else:
+                if line and (len(line) > MAX_FRAME + 1 or not line.endswith(b"\n")):
+                    value = ValueError("input frame exceeds 1 MiB or is incomplete")
+                else:
+                    value = line or None
             try:
                 asyncio.run_coroutine_threadsafe(incoming.put(value), loop).result()
             except RuntimeError:
@@ -392,7 +398,8 @@ async def main() -> None:
     for number in (signal.SIGINT, signal.SIGTERM):
         signal.signal(number, lambda number, _frame: loop.call_soon_threadsafe(stop, 128 + number))
     threading.Thread(target=read, name="ejm-harness-extension-input", daemon=True).start()
-    try:
+
+    async def serve() -> None:
         while True:
             value = await incoming.get()
             if value is None:
@@ -413,7 +420,7 @@ async def main() -> None:
                 try:
                     await host.close()
                     response = {"id": request_id, "result": None}
-                except Exception as error:
+                except Exception as error:  # noqa: BLE001 -- a failed shutdown is a protocol error response
                     response = {"id": request_id, "error": {"message": error_message(error)}}
                 await host.output.send(response, terminal=True)
                 break
@@ -427,14 +434,17 @@ async def main() -> None:
                 )
                 continue
             host.start(frame)
-    except Exception as error:
+
+    try:
+        await serve()
+    except Exception as error:  # noqa: BLE001 -- any loop failure ends the host with a nonzero exit
         host.exit_code = host.exit_code or 1
         sys.stderr.write(f"{error_message(error)}\n")
     finally:
         reader_stopped.set()
         try:
             await host.close()
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 -- cleanup failure is reported, then the host exits
             sys.stderr.write(f"{error_message(error)}\n")
         host.pool.shutdown(wait=False, cancel_futures=True)
     # Exit after the bounded cleanup, without cancelling a still-running thread's owner task.

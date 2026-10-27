@@ -25,12 +25,16 @@ The default provider returns `Demo: ...` without model charges. Configure a host
 Load a trusted package through explicit configuration:
 
 ```python
-with Harness(config={
-    "packages": [{
-        "root": "/path/to/trusted-package",
-        "grants": {"commands": ["report"], "widgets": ["status"]},
-    }],
-}) as harness:
+with Harness(
+    config={
+        "packages": [
+            {
+                "root": "/path/to/trusted-package",
+                "grants": {"commands": ["report"], "widgets": ["status"]},
+            }
+        ],
+    }
+) as harness:
     session = harness.create_session()
     print(harness.list_packages())
     print(session.invoke_package_command("@owner/package", "report", {}))

@@ -389,7 +389,9 @@ test("an unresponsive cancelled handler poisons the transport within its cleanup
     ...toolDefinition,
     execute: async () => {
       entered();
-      await new Promise(() => {});
+      await new Promise(() => {
+        // Never settles, so the call stays in flight.
+      });
       return "never settled";
     },
   });
@@ -560,7 +562,9 @@ test("malformed and oversized raw frames close the worker", async () => {
     const child = spawn(workerPath, [], { stdio: ["pipe", "pipe", "pipe"] });
     child.stdout.resume();
     child.stderr.resume();
-    child.stdin.on("error", () => {});
+    child.stdin.on("error", () => {
+      // The worker may exit before reading its input.
+    });
     const exit = once(child, "close");
     child.stdin.end(frame);
     const [code] = await exit;
