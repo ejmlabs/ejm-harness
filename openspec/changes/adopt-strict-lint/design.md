@@ -1,6 +1,6 @@
 ## Context
 
-The gate runs `npm ci`, `npm --prefix registry ci` and `./scripts/check`. The registry compiles with TypeScript 7.0.2 while the root lint resolves TypeScript 6.0.3, the split typed lint needs. Measured: TypeScript 3 (TS4111 in one registry file), ESLint 8 with the shared layer, ruff 58, mypy 2, clippy 1 (`process::exit`), ShellCheck about 3.
+The gate runs `npm ci`, `npm --prefix registry ci` and `./scripts/check`. The registry compiles with TypeScript 7.0.2 while the root lint resolves TypeScript 6.0.3, the split typed lint needs. Measured: TypeScript 3 (TS4111 in one registry file), ESLint 8 with the shared layer, ruff 65, mypy 4, clippy 1 (`process::exit`), ShellCheck 2.
 
 ## Decisions
 

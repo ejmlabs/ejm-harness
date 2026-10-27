@@ -6,8 +6,8 @@
 
 ## 2. Fixes
 
-- [x] 2.1 TypeScript 3, ESLint 8, ruff 58 (SLF001 19 outside tests, TRY301 18, BLE001 7), mypy 2, clippy 1, ShellCheck about 3.
+- [x] 2.1 TypeScript 3, ESLint 8, ruff 65, mypy 4, clippy 1, ShellCheck 2.
 
 ## 3. Enforcement and verification
 
-- [x] 3.1 `scripts/check` runs ShellCheck; `./scripts/check` and `./scripts/check-registry` pass.
+- [x] 3.1 `scripts/check` runs ShellCheck and passes; the registry typecheck passes (`check-registry` needs Node 24 and runs in CI).

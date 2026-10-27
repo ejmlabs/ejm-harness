@@ -368,7 +368,7 @@ async def main() -> None:
             value: bytes | BaseException | None
             try:
                 line = sys.stdin.buffer.readline(MAX_FRAME + 2)
-            except OSError as error:
+            except (OSError, ValueError) as error:
                 value = error
             else:
                 if line and (len(line) > MAX_FRAME + 1 or not line.endswith(b"\n")):

@@ -248,6 +248,20 @@ class HostTests(unittest.TestCase):
                 finally:
                     client.close()
 
+    def test_python_host_exits_when_input_is_closed(self) -> None:
+        launcher = (
+            "import runpy, sys; sys.stdin.close(); "
+            f"runpy.run_path({str(RUNTIME / 'python.py')!r}, run_name='__main__')"
+        )
+        result = subprocess.run(
+            [sys.executable, "-I", "-B", "-c", launcher],
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(b"closed file", result.stderr)
+
     def test_shutdown_exits_with_stdin_pipe_owner_alive(self) -> None:
         for language in self.languages():
             with self.subTest(language=language), tempfile.TemporaryDirectory() as folder:
