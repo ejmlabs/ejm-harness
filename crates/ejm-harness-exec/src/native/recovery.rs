@@ -108,12 +108,17 @@ mod tests {
         let directory = wire::directory(&root, "fixture").unwrap();
         let ownership = wire::stable_lock(&directory, "owner.lock").unwrap();
         ownership.try_lock().unwrap();
+        // An owner that hangs up at once keeps each query short; a connect to
+        // port 0 hangs until the wire timeout on Windows.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move { while listener.accept().await.is_ok() {} });
         let ad = Advertisement {
             protocol: wire::PROTOCOL,
             epoch: uuid::Uuid::new_v4(),
             capability: uuid::Uuid::new_v4(),
             pid: std::process::id(),
-            port: 0,
+            port,
             domain: "fixture".into(),
             accounted: false,
         };
@@ -129,8 +134,6 @@ mod tests {
         );
         assert_eq!(handle.snapshot().owner_deaths, 0);
         ownership.unlock().unwrap();
-        // A query already in flight may run to its connect timeout (refused
-        // loopback connects take about 2s on Windows) before the next probe.
         let completed = tokio::time::timeout(wire::TIMEOUT + PROBE_INTERVAL * 2, &mut pending)
             .await
             .unwrap();
