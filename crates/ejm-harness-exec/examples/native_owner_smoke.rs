@@ -5,21 +5,23 @@ use std::{
     io::{Read, Write},
     path::{Path, PathBuf},
     process::ExitCode,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
     time::{Duration, Instant},
+};
+
+#[cfg(unix)]
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
 };
 
 #[cfg(unix)]
 use std::sync::atomic::AtomicU32;
 
 use anyhow::{Context, Result, ensure};
-use ejm_harness_exec::{
-    CommandRequest, Executor, Governor, OperatingTarget, Reservation, ResourceLimits,
-    native::{self, NativeCommand, NativeOwner},
-};
+use ejm_harness_exec::Reservation;
+use ejm_harness_exec::native::{self, NativeCommand, NativeOwner};
+#[cfg(unix)]
+use ejm_harness_exec::{CommandRequest, Executor, Governor, OperatingTarget, ResourceLimits};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 fn main() -> Result<ExitCode> {
@@ -562,11 +564,13 @@ async fn wait_for_witness(witness: &std::fs::File) -> Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
 struct AdmissionProbe {
     governor: Arc<Governor>,
     released_while_parked: Arc<AtomicBool>,
 }
 
+#[cfg(unix)]
 impl Drop for AdmissionProbe {
     fn drop(&mut self) {
         self.released_while_parked.store(
