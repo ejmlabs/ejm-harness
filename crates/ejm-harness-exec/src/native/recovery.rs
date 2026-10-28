@@ -129,7 +129,9 @@ mod tests {
         );
         assert_eq!(handle.snapshot().owner_deaths, 0);
         ownership.unlock().unwrap();
-        let completed = tokio::time::timeout(Duration::from_secs(2), &mut pending)
+        // A query already in flight may run to its connect timeout (refused
+        // loopback connects take about 2s on Windows) before the next probe.
+        let completed = tokio::time::timeout(wire::TIMEOUT + PROBE_INTERVAL * 2, &mut pending)
             .await
             .unwrap();
         assert_eq!(completed.cleanup, NativeCleanupState::OwnerDied);
