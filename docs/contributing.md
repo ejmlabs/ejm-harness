@@ -48,7 +48,9 @@ failure stops the gate. Existing dependency trees are reused; rerun the matching
 
 The gate checks crate boundaries and skill references, rustfmt, Clippy, Rust
 tests and builds, rustdoc, unused dependencies, dependency advisories, licenses,
-generated wire types, ESLint, Prettier, TypeScript, Ruff, mypy, and SDK fixtures.
+generated wire types, ESLint, Prettier, TypeScript, Ruff, mypy, ShellCheck, and SDK fixtures.
+The shared strict settings are `eslint.strict.mjs`, `ruff.strict.toml`, `.shellcheckrc`,
+`@tsconfig/strictest` and the workspace Clippy tables. Suppressions name one rule and a reason.
 It does not publish packages or call hosted models. Rust process and compiler
 jobs are capped at two by the repository configuration.
 

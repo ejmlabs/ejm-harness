@@ -31,7 +31,7 @@ fi
 npm run check
 uv run --project sdk/python --group dev --locked ruff check .
 uv run --project sdk/python --group dev --locked ruff format --check .
-uv run --project sdk/python --group dev --locked mypy --strict scripts
-uv run --project sdk/python --group dev --locked mypy --config-file sdk/python/pyproject.toml sdk/python/ejm_harness
+uv run --project sdk/python --group dev --locked mypy --config-file sdk/python/pyproject.toml scripts crates/ejm-harness-packages/runtime registry/tests examples sdk/python/ejm_harness sdk/python/tests
+uv run --project sdk/python --group dev --locked shellcheck scripts/check scripts/check-registry scripts/install-hooks scripts/*.sh
 uv run --project sdk/python --group dev --locked python -m unittest discover -s sdk/python/tests
 uv build --project sdk/python --no-sources --out-dir dist/python

@@ -10,11 +10,11 @@ export const atomicDeviceConsent: BetterAuthPlugin = {
     ): Promise<T | null> => {
       if (
         data.model !== "deviceCode" ||
-        (data.update.status !== "approved" && data.update.status !== "denied")
+        (data.update["status"] !== "approved" && data.update["status"] !== "denied")
       ) {
         return adapter.update<T>(data);
       }
-      const userId: unknown = data.update.userId;
+      const userId: unknown = data.update["userId"];
       if (typeof userId !== "string") {
         throw new APIError("BAD_REQUEST", { error: "invalid_request" });
       }

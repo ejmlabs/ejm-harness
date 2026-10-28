@@ -1,0 +1,5 @@
+# Shared strict shell lint layer. Synced from ejmlabs/.github templates/lint; edit it there.
+enable=all
+# Braces around every variable are style only.
+disable=SC2250
+external-sources=true

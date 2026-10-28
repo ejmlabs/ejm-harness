@@ -124,7 +124,7 @@ class Client:
         return value
 
     def load(self, request_id: str = "load", **overrides: object) -> dict[str, Any]:
-        params = {
+        params: dict[str, object] = {
             "package_id": "fixture",
             "root": str(self.root),
             "entry": self.entry,
@@ -247,6 +247,20 @@ class HostTests(unittest.TestCase):
                     self.assertIn("error", client.load(entry="escape"))
                 finally:
                     client.close()
+
+    def test_python_host_exits_when_input_is_closed(self) -> None:
+        launcher = (
+            "import runpy, sys; sys.stdin.close(); "
+            f"runpy.run_path({str(RUNTIME / 'python.py')!r}, run_name='__main__')"
+        )
+        result = subprocess.run(
+            [sys.executable, "-I", "-B", "-c", launcher],
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(b"closed file", result.stderr)
 
     def test_shutdown_exits_with_stdin_pipe_owner_alive(self) -> None:
         for language in self.languages():

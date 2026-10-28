@@ -1,6 +1,4 @@
+extend = "ruff.strict.toml"
 target-version = "py311"
 line-length = 100
 exclude = ["target", "node_modules", ".venv", "sdk/python/ejm_harness/protocol.py", ".github/review-context", "review/dependency-sources/ejm-ui"]
-
-[lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "RUF", "ANN"]

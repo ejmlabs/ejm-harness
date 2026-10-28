@@ -1,0 +1,23 @@
+# Shared strict Python lint layer. Synced from ejmlabs/.github templates/lint; edit it there.
+# A repository's own ruff.toml or [tool.ruff] sets `extend = "ruff.strict.toml"`, its
+# target-version and its excludes, and may add rules but not remove them.
+[lint]
+select = ["ALL"]
+ignore = [
+  "D", "CPY",                   # docstring and copyright policy, not defects
+  "COM812", "ISC001", "E501",   # owned by the formatter
+  "T20",                        # command-line tools print by design
+  "EM", "TRY003",               # exception message style
+  "PT009", "PT027",             # unittest assertions are allowed
+  "INP001",                     # script folders are not packages
+  "S603", "S607",               # every subprocess call; the inputs are reviewed instead
+  "PLC0415",                    # deliberate lazy imports
+  "FBT003",                     # boolean arguments to third-party calls
+  "C90", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917", "PLR2004",  # size and magic-number thresholds
+  "TC",                         # import placement; unsafe with runtime-evaluated annotations
+]
+
+[lint.per-file-ignores]
+"**/{tests,test}/**" = ["S101", "SLF001", "ANN401"]
+"**/test_*.py" = ["S101", "SLF001", "ANN401"]
+"**/*_test.py" = ["S101", "SLF001", "ANN401"]

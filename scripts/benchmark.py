@@ -42,7 +42,7 @@ def process_memory(pid: int) -> tuple[int, int]:
     )
 
 
-def measure_workload(binary: Path, agents: int, parked: bool) -> dict[str, Any]:
+def measure_workload(binary: Path, agents: int, *, parked: bool) -> dict[str, Any]:
     command = [str(binary), "--agents", str(agents), "--rounds", "3", "--park-ms", "1000"]
     if parked:
         command.append("--parked")
@@ -103,7 +103,7 @@ def first_paint(binary: Path, state: Path) -> float:
         stdout=slave,
         stderr=slave,
         env=environment,
-        preexec_fn=controlling_terminal,
+        preexec_fn=controlling_terminal,  # noqa: PLW1509 -- single-threaded here; no Popen argument sets the controlling terminal
     )
     output = bytearray()
     try:
@@ -191,7 +191,7 @@ def main() -> None:
             "ejm_harness_bench": hashlib.file_digest(binary.open("rb"), "sha256").hexdigest(),
             "ejm_cli": hashlib.file_digest(cli.open("rb"), "sha256").hexdigest(),
         },
-        "workloads": [measure_workload(binary, args.agents, mode) for mode in (True, False)],
+        "workloads": [measure_workload(binary, args.agents, parked=mode) for mode in (True, False)],
         "cli_startup": startup(cli, args.iterations),
         "limits": [
             "Deterministic provider fixtures, not hosted API latency or coding quality.",

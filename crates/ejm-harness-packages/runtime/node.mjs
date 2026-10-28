@@ -13,8 +13,11 @@ const MAX_LOADS = 512;
 const MAX_PENDING_BYTES = 2 * MAX_FRAME;
 const protocolWrite = process.stdout.write.bind(process.stdout);
 process.stdout.write = process.stderr.write.bind(process.stderr);
-process.stdout.on("error", () => {});
-process.stderr.on("error", () => {});
+const ignoreBrokenPipe = () => {
+  // The parent closed the pipe; the exit path reports the failure.
+};
+process.stdout.on("error", ignoreBrokenPipe);
+process.stderr.on("error", ignoreBrokenPipe);
 
 // Only this writer retains protocol stdout. Native extensions are trusted code.
 class Output {
