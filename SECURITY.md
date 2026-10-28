@@ -6,7 +6,15 @@ The latest published patch of each documented supported minor line receives secu
 
 ## Report a vulnerability privately
 
-Use [GitHub private vulnerability reporting](https://github.com/ejmlabs/ejm-harness/security/advisories/new). Do not put exploit details, credentials, or personal data in public issues or PRs. If this channel is unavailable, contact a repository maintainer through the contact method on their GitHub profile and ask for a private channel before sending details.
+Use GitHub private vulnerability reporting for the affected repository:
+
+- [ejm-cli](https://github.com/ejmlabs/ejm-cli/security/advisories/new)
+- [ejm-harness](https://github.com/ejmlabs/ejm-harness/security/advisories/new)
+- [ejm-ide](https://github.com/ejmlabs/ejm-ide/security/advisories/new)
+- [ejm-ui](https://github.com/ejmlabs/ejm-ui/security/advisories/new)
+- [ejmlabs](https://github.com/ejmlabs/ejmlabs/security/advisories/new)
+
+Do not put exploit details, credentials, or personal data in public issues, pull requests, or the public `.github` repository. For a report about the shared `.github` repository, or if the channels above are unavailable, contact a repository maintainer through the contact method on their GitHub profile and ask for a private channel before sending details.
 
 Include the affected revision/version, scope, prerequisites, reproducible steps, impact, and a suggested fix if you have one. Use synthetic data. We aim to acknowledge a report within five business days and agree on a fix and disclosure plan; this is a target, not a guaranteed service level. We do not offer a paid bounty unless one is separately announced.
 
