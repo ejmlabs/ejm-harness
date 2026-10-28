@@ -90,42 +90,50 @@ fn main() -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
+async fn relative_cwd_client(args: &[std::ffi::OsString]) -> Result<()> {
+    let root = PathBuf::from(args.get(1).context("missing shared root")?);
+    let expected_pid = args
+        .get(2)
+        .context("missing owner PID")?
+        .to_string_lossy()
+        .parse::<u32>()?;
+    let owner = NativeOwner::new(root, "fixture")?;
+    echo(Some(&owner), Path::new(".")).await?;
+    ensure!(
+        owner.snapshot().owner_pid == Some(expected_pid),
+        "relative cwd fixture did not share the original helper"
+    );
+    Ok(())
+}
+
+async fn relative_cwd() -> Result<()> {
+    let temp = tempfile::tempdir()?;
+    let base = temp.path().canonicalize()?;
+    let root = base.join("state");
+    let second = base.join("second-caller");
+    std::fs::create_dir(&second)?;
+    let owner = NativeOwner::new(&root, "fixture")?;
+    let ready = owner.ready().await?;
+    let pid = owner.snapshot().owner_pid.context("missing owner PID")?;
+    let status = tokio::process::Command::new(std::env::current_exe()?)
+        .arg("relative-cwd-client")
+        .arg(root)
+        .arg(pid.to_string())
+        .current_dir(second)
+        .status()
+        .await?;
+    ensure!(status.success(), "relative caller cwd was not preserved");
+    drop(ready);
+    println!("relative caller cwd preserved through shared helper");
+    Ok(())
+}
+
 async fn run(args: &[std::ffi::OsString]) -> Result<()> {
     if args.first().is_some_and(|arg| arg == "relative-cwd-client") {
-        let root = PathBuf::from(args.get(1).context("missing shared root")?);
-        let expected_pid = args
-            .get(2)
-            .context("missing owner PID")?
-            .to_string_lossy()
-            .parse::<u32>()?;
-        let owner = NativeOwner::new(root, "fixture")?;
-        echo(Some(&owner), Path::new(".")).await?;
-        ensure!(
-            owner.snapshot().owner_pid == Some(expected_pid),
-            "relative cwd fixture did not share the original helper"
-        );
-        return Ok(());
+        return relative_cwd_client(args).await;
     }
     if args.first().is_some_and(|arg| arg == "relative-cwd") {
-        let temp = tempfile::tempdir()?;
-        let base = temp.path().canonicalize()?;
-        let root = base.join("state");
-        let second = base.join("second-caller");
-        std::fs::create_dir(&second)?;
-        let owner = NativeOwner::new(&root, "fixture")?;
-        let ready = owner.ready().await?;
-        let pid = owner.snapshot().owner_pid.context("missing owner PID")?;
-        let status = tokio::process::Command::new(std::env::current_exe()?)
-            .arg("relative-cwd-client")
-            .arg(root)
-            .arg(pid.to_string())
-            .current_dir(second)
-            .status()
-            .await?;
-        ensure!(status.success(), "relative caller cwd was not preserved");
-        drop(ready);
-        println!("relative caller cwd preserved through shared helper");
-        return Ok(());
+        return relative_cwd().await;
     }
     #[cfg(unix)]
     if args

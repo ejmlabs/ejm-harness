@@ -557,12 +557,12 @@ pub async fn spawn(command: NativeCommand, owner: Option<&NativeOwner>) -> Resul
     }
     command.validate()?;
     let child = crate::process::spawn_owned(command.local_command())?;
-    Ok(NativeChild::Local(child))
+    Ok(NativeChild::Local(Box::new(child)))
 }
 
 /// Native ownership that survives caller-future cancellation in its supervisor.
 pub enum NativeChild {
-    Local(OwnedChild),
+    Local(Box<OwnedChild>),
     #[doc(hidden)]
     Remote(RemoteChild),
 }
