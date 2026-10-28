@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 use super::{
     AuthEngine, DYNAMIC_CLIENT,
     accounts::{ensure_issued, registration_index},
-    locked, timestamp,
+    lock, timestamp,
 };
 use crate::{SecretString, StoredAuth};
 
@@ -103,9 +103,9 @@ pub(super) struct AttemptGuard {
 
 impl Drop for AttemptGuard {
     fn drop(&mut self) {
-        let mut attempts = locked(&self.engine.inner.attempts);
+        let mut attempts = lock(&self.engine.inner.attempts);
         let retrying = attempts.get(&self.id).is_some_and(|attempt| {
-            !attempt.cancel.is_cancelled() && locked(&attempt.retry).is_some()
+            !attempt.cancel.is_cancelled() && lock(&attempt.retry).is_some()
         });
         if !retrying && let Some(attempt) = attempts.remove(&self.id) {
             attempt.cancel.cancel();
@@ -123,7 +123,7 @@ impl AuthEngine {
         let now = timestamp();
         let expires_at = now.saturating_add(ATTEMPT_SECONDS);
         let id = uuid::Uuid::new_v4().to_string();
-        let mut attempts = locked(&self.inner.attempts);
+        let mut attempts = lock(&self.inner.attempts);
         attempts.retain(|_, attempt| {
             let live = attempt.is_live_at(now);
             if !live {
@@ -150,7 +150,7 @@ impl AuthEngine {
     /// Cancel a pending or exchanging sign-in attempt.
     #[must_use]
     pub fn cancel(&self, attempt_id: &str) -> bool {
-        let Some(attempt) = locked(&self.inner.attempts).remove(attempt_id) else {
+        let Some(attempt) = lock(&self.inner.attempts).remove(attempt_id) else {
             return false;
         };
         attempt.cancel.cancel();

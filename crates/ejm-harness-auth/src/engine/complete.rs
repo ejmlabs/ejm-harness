@@ -13,7 +13,7 @@ use super::{
     callback::{Callback, parse_callback},
     discovery::Discovery,
     http::HttpResponse,
-    locked, timestamp,
+    lock, timestamp,
     token::TokenResponse,
 };
 use crate::{
@@ -32,7 +32,7 @@ impl AuthEngine {
         callback_uri: &str,
         cancel: CancellationToken,
     ) -> Result<RegistrationStatus> {
-        let attempt = locked(&self.inner.attempts)
+        let attempt = lock(&self.inner.attempts)
             .get(attempt_id)
             .cloned()
             .context("unknown or completed sign-in attempt")?;
@@ -40,7 +40,7 @@ impl AuthEngine {
             attempt.is_live_at(timestamp()),
             "sign-in attempt expired or cancelled"
         );
-        let pending = locked(&attempt.secrets)
+        let pending = lock(&attempt.secrets)
             .take()
             .context("sign-in callback was already consumed")?;
         let _guard = AttemptGuard {
@@ -142,7 +142,7 @@ impl AuthEngine {
         stored: &StoredAuth,
     ) -> Result<()> {
         // Share cancellation's lock so saving and cancellation have a defined order.
-        let attempts = locked(&self.inner.attempts);
+        let attempts = lock(&self.inner.attempts);
         ensure!(
             attempts
                 .get(id)
@@ -177,7 +177,7 @@ fn rejected_exchange(
     if cancel.is_cancelled() || attempt.cancel.is_cancelled() {
         return anyhow::anyhow!("sign-in cancelled");
     }
-    *locked(&attempt.retry) = Some(RetryHint {
+    *lock(&attempt.retry) = Some(RetryHint {
         client_id,
         registration_id: pending.registration_id,
         expected_subject: pending.expected_subject,

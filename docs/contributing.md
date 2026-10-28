@@ -190,6 +190,35 @@ Extend the existing driver through `Provider`, `Tool`, `ContextPolicy`, and
 Keep terminal rendering, input, account UX, and product integrations in hosts.
 Do not import frontend code into the engine or execution crates.
 
+### Code layout
+
+Follow the existing pattern for a problem, or add one here before you use it, so
+every crate reads the same way. A refactor freezes behavior: messages, check
+order, bounds, wire and persisted formats, and public paths stay as they were.
+
+| Item             | Pattern                                                                                                                                                                           |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Module layout    | A `foo.rs` root with a `foo/` folder of submodules. Never `mod.rs`.                                                                                                               |
+| Module root      | `mod` lines, `use` imports, `pub use` re-exports of the public API, then shared constants and small helpers. Keep it short.                                                       |
+| Imports          | Explicit names. Clippy pedantic denies glob imports outside test modules.                                                                                                         |
+| Visibility       | `pub(super)` for what siblings need, `pub(crate)` across the crate. A split never widens the public API.                                                                          |
+| Moved code       | The original module re-exports what moved, so callers and hosts keep their paths. `sdk/typescript/src/index.ts` and `ejm_harness/client.py` stay as thin roots over the SDKs.     |
+| Large types      | One `impl` may span submodules, one per flow, as `Harness` does in `engine/`, `Store` in `store/`, and `AuthEngine` in the auth `engine/`.                                        |
+| Unit tests       | Inline `#[cfg(test)] mod tests` in a single-file module. A folder module may hold large tests in `<module>/tests.rs`. Existing test files keep their paths, since docs cite them. |
+| Modes and limits | An enum instead of a boolean mode flag, such as `Edit::{Write, Patch}`. A repeated limit, timeout, or file name becomes a named constant.                                         |
+| Poisoned mutexes | A crate-private `lock` helper recovers the data, as in the governor, the package runtime, and the auth engine.                                                                    |
+
+Reuse these instead of writing another copy:
+
+| Helper                                 | Use                                                                             |
+| -------------------------------------- | ------------------------------------------------------------------------------- |
+| `provider::cancellable`                | Await a future unless cancellation fires first. Cancellation wins a tie.        |
+| `provider::http::open_stream`          | Connect, check the status, and open a bounded SSE stream for an HTTP provider.  |
+| `http::{client_builder, bounded_body}` | The packages crate's no-redirect, timed HTTP client and capped response reader. |
+| `store::wire::BoundedJson`             | Serialize auth JSON into a buffer with a byte limit and a fixed error message.  |
+| `BoundedLines` in `ejm-harness-coding` | Shared output budget for listing and search results.                            |
+| `CancellationToken::drop_guard`        | Cancel a token when a scope ends, instead of a hand-written drop type.          |
+
 ## Strict code policy
 
 Workspace Clippy `all` and `pedantic` groups are denied. Production
@@ -273,6 +302,7 @@ exceptions. Review still supplies the judgment that these checks cannot encode.
 | 2026-10-18: atomic device consent        | Concurrent approval and denial must preserve the first owner decision                                         | [Real Better Auth race regression](../registry/README.md#authentication-sessions-and-browser-safety)                                                                                                                                                |
 | 2026-10-20: independent package identity | Use `ejm.package.json`, remove the registry default, and require an explicit client only for registry sources | [Package contract](packages.md), archive/source fixtures, SDK fixtures, and the [curation record](../openspec/changes/archive/2026-10-20-separate-project-scope/public-curation.md) state the breaking format, origin isolation and release limits. |
 | 2026-10-20: HTTPS provider endpoints     | A provider API key must not leave over cleartext to a non-loopback host or a proxy                            | Endpoint tests reject private addresses; loopback HTTP bypasses `HTTP_PROXY` and `ALL_PROXY`                                                                                                                                                        |
+| 2026-10-28: one code layout              | One pattern per problem keeps splits, reviews, and host paths predictable                                     | [Code layout](#code-layout) patterns and shared helpers; review checks new code against them                                                                                                                                                        |
 
 For a new decision, add a dated row with the changed contract and a link to its
 test or recorded measurement. Update an existing row when it is superseded.

@@ -15,7 +15,7 @@ the full gate.
 | --------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | Engine runs, hooks, recovery, providers | `crates/ejm-harness/tests`                       | `cargo test -p ejm-harness`                                                                        |
 | Admission and supervision               | `crates/ejm-harness-exec/tests`                  | `cargo test -p ejm-harness-exec`                                                                   |
-| Coding tools                            | inline in `crates/ejm-harness-coding/src/lib.rs` | `cargo test -p ejm-harness-coding`                                                                 |
+| Coding tools                            | `crates/ejm-harness-coding/src` tool modules     | `cargo test -p ejm-harness-coding`                                                                 |
 | Package install, registry client, hosts | `crates/ejm-harness-packages/tests`              | `cargo test -p ejm-harness-packages`                                                               |
 | Manifest and archive validation         | `crates/ejm-harness-package-spec/tests`          | `cargo test -p ejm-harness-package-spec`                                                           |
 | Credential store and renewal            | inline in `crates/ejm-harness-auth/src/tests.rs` | `cargo test -p ejm-harness-auth`                                                                   |
