@@ -103,7 +103,7 @@ One UTF-8 JSON object per line. Maximum inbound frame 1 MiB. Stdout is protocol 
 
 Client request: `{id: string, method: string, params: object}`. Response: `{id, result: value}` or `{id, error: {code: string, message: string}}`.
 
-Handshake first: `hello {protocol: 1}` -> `{protocol: 1, version: "0.1.0", capabilities: ["tools", "cancel", "steer", "queue", "replay"]}`.
+Handshake first: `hello {protocol: 1}` -> `{protocol: 1, version: "0.1.1", capabilities: ["tools", "cancel", "steer", "queue", "replay"]}`.
 
 `configure {state_dir?, provider?: ProviderConfig, tools?: ToolDefinition[], allow_write?: bool, allow_shell?: bool, resources?: ResourceLimits, max_sessions?, max_model_requests?, max_steps?, context_max_bytes?, run_timeout_ms?, max_repeated_calls?, max_input_tokens?, max_output_tokens?, max_store_bytes?, system_prompt?}` -> `{configured: true}`. Exactly once before sessions. Default uses echo and read tools. Never log api_key. Worker registers callbacks as Rust Tool implementations.
 

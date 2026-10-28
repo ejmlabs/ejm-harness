@@ -4,6 +4,22 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-26
+
+First public release of the worker and SDK sources. The `0.1.0` source notes below
+stay as written. Nothing is signed or notarized, and no package is published by
+these notes; see [RELEASING.md](RELEASING.md) and the known limits under
+"Verification and limits" in the `0.1.0` section.
+
+### Added
+
+- A read-only CI workflow that builds and smoke-tests the `ejm-harness-worker`
+  archive for Linux x86_64 and builds the TypeScript and Python SDK packages, each
+  with SHA-256 values. A macOS Apple silicon build runs for evidence only; no
+  macOS file is offered until it is notarized. The Linux archive is not signed or
+  notarized, and its glibc baseline is recorded in the release notes after a hosted
+  build. Registry publication of the SDKs is not set up yet.
+
 ### Changed
 
 - **Breaking:** packages require `ejm.package.json` with no legacy alias. Rename
@@ -19,6 +35,10 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ### Security
 
+- Override the registry's transitive undici to 7.30.1 (development and test
+  tooling) and zod to 4.6.7 (also used by the auth worker through better-auth)
+  for GHSA-4qv8-2p9j-2685, GHSA-f72v-6w45-q472, GHSA-xjj6-f33q-929c and
+  GHSA-mrhx-c7xc-m3w5. No package, worker or site is published.
 - Update the locked TLS dependencies to rustls-webpki 0.103.16 and
   webpki-root-certs 1.0.10 for RUSTSEC-2026-0382 and RUSTSEC-2026-0383.
   Source builds use the corrected certificate trust data. Public APIs and the

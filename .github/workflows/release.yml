@@ -1,4 +1,4 @@
-name: Draft source release
+name: Draft native release
 on:
   workflow_dispatch:
     inputs:
@@ -10,15 +10,47 @@ on:
         description: SemVer version matching VERSION
         required: true
         type: string
+      build-run-id:
+        description: Run id of the successful Build workflow for that commit
+        required: true
+        type: string
+      attest:
+        description: Attest build provenance
+        required: false
+        default: false
+        type: boolean
 permissions: {}
 jobs:
+  verify:
+    permissions:
+      actions: read
+    uses: ejmlabs/.github/.github/workflows/verify-build.yml@451ef7d1ef46373b6018a1fbcacc331e15e1d093
+    with:
+      commit: ${{ inputs.commit }}
+      build-workflow: build.yml
+      build-run-id: ${{ inputs.build-run-id }}
   release:
+    needs: verify
     permissions:
       contents: write
       pull-requests: read
       statuses: read
-    uses: ejmlabs/.github/.github/workflows/draft-release.yml@8e3e8375ab55a9582857ccc30c79276d821d00ca
+    uses: ejmlabs/.github/.github/workflows/draft-release.yml@451ef7d1ef46373b6018a1fbcacc331e15e1d093
     with:
       commit: ${{ inputs.commit }}
       version: ${{ inputs.version }}
-      standards-ref: "8e3e8375ab55a9582857ccc30c79276d821d00ca"
+      standards-ref: "451ef7d1ef46373b6018a1fbcacc331e15e1d093"
+  attach:
+    needs: release
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+      attestations: write
+    uses: ejmlabs/.github/.github/workflows/attach-assets.yml@451ef7d1ef46373b6018a1fbcacc331e15e1d093
+    with:
+      commit: ${{ inputs.commit }}
+      version: ${{ inputs.version }}
+      build-workflow: build.yml
+      build-run-id: ${{ inputs.build-run-id }}
+      attest: ${{ inputs.attest }}
