@@ -589,6 +589,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-util",
+ "url",
  "uuid",
  "wiremock",
 ]
@@ -751,6 +752,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "uuid",
+ "wiremock",
 ]
 
 [[package]]
