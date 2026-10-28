@@ -26,6 +26,12 @@ after resolution through the workspace capability. Ordinary workspace aliases
 remain readable. Edits retain their stricter rule rejecting symbolic links.
 These path controls do not sandbox shell commands or trusted extension code.
 
+Search reports an incomplete result when it encounters a directory at its
+32-level depth boundary or consumes its 8 MiB scan budget, even on the final
+entry. These notices are conservative: an empty boundary directory or an exact
+byte fit can still be reported as incomplete. Narrow the search path to inspect
+content beyond either limit.
+
 The journal retains full bounded messages. Context preparation changes only the
 request copy. Loading history has separate byte and row limits. A page that ends
 inside an exchange drops that partial older exchange, fetches the original user
