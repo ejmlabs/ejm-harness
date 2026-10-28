@@ -17,6 +17,7 @@ use sha2::{Digest, Sha256};
 
 const MAX_FILE_BYTES: u64 = 1024 * 1024;
 const MAX_SEARCH_BYTES: usize = 8 * 1024 * 1024;
+const MAX_SEARCH_DEPTH: usize = 32;
 const MAX_RETRIEVAL_BYTES: usize = 14 * 1024;
 
 #[derive(Clone)]
@@ -90,7 +91,7 @@ impl Tool for NativeTool {
             ),
             Kind::Search => (
                 "search",
-                "Search a Rust regular expression in text files. Respects gitignore; bounded to 100 hits, 20000 entries, 8 MiB read and 14 KiB of match text. Skips non-UTF-8 files and files over 256 KiB. Reports incomplete results; narrow path or pattern.",
+                "Search a Rust regular expression in text files. Respects gitignore; bounded to 32 levels, 100 hits, 20000 entries, 8 MiB read and 14 KiB of match text. Skips non-UTF-8 files and files over 256 KiB. Reports incomplete results; narrow path or pattern.",
                 json!({"pattern":{"type":"string","maxLength":1024},"path":{"type":"string"},"limit":{"type":"integer","minimum":1,"maximum":100}}),
                 vec!["pattern"],
                 Effect::Read,
@@ -297,7 +298,7 @@ fn search(
     ensure!(resolved.starts_with(cwd), "search path escapes workspace");
     let walker = ignore::WalkBuilder::new(start)
         .follow_links(false)
-        .max_depth(Some(32))
+        .max_depth(Some(MAX_SEARCH_DEPTH))
         .build();
     let mut bytes_read = 0;
     let mut visited = 0;
@@ -320,11 +321,14 @@ fn search(
             skipped += 1;
             continue;
         };
-        if !entry.file_type().is_some_and(|t| t.is_file()) {
-            continue;
-        }
         let relative = entry.path().strip_prefix(cwd)?;
         if protected_path(relative) {
+            continue;
+        }
+        if entry.file_type().is_some_and(|t| t.is_dir()) && entry.depth() == MAX_SEARCH_DEPTH {
+            limit_reached.get_or_insert("32-level depth limit");
+        }
+        if !entry.file_type().is_some_and(|t| t.is_file()) {
             continue;
         }
         let Ok(resolved) = resolve_read_path(root, relative) else {
@@ -343,6 +347,9 @@ fn search(
         file.take((256 * 1024 + 1).min(MAX_SEARCH_BYTES - bytes_read) as u64)
             .read_to_end(&mut bytes)?;
         bytes_read += bytes.len();
+        if bytes_read == MAX_SEARCH_BYTES {
+            limit_reached = Some("8 MiB scan limit");
+        }
         let Ok(text) = std::str::from_utf8(&bytes) else {
             skipped += 1;
             continue;
@@ -788,6 +795,55 @@ mod tests {
         assert_eq!(output.data["skipped"], 0);
         assert_eq!(output.data["truncated"], false);
         assert!(!output.is_error);
+        Ok(())
+    }
+
+    #[test]
+    fn search_reports_depth_boundary_and_can_search_a_narrower_path() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let mut deep = temp.path().to_path_buf();
+        for _ in 0..32 {
+            deep.push("d");
+        }
+        std::fs::create_dir_all(&deep)?;
+        std::fs::write(deep.join("sample"), "needle\n")?;
+        let cwd = std::fs::canonicalize(temp.path())?;
+        let root = Dir::open_ambient_dir(&cwd, ambient_authority())?;
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let output = search(&root, &cwd, &json!({"pattern":"needle"}), &cancel)?;
+        assert_eq!(output.data["matches"], 0);
+        assert_eq!(output.data["truncated"], true);
+        assert!(output.content.contains("32-level depth limit"));
+
+        let output = search(
+            &root,
+            &cwd,
+            &json!({"pattern":"needle","path":"d"}),
+            &cancel,
+        )?;
+        assert_eq!(output.data["matches"], 1);
+        assert_eq!(output.data["truncated"], false);
+        Ok(())
+    }
+
+    #[test]
+    fn search_reports_byte_limit_reached_in_the_final_file() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let bytes = vec![b'x'; 254 * 1024];
+        for index in 0..33 {
+            std::fs::write(temp.path().join(format!("sample-{index}")), &bytes)?;
+        }
+        let cwd = std::fs::canonicalize(temp.path())?;
+        let root = Dir::open_ambient_dir(&cwd, ambient_authority())?;
+        let output = search(
+            &root,
+            &cwd,
+            &json!({"pattern":"needle"}),
+            &tokio_util::sync::CancellationToken::new(),
+        )?;
+        assert_eq!(output.data["bytes_read"], json!(MAX_SEARCH_BYTES));
+        assert_eq!(output.data["truncated"], true);
+        assert!(output.content.contains("8 MiB scan limit"));
         Ok(())
     }
 
