@@ -82,9 +82,8 @@ impl PackageManager {
     /// Rejects invalid, oversized, duplicate, or tampered records.
     pub fn list(&self) -> Result<Vec<PackageRecord>> {
         #[cfg(windows)]
-        let bytes = match self.native.read_records(MAX_LOCK_BYTES)? {
-            Some(bytes) => bytes,
-            None => return Ok(Vec::new()),
+        let Some(bytes) = self.native.read_records(MAX_LOCK_BYTES)? else {
+            return Ok(Vec::new());
         };
         #[cfg(not(windows))]
         let bytes = {
