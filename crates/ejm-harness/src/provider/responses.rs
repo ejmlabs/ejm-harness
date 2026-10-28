@@ -73,6 +73,7 @@ impl ResponsesProvider {
     }
 
     /// Use a loopback HTTP fixture without exposing credentials to arbitrary hosts.
+    /// The fixture URL is not `https`, so its client uses no proxy.
     ///
     /// # Errors
     /// Rejects any destination other than an HTTP loopback address, an invalid
@@ -107,7 +108,7 @@ impl ResponsesProvider {
         Ok(Self {
             config,
             credentials,
-            client: http_client()?,
+            client: http_client(&base_url)?,
             base_url,
             observer: None,
         })
@@ -222,7 +223,13 @@ impl ResponsesProvider {
         credentials: Arc<dyn CredentialSource>,
         cancel: CancellationToken,
     ) -> Result<Vec<AvailableModel>> {
-        catalog(&http_client()?, credentials.as_ref(), OPENAI_BASE, &cancel).await
+        catalog(
+            &http_client(OPENAI_BASE)?,
+            credentials.as_ref(),
+            OPENAI_BASE,
+            &cancel,
+        )
+        .await
     }
 
     /// Fetch the selected account's catalog, preserving its ordering.

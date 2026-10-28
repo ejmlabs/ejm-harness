@@ -94,6 +94,16 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
   Windows Job ownership keep their existing behavior.
 - Preserve original document and license bytes, including CRLF line endings,
   when validating source archives.
+- Provider base URLs require `https`. Plain `http` is accepted only for exact
+  `localhost`, an IPv4 address in `127.0.0.0/8`, or `::1`. `0.0.0.0`, LAN
+  addresses, and other private addresses are rejected when the provider is
+  constructed, before a connection or an API key is sent. The error does not
+  include the API key. There is no opt-out. Worker protocol 1 and the generated
+  schema are unchanged. Plain `http` loopback requests do not use `HTTP_PROXY`
+  or `ALL_PROXY`. `https` still uses the process proxy. `VERSION` stays `0.1.0`.
+  Everett recreates the
+  unpublished `v0.1.0` tag at the protected `main` commit after this change
+  and the registry move land.
 
 ### Verification and limits
 
@@ -107,3 +117,6 @@ service. Follow [Releases](RELEASING.md) before creating or publishing artifacts
 - The SDKs require a separately built compatible `ejm-harness-worker`; they do not
   bundle or fetch prebuilt executables. Package registry publication, worker
   distribution and registry deployment each need their own release gates.
+- `v0.1.0` was re-pointed from `8d3dc39` to the protected main commit recorded in provenance.json
+  before publication. Discard archives from the withdrawn draft
+  `untagged-d41ae33f280d24c8daa7`.

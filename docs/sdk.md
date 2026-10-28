@@ -35,6 +35,8 @@ Both SDKs accept the same `provider` configuration:
 
 `responses` uses `https://api.openai.com/v1` with `store: false` and streaming enabled. It retains bounded encrypted reasoning between tool turns. `anthropic` uses `https://api.anthropic.com/v1`. These two variants have fixed endpoints and use API keys. The worker does not provide subscription sign-in UI.
 
+An `openai` `base_url` must use `https`, or `http` on exact `localhost`, an address in `127.0.0.0/8`, or `::1`. Any other `http` URL, including `0.0.0.0` and LAN or private addresses, fails at configuration with protocol code `configuration`. The error does not include the API key. There is no flag or environment variable that disables the rule. The worker protocol stays at 1 and `base_url` stays a string.
+
 `reasoning_effort` accepts `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`, or `ultra`. A provider or model can support a narrower set. An omitted value uses the provider default. The two native variants reject an empty model, empty or malformed API key, or unknown effort before a request can start. Creating a harness or session does not contact a model provider.
 
 For example, pass this object as `provider` in the TypeScript SDK:
