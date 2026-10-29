@@ -676,12 +676,15 @@ fn unsupported_nested_provider_versions_are_rejected() -> Result<()> {
 async fn native_os_key_service_round_trip() -> Result<()> {
     #[cfg(target_os = "linux")]
     {
-        use std::os::unix::fs::{FileTypeExt, MetadataExt};
+        use std::os::unix::{
+            fs::{FileTypeExt, MetadataExt},
+            net::UnixStream,
+        };
 
         const CHILD: &str = "EJM_AUTH_SECRET_SERVICE_TEST_CHILD";
         if std::env::var_os(CHILD).is_none() {
-            let wrapper = Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../scripts/with-secret-service");
+            let wrapper =
+                Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/with-secret-service");
             let output = std::process::Command::new(wrapper)
                 .arg(std::env::current_exe()?)
                 .args([
@@ -702,14 +705,24 @@ async fn native_os_key_service_round_trip() -> Result<()> {
             return Ok(());
         }
 
+        let wrapper_pid = rustix::process::getppid()
+            .context("missing service wrapper")?
+            .as_raw_pid();
         let runtime = std::env::var_os("XDG_RUNTIME_DIR")
             .context("isolated native key fixture requires a runtime directory")?;
         let runtime = Path::new(&runtime);
-        let service_dir = runtime.parent().context("missing private service directory")?;
+        ensure!(
+            runtime == Path::new(&format!("/proc/{wrapper_pid}/fd/3")),
+            "isolated native key fixture requires its wrapper descriptor"
+        );
+        let runtime_dir = fs::canonicalize(runtime)?;
+        let service_dir = runtime_dir
+            .parent()
+            .context("missing private service directory")?;
         let project = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))?;
         let name = service_dir.file_name().and_then(|name| name.to_str());
         ensure!(
-            runtime.file_name() == Some(std::ffi::OsStr::new("r"))
+            runtime_dir.file_name() == Some(std::ffi::OsStr::new("r"))
                 && service_dir.parent() == Some(project.as_path())
                 && name.is_some_and(|name| {
                     name.strip_prefix(".s.").is_some_and(|suffix| {
@@ -736,7 +749,7 @@ async fn native_os_key_service_round_trip() -> Result<()> {
             data_metadata.is_dir() && data_metadata.uid() == owner,
             "isolated native key fixture requires a private data directory"
         );
-        let metadata = fs::symlink_metadata(runtime)?;
+        let metadata = fs::symlink_metadata(&runtime_dir)?;
         ensure!(
             metadata.is_dir() && metadata.uid() == owner && metadata.mode() & 0o7777 == 0o700,
             "isolated native key fixture requires a private runtime directory"
@@ -748,10 +761,55 @@ async fn native_os_key_service_round_trip() -> Result<()> {
                 == Some(std::ffi::OsStr::new(&expected)),
             "isolated native key fixture requires its private bus"
         );
-        let metadata = fs::symlink_metadata(socket)?;
+        let metadata = fs::symlink_metadata(&socket)?;
         ensure!(
             metadata.file_type().is_socket() && metadata.uid() == owner,
             "isolated native key fixture requires its private bus socket"
+        );
+        let bus_pid: i32 = std::env::var("EJM_TEST_SECRET_BUS_PID")?.parse()?;
+        let service_pid: i32 = std::env::var("EJM_TEST_SECRET_SERVICE_PID")?.parse()?;
+        let connection = UnixStream::connect(&socket)?;
+        let peer = rustix::net::sockopt::socket_peercred(&connection)?;
+        ensure!(
+            peer.pid.as_raw_pid() == bus_pid && peer.uid.as_raw() == owner,
+            "unexpected bus peer"
+        );
+        for (pid, program) in [
+            (bus_pid, "dbus-daemon"),
+            (service_pid, "gnome-keyring-daemon"),
+        ] {
+            let proc_dir = format!("/proc/{pid}");
+            let executable = fs::canonicalize(which::which(program)?)?;
+            let status = fs::read_to_string(format!("{proc_dir}/status"))?;
+            ensure!(
+                fs::read_link(format!("{proc_dir}/exe"))? == executable
+                    && status.lines().any(|line| line
+                        .strip_prefix("PPid:")
+                        .and_then(|value| value.trim().parse::<i32>().ok())
+                        == Some(wrapper_pid)),
+                "unexpected isolated service process"
+            );
+        }
+        let output = std::process::Command::new("gdbus")
+            .args([
+                "call",
+                "--session",
+                "--timeout",
+                "10",
+                "--dest",
+                "org.freedesktop.DBus",
+                "--object-path",
+                "/org/freedesktop/DBus",
+                "--method",
+                "org.freedesktop.DBus.GetConnectionUnixProcessID",
+                "org.freedesktop.secrets",
+            ])
+            .output()?;
+        ensure!(
+            output.status.success()
+                && String::from_utf8_lossy(&output.stdout).trim()
+                    == format!("(uint32 {service_pid},)"),
+            "unexpected Secret Service owner"
         );
     }
     let root = tempfile::tempdir()?;

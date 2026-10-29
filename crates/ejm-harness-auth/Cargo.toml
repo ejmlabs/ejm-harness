@@ -47,7 +47,7 @@ processkit = { version = "=3.3.4", default-features = false, features = ["proces
 dbus-secret-service-keyring-store = { version = "=1.0.1", default-features = false, features = ["crypto-rust"] }
 
 [target.'cfg(unix)'.dependencies]
-rustix = { workspace = true, features = ["process", "fs"] }
+rustix = { workspace = true, features = ["process", "fs", "net"] }
 
 [dev-dependencies]
 wiremock.workspace = true

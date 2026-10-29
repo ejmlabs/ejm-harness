@@ -506,37 +506,20 @@ mod tests {
         let governor = Arc::new(crate::Governor::new(crate::ResourceLimits::default())?);
         *lock(&governor.monitor.violation_witness) = Some(Vec::new());
         let executor = crate::Executor::new(governor.clone(), directory.path().join("artifacts"))?;
-        let current = std::env::current_exe()?;
-        let fixture = current
-            .parent()
-            .and_then(std::path::Path::parent)
-            .context("test executable is outside Cargo's target directory")?
-            .join(format!(
-                "ejm-harness-exec-fixture{}",
-                std::env::consts::EXE_SUFFIX
-            ));
-        let use_fixture = fixture.is_file();
-        let program = if use_fixture { fixture } else { current };
         let mut request = crate::CommandRequest {
-            program: program.to_string_lossy().into_owned(),
+            program: std::env::current_exe()?.to_string_lossy().into_owned(),
             cwd: directory.path().to_owned(),
             timeout_ms: 5_000,
             ..crate::CommandRequest::default()
         };
-        if use_fixture {
-            request
-                .env
-                .insert("EJM_HARNESS_EXEC_FIXTURE".into(), "many-descendants".into());
-        } else {
-            request.args = vec![
-                "--exact".into(),
-                "monitor::tests::observed_process_budget_abuse_is_stopped_and_released".into(),
-                "--nocapture".into(),
-            ];
-            request
-                .env
-                .insert("EJM_TEST_PROCESS_BUDGET_FIXTURE".into(), "spawn".into());
-        }
+        request.args = vec![
+            "--exact".into(),
+            "monitor::tests::observed_process_budget_abuse_is_stopped_and_released".into(),
+            "--nocapture".into(),
+        ];
+        request
+            .env
+            .insert("EJM_TEST_PROCESS_BUDGET_FIXTURE".into(), "spawn".into());
         request.reservation.processes = 5;
         request.reservation.memory_bytes = 256 * 1024 * 1024;
         let error = executor

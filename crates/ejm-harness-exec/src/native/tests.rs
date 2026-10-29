@@ -18,18 +18,9 @@ fn helper_path(variable: &str) -> anyhow::Result<std::path::PathBuf> {
     use anyhow::{Context, ensure};
     use std::os::unix::fs::PermissionsExt;
 
-    let path = match std::env::var_os(variable) {
-        Some(path) => std::path::PathBuf::from(path),
-        None => {
-            let current = std::env::current_exe()?;
-            let fixture = current
-                .parent()
-                .and_then(std::path::Path::parent)
-                .context("test executable is outside Cargo's target directory")?
-                .join("ejm-harness-exec-fixture");
-            if fixture.is_file() { fixture } else { current }
-        }
-    };
+    let path = std::env::var_os(variable)
+        .map(std::path::PathBuf::from)
+        .map_or_else(std::env::current_exe, Ok)?;
     ensure!(path.is_absolute(), "test helper path must be absolute");
     let metadata = path.metadata().context("inspect test helper")?;
     ensure!(
@@ -37,6 +28,41 @@ fn helper_path(variable: &str) -> anyhow::Result<std::path::PathBuf> {
         "test helper must name an executable file"
     );
     path.canonicalize().context("resolve test helper")
+}
+
+#[cfg(unix)]
+#[test]
+fn missing_helper_override_uses_current_test_executable() {
+    use std::os::unix::fs::PermissionsExt;
+
+    const CHILD: &str = "EJM_TEST_HELPER_SELECTION_CHILD";
+    if std::env::var_os(CHILD).is_some() {
+        let current = std::env::current_exe().unwrap().canonicalize().unwrap();
+        assert_eq!(helper_path("EJM_NATIVE_STARTUP_HELPER").unwrap(), current);
+        assert_eq!(helper_path("EJM_NATIVE_OCCUPANCY_HELPER").unwrap(), current);
+        return;
+    }
+    let current = std::env::current_exe().unwrap();
+    let target = current.parent().unwrap().parent().unwrap();
+    let directory = tempfile::Builder::new().tempdir_in(target).unwrap();
+    let deps = directory.path().join("deps");
+    std::fs::create_dir(&deps).unwrap();
+    let copied = deps.join("test-executable");
+    std::fs::hard_link(current, &copied).unwrap();
+    let stale = directory.path().join("ejm-harness-exec-fixture");
+    std::fs::write(&stale, "stale fixture").unwrap();
+    std::fs::set_permissions(&stale, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let status = std::process::Command::new(copied)
+        .args([
+            "--exact",
+            "native::tests::missing_helper_override_uses_current_test_executable",
+        ])
+        .env(CHILD, "1")
+        .env_remove("EJM_NATIVE_STARTUP_HELPER")
+        .env_remove("EJM_NATIVE_OCCUPANCY_HELPER")
+        .status()
+        .unwrap();
+    assert!(status.success());
 }
 
 fn private_tempdir() -> std::io::Result<tempfile::TempDir> {

@@ -12,15 +12,19 @@ env:
 jobs:
   reliability:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 140
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        timeout-minutes: 5
         with:
           persist-credentials: false
       - name: Install native test prerequisites
+        timeout-minutes: 15
         run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends pkg-config libdbus-1-dev dbus-x11 gnome-keyring libglib2.0-bin
       - run: rustup toolchain install 1.99.1 --profile minimal
+        timeout-minutes: 10
       - name: Install verified cargo-nextest
+        timeout-minutes: 5
         shell: bash
         run: |
           set -euo pipefail
@@ -35,6 +39,7 @@ jobs:
           "$bindir/cargo-nextest" --version
           echo "$bindir" >> "$GITHUB_PATH"
       - run: PYTHONPATH=scripts python3 -B -m unittest test_bounded_report test_check_registry test_compare_partial_flakes test_evidence_identity test_flake_check test_nextest_evidence test_registry_rust_compare test_registry_unittest_evidence test_registry_vitest_compare test_secret_service
+        timeout-minutes: 30
       - name: Compare two independent Rust test runs
         id: rust_reliability
         timeout-minutes: 50
@@ -47,6 +52,7 @@ jobs:
         run: python3 -I scripts/compare_partial_flakes.py "$RUNNER_TEMP/harness-flakes"
       - name: Stage bounded reliability reports
         if: always() && !cancelled()
+        timeout-minutes: 3
         shell: bash
         run: |
           set -uo pipefail
@@ -69,6 +75,7 @@ jobs:
           exit "$result"
       - name: Preserve reliability reports
         if: always() && !cancelled()
+        timeout-minutes: 5
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: harness-rust-reliability
@@ -77,12 +84,14 @@ jobs:
           if-no-files-found: warn
   registry-reliability:
     runs-on: ubuntu-24.04
-    timeout-minutes: 80
+    timeout-minutes: 125
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        timeout-minutes: 5
         with:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        timeout-minutes: 10
         with:
           node-version: "24"
       - name: Prepare pinned tools and registry fixtures
@@ -105,9 +114,11 @@ jobs:
           npm --prefix registry run build
       - name: Verify Vitest evidence reporter
         if: always() && !cancelled()
+        timeout-minutes: 10
         run: PYTHONPATH=scripts python3 -B -m unittest test_registry_vitest_reporter
       - name: Prepare evidence directory
         if: always() && !cancelled()
+        timeout-minutes: 1
         run: mkdir -p "$RUNNER_TEMP/registry-flakes"
       - name: Inventory registry Rust tests
         if: always() && !cancelled()
@@ -223,6 +234,7 @@ jobs:
         run: python3 -I scripts/registry_vitest_compare.py "$RUNNER_TEMP/registry-flakes/auth-inventory.json" "$RUNNER_TEMP/registry-flakes/auth-1.json" "$RUNNER_TEMP/registry-flakes/auth-2.json" registry "$RUNNER_TEMP/registry-flakes/auth-summary.json"
       - name: Preserve bounded registry diagnostics
         if: always() && !cancelled()
+        timeout-minutes: 5
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: harness-registry-reliability
