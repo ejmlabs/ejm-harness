@@ -19,11 +19,11 @@ An older compiler is not a supported configuration. Linux builds require `pkg-co
 and D-Bus development headers for the native Secret Service key adapter. On
 Debian/Ubuntu install `pkg-config` and `libdbus-1-dev` before the Cargo gate.
 Many offline fixtures inject key storage, but the workspace tests and required
-gate also run a real native credential-service round trip. They need an unlocked
-Secret Service in a user D-Bus session on Linux, an unlocked default Keychain on
-macOS, or a Windows logon session with Credential Manager available. On Linux,
-`./scripts/check` starts an isolated Secret Service for its workspace test; it
-requires `dbus-run-session`, `gnome-keyring-daemon`, and `gdbus`. An
+gate also run a real native credential-service round trip. They need an
+isolated Secret Service on Linux, an unlocked default Keychain on macOS, or
+a Windows logon session with Credential Manager available. On Linux, the test
+starts its own isolated Secret Service, including for direct Cargo invocations;
+it requires `dbus-daemon`, `gnome-keyring-daemon`, and `gdbus`. An
 unavailable service fails the test; hosted runner availability and ephemeral
 service cleanup remain unverified on each platform. Real persistent use also
 needs the platform credential service. Cargo, npm, and Python development locks

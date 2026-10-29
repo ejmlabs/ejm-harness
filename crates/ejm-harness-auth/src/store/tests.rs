@@ -674,6 +674,86 @@ fn unsupported_nested_provider_versions_are_rejected() -> Result<()> {
 
 #[tokio::test]
 async fn native_os_key_service_round_trip() -> Result<()> {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::{FileTypeExt, MetadataExt};
+
+        const CHILD: &str = "EJM_AUTH_SECRET_SERVICE_TEST_CHILD";
+        if std::env::var_os(CHILD).is_none() {
+            let wrapper = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../scripts/with-secret-service");
+            let output = std::process::Command::new(wrapper)
+                .arg(std::env::current_exe()?)
+                .args([
+                    "--exact",
+                    "store::vault::tests::native_os_key_service_round_trip",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .output()
+                .context("run isolated native key fixture")?;
+            ensure!(
+                output.status.success()
+                    && String::from_utf8_lossy(&output.stdout).contains("1 passed"),
+                "isolated native key fixture failed: {} {}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            return Ok(());
+        }
+
+        let runtime = std::env::var_os("XDG_RUNTIME_DIR")
+            .context("isolated native key fixture requires a runtime directory")?;
+        let runtime = Path::new(&runtime);
+        let service_dir = runtime.parent().context("missing private service directory")?;
+        let project = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))?;
+        let name = service_dir.file_name().and_then(|name| name.to_str());
+        ensure!(
+            runtime.file_name() == Some(std::ffi::OsStr::new("r"))
+                && service_dir.parent() == Some(project.as_path())
+                && name.is_some_and(|name| {
+                    name.strip_prefix(".s.").is_some_and(|suffix| {
+                        suffix.len() == 8 && suffix.bytes().all(|byte| byte.is_ascii_alphanumeric())
+                    })
+                }),
+            "isolated native key fixture requires its wrapper directory"
+        );
+        let service_metadata = fs::symlink_metadata(service_dir)?;
+        let owner = rustix::process::geteuid().as_raw();
+        ensure!(
+            service_metadata.is_dir()
+                && service_metadata.uid() == owner
+                && service_metadata.mode() & 0o7777 == 0o700,
+            "isolated native key fixture requires a private wrapper directory"
+        );
+        ensure!(
+            std::env::var_os("XDG_DATA_HOME").as_deref()
+                == Some(service_dir.join("data").as_os_str()),
+            "isolated native key fixture requires its private data directory"
+        );
+        let data_metadata = fs::symlink_metadata(service_dir.join("data"))?;
+        ensure!(
+            data_metadata.is_dir() && data_metadata.uid() == owner,
+            "isolated native key fixture requires a private data directory"
+        );
+        let metadata = fs::symlink_metadata(runtime)?;
+        ensure!(
+            metadata.is_dir() && metadata.uid() == owner && metadata.mode() & 0o7777 == 0o700,
+            "isolated native key fixture requires a private runtime directory"
+        );
+        let socket = runtime.join("b");
+        let expected = format!("unix:path={}", socket.display());
+        ensure!(
+            std::env::var_os("DBUS_SESSION_BUS_ADDRESS").as_deref()
+                == Some(std::ffi::OsStr::new(&expected)),
+            "isolated native key fixture requires its private bus"
+        );
+        let metadata = fs::symlink_metadata(socket)?;
+        ensure!(
+            metadata.file_type().is_socket() && metadata.uid() == owner,
+            "isolated native key fixture requires its private bus socket"
+        );
+    }
     let root = tempfile::tempdir()?;
     let vault = SecretVault::open(root.path().join("native-key-fixture"))?;
     let identity = match &vault.backend {
