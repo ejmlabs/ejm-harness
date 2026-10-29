@@ -58,6 +58,48 @@ fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
         "hold" => loop {
             std::thread::sleep(Duration::from_secs(1));
         },
+        "hold-report" => {
+            let path = pid_file.ok_or("fixture requires a child PID file")?;
+            std::fs::write(path, format!("{}\n", std::process::id()))?;
+            loop {
+                std::thread::sleep(Duration::from_secs(1));
+            }
+        }
+        "spawn-paused" => {
+            let path = pid_file.ok_or("fixture requires a PID file")?;
+            let directory = path.parent().ok_or("fixture PID file has no parent")?;
+            let mut children = Vec::new();
+            let mut pids = vec![std::process::id()];
+            for index in 0..5 {
+                let child = std::process::Command::new(std::env::current_exe()?)
+                    .env("EJM_HARNESS_EXEC_FIXTURE", "hold-report")
+                    .env(
+                        "EJM_HARNESS_EXEC_PID_FILE",
+                        directory.join(format!("child-{index}")),
+                    )
+                    .spawn()?;
+                if index == 1 {
+                    std::fs::write(
+                        &path,
+                        format!(
+                            "{}\n",
+                            pids.iter()
+                                .map(ToString::to_string)
+                                .collect::<Vec<_>>()
+                                .join(" ")
+                        ),
+                    )?;
+                    while !directory.join("resume").exists() {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                }
+                pids.push(child.id());
+                children.push(child);
+            }
+            for mut child in children {
+                let _ = child.wait();
+            }
+        }
         "descendant" | "orphan" | "many-descendants" => descendants(&mode, pid_file)?,
         _ => std::process::exit(2),
     }

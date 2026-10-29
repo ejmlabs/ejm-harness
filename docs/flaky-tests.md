@@ -47,6 +47,9 @@ failed identities and their counterparts from earlier attempts, then retain
 other identities in deterministic order. A mixed outcome can be unavailable
 if its earlier passing result did not fit. Any omitted identity or truncated
 diagnostic marks the attempt incomplete.
+Worker and JUnit reports retain bounded first failure diagnostics separately
+from ambiguous identities, which remain ineligible for mixed-outcome comparison.
+Worker diagnostics also include suite and module setup errors.
 Duplicate tracking uses exact identities up to its bound and then a fixed-size
 probabilistic filter. A collision can exclude an unrelated identity; it marks
 evidence incomplete and does not report that identity as a comparable result.

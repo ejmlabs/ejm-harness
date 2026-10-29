@@ -7,11 +7,69 @@ import sys
 import tempfile
 import time
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
 
 
 class BoundedReportTests(unittest.TestCase):
+    def test_junit_diagnostic_fits_small_bounds_and_retains_tail(self) -> None:
+        from junit_stream import JunitRecords
+
+        report = (b'<testsuites><testsuite name="suite"><testcase classname="suite" name="case">'
+                  + b'<failure>' + b'x' * 20000 + b'TAIL</failure></testcase></testsuite></testsuites>')
+        for limit in (64, 128, 512):
+            collector = JunitRecords(limit, None)
+            collector.add(report)
+            output = collector.finish()
+            self.assertLessEqual(len(output), limit)
+            root = ET.fromstring(output)
+            self.assertEqual(root.get("incomplete"), "true")
+            if limit >= 128:
+                self.assertIn("TAIL", root.findtext("first-diagnostic", ""))
+
+    def test_ambiguous_junit_failure_keeps_diagnostic_without_becoming_mixed(self) -> None:
+        script = Path(__file__).with_name("bounded_report.py")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for kind in ("failure", "error"):
+                for failure_first in (False, True):
+                    for overflow in (False, True):
+                        first, second = root / "first.xml", root / "second.xml"
+                        failed = (f'<testcase classname="suite" name="duplicate">'
+                                  f'<{kind} message="duplicate sentinel">first detail</{kind}></testcase>')
+                        passed = '<testcase classname="suite" name="duplicate"/>'
+                        duplicate = failed + passed if failure_first else passed + failed
+                        padding = " " * 8192 if overflow else ""
+                        first_xml = (f'<testsuites><testsuite name="suite">{padding}{duplicate}'
+                                     '<testcase classname="suite" name="stable"><failure/></testcase>'
+                                     '</testsuite></testsuites>')
+                        second_xml = ('<testsuites><testsuite name="suite">'
+                                      '<testcase classname="suite" name="duplicate"/>'
+                                      '<testcase classname="suite" name="stable"/>'
+                                      '</testsuite></testsuites>')
+                        for output, report in ((first, first_xml), (second, second_xml)):
+                            code = "from pathlib import Path; import sys; Path(sys.argv[1]).write_text(sys.argv[2])"
+                            subprocess.run(
+                                [sys.executable, str(script), "fifo-xml", str(output), "4096", "--",
+                                 sys.executable, "-c", code, str(output) + ".fifo", report],
+                                capture_output=True, timeout=10, check=False,
+                            )
+                            self.assertLessEqual(output.stat().st_size, 4096)
+                        inventory, summary = root / "inventory.json", root / "summary.json"
+                        inventory.write_text("{}")
+                        result = subprocess.run(
+                            [sys.executable, "-I", str(script.with_name("registry_rust_compare.py")),
+                             str(inventory), str(first), str(second), str(summary)],
+                            capture_output=True, timeout=10, check=False,
+                        )
+                        evidence = json.loads(summary.read_text())
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertTrue(evidence["incomplete"])
+                        self.assertNotIn(["suite", "duplicate"], evidence["mixed"])
+                        self.assertIn(["suite", "stable"], evidence["mixed"])
+                        self.assertIn("duplicate sentinel", evidence["first_diagnostic"]["message"])
+
     def test_interrupted_snapshot_retains_last_complete_evidence(self) -> None:
         script = Path(__file__).with_name("bounded_report.py")
         with tempfile.TemporaryDirectory() as directory:

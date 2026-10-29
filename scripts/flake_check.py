@@ -22,6 +22,21 @@ if _identity_spec is None or _identity_spec.loader is None:
 _identity_module = importlib.util.module_from_spec(_identity_spec)
 _identity_spec.loader.exec_module(_identity_module)
 IdentityFilter = _identity_module.IdentityFilter
+JunitRecords = _identity_module.JunitRecords
+
+
+def first_junit_diagnostic(path: Path) -> dict[str, str] | None:
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > 50 * 1024 * 1024:
+        return None
+    collector = JunitRecords(64, None)
+    try:
+        with path.open("rb") as stream:
+            while chunk := stream.read(65536):
+                collector.add(chunk)
+        diagnostic = collector.first_diagnostic()
+        return {"message": diagnostic} if diagnostic is not None else None
+    except OSError:
+        return None
 
 
 def bounded_summary(data: dict[str, Any], keys: tuple[str, ...]) -> tuple[str, bool]:
@@ -649,7 +664,7 @@ def main() -> int:
         config.write_text(
             "[profile.ci.junit]\npath = "
             + json.dumps(str(report) + ".fifo")
-            + "\nstore-failure-output = false\n",
+            + "\nstore-failure-output = true\n",
             encoding="utf-8",
         )
         os.environ["EJM_HARNESS_JUNIT_REFERENCE"] = str(output / "attempt-1.xml") if number == 2 else ""
@@ -801,6 +816,8 @@ def main() -> int:
         "doctest_inconsistent": docs_differed,
         "mixed": mixed,
         "incomplete": incomplete,
+        "first_diagnostic": first_junit_diagnostic(output / "attempt-1.xml"),
+        "second_diagnostic": first_junit_diagnostic(output / "attempt-2.xml"),
     }
     encoded, truncated = bounded_summary(summary, ("mixed",))
     incomplete |= truncated

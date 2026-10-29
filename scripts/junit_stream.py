@@ -37,6 +37,9 @@ class JunitRecords:
         self.records: list[tuple[tuple[int, int], tuple[str, str], bytes]] = []
         self.size = 0
         self.first_failure = False
+        self.diagnostic: str | None = None
+        self.diagnostic_tail = ""
+        self.diagnostic_case = False
         self.reference: set[tuple[str, str]] = set()
         if reference:
             try:
@@ -70,7 +73,16 @@ class JunitRecords:
         elif self.stack == ["testsuites", "testsuite", "testcase"]:
             self.case = attrs
             self.states = []
+            self.diagnostic_case = False
+        elif self.stack == ["testsuites", "first-diagnostic"]:
+            self.diagnostic = ""
+            self.diagnostic_tail = ""
         elif self.case is not None and len(self.stack) == 4:
+            if name in ("failure", "error") and self.diagnostic is None:
+                self.diagnostic = f"{self.suite[:1024]} :: {self.case.get('name', '')[:1024]} :: {name}"
+                self.diagnostic_case = True
+                if attrs.get("message"):
+                    self.add_diagnostic("\n" + attrs["message"])
             if name in ("failure", "error", "skipped") or name.startswith(("flaky", "rerun")):
                 if len(self.states) < 2:
                     self.states.append(name)
@@ -84,8 +96,24 @@ class JunitRecords:
             self.case = None
         self.stack.pop()
 
-    def characters(self, _data: str) -> None:
+    def add_diagnostic(self, data: str) -> None:
+        assert self.diagnostic is not None
+        self.diagnostic = (self.diagnostic + data)[:4096]
+        self.diagnostic_tail = (self.diagnostic_tail + data)[-4096:]
+
+    def characters(self, data: str) -> None:
         self.pending = 0
+        if (self.stack == ["testsuites", "first-diagnostic"] or
+                (self.diagnostic_case and len(self.stack) == 4 and
+                 self.stack[-1] in ("failure", "error", "system-out", "system-err"))):
+            self.add_diagnostic(data)
+
+    def first_diagnostic(self) -> str | None:
+        if self.diagnostic is None:
+            return None
+        if self.diagnostic_tail and not self.diagnostic.endswith(self.diagnostic_tail):
+            return self.diagnostic + "\n...\n" + self.diagnostic_tail
+        return self.diagnostic
 
     def record(self) -> None:
         assert self.case is not None
@@ -116,9 +144,9 @@ class JunitRecords:
         if state != "passed":
             ET.SubElement(case, state)
         raw = ET.tostring(suite, encoding="utf-8")
-        first = state == "failure" and not self.first_failure
-        self.first_failure |= state == "failure"
-        priority = 3 if first else 2 if state == "failure" else 1 if key in self.reference else 0
+        first = state in ("failure", "error") and not self.first_failure
+        self.first_failure |= state in ("failure", "error")
+        priority = 3 if first else 2 if state in ("failure", "error") else 1 if key in self.reference else 0
         digest = int.from_bytes(hashlib.sha256(repr(key).encode()).digest(), "big")
         rank = (priority, -digest)
         if len(raw) > self.limit:
@@ -163,7 +191,26 @@ class JunitRecords:
         return self.snapshot()
 
     def snapshot(self) -> bytes:
-        return b'<testsuites incomplete="true">' + b"".join(
-            raw for _, key, raw in sorted(self.records, key=lambda item: (-item[0][0], item[1]))
-            if key not in self.ambiguous
-        ) + b"</testsuites>"
+        diagnostic = self.first_diagnostic()
+        evidence = b""
+        if diagnostic is not None:
+            element = ET.Element("first-diagnostic")
+            element.text = diagnostic
+            evidence = ET.tostring(element, encoding="utf-8")
+            budget = min(self.limit, 16_384)
+            while len(evidence) > budget and element.text:
+                if len(element.text) > 12:
+                    half = len(element.text) // 4
+                    element.text = element.text[:half] + "\n...\n" + element.text[-half:]
+                else:
+                    element.text = element.text[: len(element.text) // 2]
+                evidence = ET.tostring(element, encoding="utf-8")
+            if len(evidence) > budget:
+                evidence = b""
+        remaining = self.limit - len(evidence)
+        retained = []
+        for _, key, raw in sorted(self.records, key=lambda item: (-item[0][0], item[1])):
+            if key not in self.ambiguous and len(raw) <= remaining:
+                retained.append(raw)
+                remaining -= len(raw)
+        return b'<testsuites incomplete="true">' + evidence + b"".join(retained) + b"</testsuites>"

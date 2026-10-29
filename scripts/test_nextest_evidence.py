@@ -26,7 +26,7 @@ class NextestEvidenceTests(unittest.TestCase):
                 'version = "0.1.0"\n', encoding="utf-8"
             )
             (fixture / "src/lib.rs").write_text(
-                '#[test] fn flip() { assert_ne!(std::env::var("FAIL_FLIP").as_deref(), Ok("1")); }\n'
+                '#[test] fn flip() { assert_ne!(std::env::var("FAIL_FLIP").as_deref(), Ok("1"), "first failure evidence"); }\n'
                 '#[test] fn fixed_failure() { panic!("first failure evidence"); }\n',
                 encoding="utf-8",
             )
@@ -46,7 +46,7 @@ class NextestEvidenceTests(unittest.TestCase):
                 config = fixture / (report.stem + ".toml")
                 config.write_text(
                     '[profile.ci.junit]\npath = ' + json.dumps(str(report) + ".fifo")
-                    + '\nstore-failure-output = false\n', encoding="utf-8",
+                    + '\nstore-failure-output = true\n', encoding="utf-8",
                 )
                 result = subprocess.run(
                     [sys.executable, "-I", str(root / "scripts/bounded_report.py"),
@@ -68,6 +68,7 @@ class NextestEvidenceTests(unittest.TestCase):
             evidence = json.loads(summary.read_text(encoding="utf-8"))
             self.assertFalse(evidence["incomplete"])
             self.assertTrue(any(case[1] == "flip" for case in evidence["mixed"]))
+            self.assertIn("first failure evidence", evidence["first_diagnostic"]["message"])
 
     def test_pinned_nextest_retains_late_failure_after_overflow(self) -> None:
         root = Path(__file__).resolve().parents[1]
@@ -88,7 +89,7 @@ class NextestEvidenceTests(unittest.TestCase):
             )
             tests = ''.join(f'#[test] fn case_{index:04d}_'+ 'x' * 80 + '() {}\n' for index in range(100))
             (fixture / "src/lib.rs").write_text(
-                tests + '#[test] fn zz_flip() { assert_ne!(std::env::var("FAIL_FLIP").as_deref(), Ok("1")); }\n',
+                tests + '#[test] fn zz_flip() { assert_ne!(std::env::var("FAIL_FLIP").as_deref(), Ok("1"), "late failure evidence"); }\n',
                 encoding="utf-8",
             )
             env = {**os.environ, "CARGO_BUILD_JOBS": "2", "CARGO_INCREMENTAL": "0"}
@@ -107,7 +108,7 @@ class NextestEvidenceTests(unittest.TestCase):
                 config = fixture / (report.stem + ".toml")
                 config.write_text(
                     '[profile.ci.junit]\npath = ' + json.dumps(str(report) + ".fifo")
-                    + '\nstore-failure-output = false\n', encoding="utf-8",
+                    + '\nstore-failure-output = true\n', encoding="utf-8",
                 )
                 attempt_env = {**env, "FAIL_FLIP": fail}
                 if index:
@@ -132,6 +133,7 @@ class NextestEvidenceTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertTrue(evidence["incomplete"])
             self.assertTrue(any(case[1] == "zz_flip" for case in evidence["mixed"]))
+            self.assertIn("late failure evidence", evidence["first_diagnostic"]["message"])
 
 
 if __name__ == "__main__":

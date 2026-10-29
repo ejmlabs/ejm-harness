@@ -37,6 +37,7 @@ class VitestRecords:
         self.records: list[tuple[tuple[int, int], str, bytes]] = []
         self.size = 0
         self.first_failure = False
+        self.diagnostic = b""
         self.reference: set[str] = set()
         reference = os.environ.get("EJM_REGISTRY_VITEST_REFERENCE")
         if reference:
@@ -79,11 +80,21 @@ class VitestRecords:
                 self.finished = True
                 self.incomplete |= record["incomplete"]
                 return
+            if kind == "diagnostic":
+                self.save_diagnostic(record)
+                self.incomplete |= record.get("truncated") is True
+                self.incomplete = True
+                return
             if kind != "case":
                 raise ValueError("invalid case")
             file, name, status = record["file"], record["name"], record["status"]
             if not isinstance(file, str) or not isinstance(name, str) or status not in ("passed", "failed", "skipped"):
                 raise ValueError("invalid case")
+            first = status == "failed" and not self.first_failure
+            if first:
+                self.save_diagnostic({"kind": "diagnostic", "file": file, "name": name,
+                                      "message": record.get("message", "")})
+            self.first_failure |= status == "failed"
             key = json.dumps([file, name])
             maybe_duplicate = self.seen.add(key)
             if len(self.exact) < 20_000:
@@ -96,8 +107,6 @@ class VitestRecords:
                     self.ambiguous.add(key)
                 self.incomplete = True
                 return
-            first = status == "failed" and not self.first_failure
-            self.first_failure |= status == "failed"
             self.incomplete |= record.get("truncated") is True
             message = record.get("message")
             message_limit = min(8192, self.limit // 4)
@@ -133,10 +142,48 @@ class VitestRecords:
         except (ValueError, KeyError, TypeError, RecursionError):
             self.incomplete = True
 
+    def save_diagnostic(self, record: dict) -> None:
+        if self.diagnostic:
+            return
+        message = record.get("message", "")
+        if not isinstance(message, str):
+            message = ""
+            self.incomplete = True
+        maximum = min(8192, max(0, self.limit // 2 - 64) // 6)
+        if len(message) > maximum:
+            half = maximum // 2
+            message = message[:half] + "\n...\n" + (message[-half:] if half else "")
+            self.incomplete = True
+        data = {"kind": "diagnostic", "message": message}
+        if isinstance(record.get("file"), str) and isinstance(record.get("name"), str):
+            data.update(file=record["file"], name=record["name"])
+        elif isinstance(record.get("test"), str):
+            data["test"] = record["test"][:1024]
+        raw = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode() + b"\n"
+        if len(raw) > self.limit // 2:
+            data.pop("file", None)
+            data.pop("name", None)
+            data.pop("test", None)
+            raw = json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode() + b"\n"
+            self.incomplete = True
+        if len(raw) > self.limit // 2:
+            self.incomplete = True
+            return
+        self.diagnostic = raw
+        self.limit -= len(raw)
+        while self.size > self.limit:
+            _, victim, removed = heapq.heappop(self.records)
+            self.retained.remove(victim)
+            self.ambiguous.discard(victim)
+            self.size -= len(removed)
+            self.incomplete = True
+
     def write(self, stream: BinaryIO, *, partial: bool = False) -> bool:
         incomplete = partial or self.incomplete or not self.header or not self.finished or bool(self.buffer)
         if self.header:
             stream.write(b'{"kind":"start"}\n')
+            if self.diagnostic:
+                stream.write(self.diagnostic)
             for _, key, line in sorted(self.records, key=lambda item: (-item[0][0], item[1])):
                 if key not in self.ambiguous:
                     stream.write(line)

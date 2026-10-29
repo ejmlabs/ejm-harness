@@ -389,6 +389,46 @@ async fn cancellation_reaps_command_and_ordinary_descendants() {
     wait_for_cleanup(&governor, &pids).await;
 }
 
+#[tokio::test]
+async fn cancellation_during_spawning_reaps_every_spawned_child() {
+    let (directory, governor, executor) = executor(ResourceLimits::default());
+    let path = directory.path().join("pids");
+    let mut request = fixture_request("spawn-paused", directory.path());
+    request.timeout_ms = 15_000;
+    request.reservation.processes = 6;
+    request.env.insert(
+        "EJM_HARNESS_EXEC_PID_FILE".into(),
+        path.to_string_lossy().into_owned(),
+    );
+    let cancel = CancellationToken::new();
+    let worker_cancel = cancel.clone();
+    let running = tokio::spawn(async move { executor.run(request, worker_cancel).await });
+    let mut pids = parse_pids(&wait_for_file(&path).await);
+    assert_eq!(pids.len(), 2, "root and first child must be recorded");
+    for index in 0..2 {
+        let child =
+            parse_pids(&wait_for_file(&directory.path().join(format!("child-{index}"))).await);
+        assert_eq!(child.len(), 1);
+        if index == 0 {
+            assert_eq!(child, [pids[1]]);
+        } else {
+            assert!(!pids.contains(&child[0]));
+            pids.push(child[0]);
+        }
+    }
+    assert!(pids.iter().all(|pid| live(*pid)));
+    assert!(!directory.path().join("resume").exists());
+    assert!(!directory.path().join("child-2").exists());
+    cancel.cancel();
+    let result = timeout(Duration::from_secs(5), running)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert!(result.cancelled);
+    wait_for_cleanup(&governor, &pids).await;
+}
+
 struct CleanupProbe {
     pids: Arc<std::sync::Mutex<Vec<u32>>>,
     dropped: Option<tokio::sync::oneshot::Sender<bool>>,

@@ -78,10 +78,11 @@ def stream_report(
     diagnostic = None
     incomplete = False
     finished = False
+    count = 0
     with path.open("rb") as stream:
         if stream.readline() != b'{"kind":"start"}\n':
             raise ValueError("invalid report header")
-        for number, line in enumerate(stream, 1):
+        for line in stream:
             if not line.endswith(b"\n"):
                 incomplete = True
                 break
@@ -95,13 +96,32 @@ def stream_report(
                     incomplete |= record["incomplete"]
                     finished = True
                     continue
+                if not finished and record.get("kind") == "diagnostic":
+                    message = record.get("message")
+                    if not isinstance(message, str):
+                        raise ValueError("invalid diagnostic")
+                    label = record.get("test", "")
+                    if "file" in record and "name" in record:
+                        try:
+                            label = identity(record["file"], record["name"], root)
+                            if len(failures) < MAX_TESTS:
+                                failures.add(label)
+                        except (OSError, TypeError, ValueError):
+                            label = ""
+                            incomplete = True
+                    if not isinstance(label, str):
+                        raise ValueError("invalid diagnostic identity")
+                    if diagnostic is None:
+                        diagnostic = {"test": label, "message": bounded_message(message)}
+                    continue
                 if finished or record.get("kind") != "case":
                     raise ValueError("invalid report record")
+                count += 1
                 file, name, status = record["file"], record["name"], record["status"]
                 if not isinstance(file, str) or not isinstance(name, str):
                     raise ValueError("invalid identity")
                 key = identity(file, name, root)
-                if number > MAX_TESTS:
+                if count > MAX_TESTS:
                     incomplete = True
                 maybe_duplicate = identities.add(key)
                 if len(exact) < MAX_TESTS:

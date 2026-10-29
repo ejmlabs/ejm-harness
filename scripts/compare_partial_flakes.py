@@ -108,8 +108,13 @@ def main() -> int:
                         failures[index].add(key)
     mixed.update(key for key, states in by_case.items() if {"passed", "failure"} <= states)
     summary = {"incomplete": True, "mixed": sorted(mixed),
-               "first_failed": sorted(failures[0]), "second_failed": sorted(failures[1])}
+               "first_failed": sorted(failures[0]), "second_failed": sorted(failures[1]),
+               "first_diagnostic": reporter.first_junit_diagnostic(output / "attempt-1.xml"),
+               "second_diagnostic": reporter.first_junit_diagnostic(output / "attempt-2.xml")}
     if prior is not None:
+        for name in ("first_diagnostic", "second_diagnostic"):
+            if summary[name] is None and isinstance(prior.get(name), dict):
+                summary[name] = prior[name]
         summary["mixed"] = sorted({tuple(item) for item in prior["mixed"]
                                    if isinstance(item, (list, tuple)) and len(item) == 2
                                    and all(isinstance(part, str) for part in item)} | mixed)

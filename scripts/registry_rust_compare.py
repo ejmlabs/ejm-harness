@@ -64,6 +64,8 @@ def main() -> int:
         "mixed": mixed,
         "first_failed": sorted(known_failures[0]),
         "second_failed": sorted(known_failures[1]),
+        "first_diagnostic": reporter.first_junit_diagnostic(first),
+        "second_diagnostic": reporter.first_junit_diagnostic(second),
     }
     for name in ("FIRST_OUTCOME", "SECOND_OUTCOME"):
         outcome = os.environ.get(name)

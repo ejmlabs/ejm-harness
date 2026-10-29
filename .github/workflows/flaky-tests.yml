@@ -132,7 +132,7 @@ jobs:
         working-directory: registry
         shell: bash
         run: |
-          printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = false\n' "$RUNNER_TEMP/registry-flakes/rust-1.xml.fifo" > "$RUNNER_TEMP/registry-flakes/rust-1.toml"
+          printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = true\n' "$RUNNER_TEMP/registry-flakes/rust-1.xml.fifo" > "$RUNNER_TEMP/registry-flakes/rust-1.toml"
           python3 -I ../scripts/bounded_report.py fifo-xml "$RUNNER_TEMP/registry-flakes/rust-1.xml" 52428800 -- cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-1.toml" --user-config-file none --no-tests fail --no-fail-fast
       - name: Run registry Rust tests, second attempt
         id: rust_second
@@ -141,7 +141,7 @@ jobs:
         working-directory: registry
         shell: bash
         run: |
-          printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = false\n' "$RUNNER_TEMP/registry-flakes/rust-2.xml.fifo" > "$RUNNER_TEMP/registry-flakes/rust-2.toml"
+          printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = true\n' "$RUNNER_TEMP/registry-flakes/rust-2.xml.fifo" > "$RUNNER_TEMP/registry-flakes/rust-2.toml"
           EJM_HARNESS_JUNIT_REFERENCE="$RUNNER_TEMP/registry-flakes/rust-1.xml" python3 -I ../scripts/bounded_report.py fifo-xml "$RUNNER_TEMP/registry-flakes/rust-2.xml" 52428800 -- cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-2.toml" --user-config-file none --no-tests fail --no-fail-fast
       - name: Compare registry Rust outcomes
         if: always() && !cancelled()
