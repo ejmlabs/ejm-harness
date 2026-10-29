@@ -2,7 +2,7 @@
 
 use std::{
     fs::{File, TryLockError},
-    path::{Path, PathBuf},
+    path::Path,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -30,10 +30,7 @@ impl NativeOwnerAdmission for Admissions {
 
 #[tokio::test]
 async fn startup_lock_wait_preserves_readiness_and_executor_bounds() -> Result<()> {
-    let helper = PathBuf::from(
-        std::env::var_os("EJM_NATIVE_STARTUP_HELPER").context("set EJM_NATIVE_STARTUP_HELPER")?,
-    );
-    ensure!(helper.is_absolute(), "test helper path must be absolute");
+    let helper = super::helper_path("EJM_NATIVE_STARTUP_HELPER")?;
     let temporary = super::private_tempdir()?;
     let root = temporary.path().canonicalize()?.join("state");
     let directory = wire::directory(&root, "startup-wait")?;

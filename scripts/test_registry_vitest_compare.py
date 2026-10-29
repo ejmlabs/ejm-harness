@@ -95,6 +95,29 @@ class RegistryVitestCompareTests(unittest.TestCase):
             self.assertEqual(result["mixed"], ['["worker.test.ts","flip"]'])
             self.assertEqual(result["first_failed"], ['["worker.test.ts","flip"]'])
 
+    def test_malformed_sibling_keeps_comparable_outcome(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = str(root / "worker.test.ts")
+            listing = root / "inventory.json"
+            listing.write_text(json.dumps([{"file": file, "name": "flip"}]))
+            reports = [root / "first.json", root / "second.json"]
+            for path, state in zip(reports, ("failed", "passed"), strict=True):
+                path.write_text(json.dumps({
+                    "testResults": [{"name": file, "assertionResults": [
+                        {"fullName": "flip", "status": state},
+                        {"fullName": "bad", "status": "unknown"},
+                    ]}],
+                }))
+            result = compare(listing, reports[0], reports[1], root)
+            self.assertTrue(result["incomplete"])
+            self.assertEqual(result["mixed"], ['["worker.test.ts","flip"]'])
+            self.assertEqual(result["first_failed"], ['["worker.test.ts","flip"]'])
+            first = json.loads(reports[0].read_text())
+            first["testResults"][0]["assertionResults"][1]["fullName"] = "flip"
+            reports[0].write_text(json.dumps(first))
+            self.assertEqual(compare(listing, reports[0], reports[1], root)["mixed"], [])
+
     def test_duplicate_failure_is_preserved_without_a_flake(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

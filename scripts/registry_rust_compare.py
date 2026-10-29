@@ -4,7 +4,6 @@
 import importlib.util
 import json
 import os
-import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -16,47 +15,6 @@ if spec is None or spec.loader is None:
     raise RuntimeError("Cannot load the Rust test reporter")
 reporter = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(reporter)
-
-
-def partial_outcomes(path: Path) -> tuple[dict[tuple[str, str], str], set[tuple[str, str]]]:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 50 * 1024 * 1024:
-        raise ValueError("invalid report")
-    text = path.read_text(encoding="utf-8")
-    if re.search(r"<!\s*(?:DOCTYPE|ENTITY)", text, re.IGNORECASE):
-        raise ValueError("unsafe XML")
-    root = ET.fromstring(text)
-    if root.tag != "testsuites":
-        raise ValueError("invalid report root")
-    outcomes: dict[tuple[str, str], str] = {}
-    ambiguous: set[tuple[str, str]] = set()
-    failures: set[tuple[str, str]] = set()
-    count = 0
-    for suite in root.findall("testsuite"):
-        suite_name = suite.get("name")
-        if not suite_name or len(suite_name) > 1024:
-            continue
-        for case in suite.findall("testcase"):
-            count += 1
-            name = case.get("name")
-            if count > 20_000:
-                raise ValueError("too many cases")
-            if not name or len(name) > 1024 or case.get("classname") != suite_name:
-                continue
-            key = (suite_name, name)
-            states = [child.tag for child in case if child.tag in ("failure", "error", "skipped")]
-            if "failure" in states:
-                failures.add(key)
-            if (
-                key in outcomes
-                or key in ambiguous
-                or len(states) > 1
-                or any(child.tag.startswith(("flaky", "rerun")) for child in case)
-            ):
-                outcomes.pop(key, None)
-                ambiguous.add(key)
-            else:
-                outcomes[key] = states[0] if states else "passed"
-    return outcomes, failures
 
 
 def main() -> int:
@@ -80,7 +38,7 @@ def main() -> int:
         except (OSError, ValueError, ET.ParseError):
             incomplete = True
             try:
-                record, failures = partial_outcomes(path)
+                record, failures = reporter.partial_outcomes(path)
                 results.append(record)
                 known_failures.append(failures)
             except (OSError, ValueError, ET.ParseError):

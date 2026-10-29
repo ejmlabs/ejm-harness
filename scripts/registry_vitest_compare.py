@@ -49,19 +49,29 @@ def report(path: Path, root: Path) -> tuple[dict[str, str], set[str], set[str], 
             or not isinstance(suite.get("name"), str)
             or not isinstance(suite.get("assertionResults"), list)
         ):
-            raise ValueError("invalid suite")
+            incomplete = True
+            continue
         suite_failed = False
         for case in suite["assertionResults"]:
             total += 1
-            if (
-                total > MAX_TESTS
-                or not isinstance(case, dict)
-                or not isinstance(case.get("fullName"), str)
-                or case.get("status") not in counts
-            ):
-                raise ValueError("invalid test case")
+            if not isinstance(case, dict) or not isinstance(case.get("fullName"), str):
+                incomplete = True
+                continue
+            try:
+                key = identity(suite["name"], case["fullName"], root)
+            except (ValueError, OSError):
+                incomplete = True
+                continue
+            if total > MAX_TESTS:
+                incomplete = True
+                if key not in outcomes and key not in ambiguous:
+                    continue
+            if not isinstance(case.get("status"), str) or case["status"] not in counts:
+                incomplete = True
+                outcomes.pop(key, None)
+                ambiguous.add(key)
+                continue
             state = case["status"]
-            key = identity(suite["name"], case["fullName"], root)
             counts[state] += 1
             if state == "failed":
                 failures.add(key)

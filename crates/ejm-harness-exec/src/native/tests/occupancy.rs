@@ -4,8 +4,7 @@ use std::{
     collections::HashSet,
     fs::{File, TryLockError},
     io,
-    os::unix::fs::PermissionsExt,
-    path::{Path, PathBuf},
+    path::Path,
     time::Duration,
 };
 
@@ -40,7 +39,7 @@ struct Fixture {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn real_helper_control_state_saturation() -> Result<()> {
-    let helper = helper_path()?;
+    let helper = super::helper_path(HELPER_ENV)?;
     preflight_descriptors()?;
     let temporary = super::private_tempdir()?;
     let root = temporary.path().canonicalize()?.join("capacity");
@@ -74,21 +73,6 @@ async fn real_helper_control_state_saturation() -> Result<()> {
         );
     }
     result
-}
-
-fn helper_path() -> Result<PathBuf> {
-    let path = PathBuf::from(std::env::var_os(HELPER_ENV).with_context(|| {
-        format!(
-            "set {HELPER_ENV} to the absolute path of a test helper implementing dispatch_helper"
-        )
-    })?);
-    ensure!(path.is_absolute(), "{HELPER_ENV} must be absolute");
-    let metadata = path.metadata().context("inspect explicit test helper")?;
-    ensure!(
-        metadata.is_file() && metadata.permissions().mode() & 0o111 != 0,
-        "{HELPER_ENV} must name an executable file"
-    );
-    path.canonicalize().context("resolve explicit test helper")
 }
 
 fn preflight_descriptors() -> Result<()> {

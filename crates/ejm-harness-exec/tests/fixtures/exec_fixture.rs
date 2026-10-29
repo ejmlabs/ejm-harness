@@ -4,7 +4,10 @@ use std::{
     time::Duration,
 };
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
+    if let Some(result) = ejm_harness_exec::native::dispatch_helper() {
+        return result.map_err(Into::into);
+    }
     let mode = std::env::var("EJM_HARNESS_EXEC_FIXTURE")?;
     let pid_file = std::env::var_os("EJM_HARNESS_EXEC_PID_FILE").map(PathBuf::from);
     if let Some(path) = std::env::var_os("EJM_HARNESS_EXEC_CHILD_PID_FILE") {
@@ -61,7 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "descendant" | "orphan" | "many-descendants" => descendants(&mode, pid_file)?,
         _ => std::process::exit(2),
     }
-    Ok(())
+    Ok(std::process::ExitCode::SUCCESS)
 }
 
 fn descendants(mode: &str, pid_file: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {

@@ -5,10 +5,11 @@ import sys
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from flake_check import inventory, mixed_tests, outcomes
+from flake_check import doctest_inventory, doctest_outcomes, inventory, mixed_tests, outcomes, partial_outcomes
 
 
 def report(cases: list[tuple[str, str]]) -> str:
@@ -31,6 +32,28 @@ def fake_rustc(root: Path) -> None:
     rustc = root / "rustc"
     rustc.write_text("#!/bin/sh\nprintf '%s\\n' fake-host\n", encoding="utf-8")
     rustc.chmod(0o755)
+
+
+def fake_doctests(cargo: Path) -> None:
+    source = cargo.read_text(encoding="utf-8")
+    if source.startswith("#!/usr/bin/env python3\n"):
+        preamble = '''import json, os, sys
+if sys.argv[1] == "metadata":
+    print(json.dumps({"workspace_members": ["pkg"], "packages": [{"id": "pkg",
+          "targets": [{"name": "pkg", "kind": ["lib"], "doctest": True}]}]}))
+    raise SystemExit(0)
+if sys.argv[1] == "test":
+    if "--list" in sys.argv:
+        print("   Doc-tests pkg\\n\\nsrc/lib.rs - example (line 1): test\\n1 test, 0 benchmarks")
+        raise SystemExit(0)
+    status = os.environ.get("FAKE_DOCTEST_STATUS" if "--doc" in sys.argv else "FAKE_BASELINE_DOCTEST_STATUS", "ok")
+    print("   Doc-tests pkg\\n\\nrunning 1 test\\ntest src/lib.rs - example (line 1) ... " + status)
+    print("test result: ok. " + str(int(status == "ok")) + " passed; 0 failed; "
+          + str(int(status == "ignored")) + " ignored; 0 measured; 0 filtered out; finished in 0.00s")
+    if "--doc" in sys.argv:
+        raise SystemExit(0)
+'''
+        cargo.write_text(source.replace("\n", "\n" + preamble, 1), encoding="utf-8")
 
 
 class FlakeCheckTests(unittest.TestCase):
@@ -73,6 +96,66 @@ class FlakeCheckTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 inventory(path)
 
+    def test_doctest_results_require_all_targets_and_executed_cases(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "doctest.log"
+            passing = (
+                "   Doc-tests pkg\n\nrunning 1 test\n"
+                "test src/lib.rs - example (line 1) ... ok\n"
+                "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+            )
+            path.write_text(passing, encoding="utf-8")
+            self.assertEqual(doctest_outcomes(path, Counter({"pkg": 1}))[1], True)
+            ignored = passing.replace("... ok", "... ignored").replace("1 passed; 0 failed; 0 ignored", "0 passed; 0 failed; 1 ignored")
+            for value, targets in [
+                (ignored, Counter({"pkg": 1})),
+                (passing, Counter({"pkg": 1, "missing": 1})),
+                (passing.replace("test src/lib.rs - example (line 1) ... ok\n", ""), Counter({"pkg": 1})),
+                (passing.replace("0 filtered out", "1 filtered out"), Counter({"pkg": 1})),
+            ]:
+                path.write_text(value, encoding="utf-8")
+                self.assertFalse(doctest_outcomes(path, targets)[1])
+
+    def test_real_ignored_doctest_is_incomplete(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            (root / "Cargo.toml").write_text(
+                '[package]\nname = "doctest-fixture"\nversion = "0.1.0"\nedition = "2021"\n',
+                encoding="utf-8",
+            )
+            (root / "src/lib.rs").write_text(
+                '/// ```\n/// assert!(true);\n/// ```\n/// ```ignore\n/// assert!(true);\n/// ```\npub fn sample() {}\n',
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                ["cargo", "test", "--offline", "--doc", "--color", "never"],
+                cwd=root,
+                env={**os.environ, "CARGO_TARGET_DIR": str(root / "target")},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout)
+            log = root / "doctest.log"
+            log.write_text(result.stdout, encoding="utf-8")
+            results, complete = doctest_outcomes(log, Counter({"doctest_fixture": 1}))
+            self.assertEqual(set(results.values()), {"passed", "skipped"})
+            self.assertFalse(complete)
+            listing = subprocess.run(
+                ["cargo", "test", "--offline", "--doc", "--color", "never", "--", "--list"],
+                cwd=root,
+                env={**os.environ, "CARGO_TARGET_DIR": str(root / "target")},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(listing.returncode, 0, listing.stdout)
+            log.write_text(listing.stdout, encoding="utf-8")
+            self.assertEqual(doctest_inventory(log, Counter({"doctest_fixture": 1})), set(results))
+
     def test_identical_omissions_and_skips_are_incomplete(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -110,6 +193,46 @@ class FlakeCheckTests(unittest.TestCase):
                 paths = self.write_reports(root, good, other)
                 with self.assertRaises((ValueError, ET.ParseError)):
                     mixed_tests(*paths, {("pkg::suite", "x"), ("pkg::suite", "y")})
+
+    def test_partial_results_preserve_unambiguous_mixed_outcomes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            first, second = self.write_reports(
+                Path(directory),
+                report([("flip", "<failure/>"), ("duplicate", ""), ("duplicate", "")]),
+                report([("flip", ""), ("duplicate", "")]).replace('tests="2"', 'tests="3"', 1),
+            )
+            for path in (first, second):
+                with self.assertRaises(ValueError):
+                    outcomes(path)
+            a, _ = partial_outcomes(first)
+            b, _ = partial_outcomes(second)
+            self.assertEqual(
+                [key for key in a.keys() & b.keys() if {a[key], b[key]} == {"failure", "passed"}],
+                [("pkg::suite", "flip")],
+            )
+            self.assertNotIn(("pkg::suite", "duplicate"), a)
+
+    def test_log_capture_is_bounded_and_preserves_first_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = Path(__file__).with_name("flake_check.py")
+            program = (
+                "import sys; sys.path.insert(0, sys.argv[1]); from flake_check import run; "
+                "from pathlib import Path; "
+                "print(run([sys.executable, '-c', "
+                "\"import sys; sys.stdout.write('first failure\\\\n' + 'x' * 5000000)\"], "
+                "Path(sys.argv[2])))"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", program, str(script.parent), str(root / "log")],
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertTrue((root / "log").read_bytes().startswith(b"first failure\n"))
+            self.assertEqual((root / "log").stat().st_size, 4 * 1024 * 1024)
+            self.assertIn(b"Output exceeded its limit", result.stderr)
+            self.assertTrue(result.stdout.endswith(b"None\n"))
 
     def test_captured_output_cannot_spoof_a_test_result(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -159,6 +282,7 @@ raise SystemExit(0)
 """,
                 encoding="utf-8",
             )
+            fake_doctests(cargo)
             cargo.chmod(0o755)
             env = {
                 **os.environ,
@@ -181,6 +305,29 @@ raise SystemExit(0)
             self.assertEqual(summary["doctest_exit_codes"], [0, 0])
             self.assertFalse(summary["incomplete"])
             self.assertEqual(summary["mixed"], [["pkg::suite", "write"]])
+            env["FAKE_DOCTEST_STATUS"] = "ignored"
+            result = subprocess.run(
+                [sys.executable, str(script), str(root / "ignored-evidence")],
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            ignored = json.loads((root / "ignored-evidence/summary.json").read_text())
+            self.assertTrue(ignored["incomplete"])
+            del env["FAKE_DOCTEST_STATUS"]
+            env["FAKE_BASELINE_DOCTEST_STATUS"] = "ignored"
+            result = subprocess.run(
+                [sys.executable, str(script), str(root / "ignored-baseline-evidence")],
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            ignored = json.loads((root / "ignored-baseline-evidence/summary.json").read_text())
+            self.assertTrue(ignored["incomplete"])
 
     def test_cli_rejects_a_test_omitted_from_both_reports(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -211,6 +358,7 @@ elif sys.argv[1] == "nextest":
 """,
                 encoding="utf-8",
             )
+            fake_doctests(cargo)
             cargo.chmod(0o755)
             env = {**os.environ, "PATH": str(root) + os.pathsep + os.environ.get("PATH", "")}
             result = subprocess.run(
@@ -261,6 +409,7 @@ if "--doc" not in sys.argv:
 """,
                 encoding="utf-8",
             )
+            fake_doctests(cargo)
             cargo.chmod(0o755)
             env = {**os.environ, "PATH": str(root) + os.pathsep + os.environ.get("PATH", "")}
             result = subprocess.run(

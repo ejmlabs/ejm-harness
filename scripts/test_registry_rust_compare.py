@@ -50,6 +50,30 @@ class RegistryRustCompareTests(unittest.TestCase):
             self.assertEqual(data["mixed"], [["suite", "flip"]])
             self.assertEqual(data["first_failed"], [["suite", "duplicate"], ["suite", "flip"]])
 
+    def test_case_limit_preserves_already_parsed_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            listing = root / "inventory.json"
+            listing.write_text("{}")
+            first, second = root / "first.xml", root / "second.xml"
+            cases = ''.join(f'<testcase classname="suite" name="case{i}"/>' for i in range(20_000))
+            first.write_text('<testsuites><testsuite name="suite">'
+                             '<testcase classname="suite" name="flip"><failure/></testcase>'
+                             + cases + '</testsuite></testsuites>')
+            second.write_text('<testsuites><testsuite name="suite">'
+                              '<testcase classname="suite" name="flip"/>'
+                              '</testsuite></testsuites>')
+            summary = root / "summary.json"
+            result = subprocess.run([
+                sys.executable, "-I", str(Path(__file__).with_name("registry_rust_compare.py")),
+                str(listing), str(first), str(second), str(summary),
+            ], capture_output=True, check=False)
+            data = json.loads(summary.read_text())
+            self.assertEqual(result.returncode, 1)
+            self.assertTrue(data["incomplete"])
+            self.assertEqual(data["mixed"], [["suite", "flip"]])
+            self.assertEqual(data["first_failed"], [["suite", "flip"]])
+
     def test_incomplete_inventory_keeps_a_comparable_flake(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

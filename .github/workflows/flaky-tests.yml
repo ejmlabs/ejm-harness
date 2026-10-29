@@ -38,15 +38,34 @@ jobs:
       - name: Compare two independent Rust test runs
         timeout-minutes: 50
         run: scripts/with-secret-service python3 scripts/flake_check.py "$RUNNER_TEMP/harness-flakes"
+      - name: Stage bounded reliability reports
+        if: always() && !cancelled()
+        shell: bash
+        run: |
+          set -uo pipefail
+          source="$RUNNER_TEMP/harness-flakes"
+          destination="$RUNNER_TEMP/harness-flakes-upload"
+          mkdir -p "$destination"
+          shopt -s nullglob
+          result=0
+          for file in "$source"/summary.json "$source"/inventory.json "$source"/attempt-*.xml "$source"/*.log; do
+            [[ -e "$file" ]] || continue
+            limit=52428800
+            [[ "$file" == *.log || "$file" == */summary.json ]] && limit=4194304
+            if [[ -L "$file" || ! -f "$file" ]] || (( $(wc -c < "$file") > limit )); then
+              echo "Evidence exceeds its bound or is not a regular file: $file" >&2
+              result=1
+              continue
+            fi
+            cp -- "$file" "$destination/" || result=1
+          done
+          exit "$result"
       - name: Preserve reliability reports
         if: always() && !cancelled()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: harness-rust-reliability
-          path: |
-            ${{ runner.temp }}/harness-flakes/summary.json
-            ${{ runner.temp }}/harness-flakes/inventory.json
-            ${{ runner.temp }}/harness-flakes/attempt-*.xml
+          path: ${{ runner.temp }}/harness-flakes-upload/
           retention-days: 14
           if-no-files-found: warn
   registry-reliability:
@@ -93,7 +112,7 @@ jobs:
         shell: bash
         run: |
           printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = false\n' "$RUNNER_TEMP/registry-flakes/rust-1.xml" > "$RUNNER_TEMP/registry-flakes/rust-1.toml"
-          cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-1.toml" --user-config-file none --no-tests fail
+          cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-1.toml" --user-config-file none --no-tests fail --no-fail-fast
       - name: Run registry Rust tests, second attempt
         id: rust_second
         if: always() && !cancelled()
@@ -102,7 +121,7 @@ jobs:
         shell: bash
         run: |
           printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = false\n' "$RUNNER_TEMP/registry-flakes/rust-2.xml" > "$RUNNER_TEMP/registry-flakes/rust-2.toml"
-          cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-2.toml" --user-config-file none --no-tests fail
+          cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-2.toml" --user-config-file none --no-tests fail --no-fail-fast
       - name: Compare registry Rust outcomes
         if: always() && !cancelled()
         timeout-minutes: 1

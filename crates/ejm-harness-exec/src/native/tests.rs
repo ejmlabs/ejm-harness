@@ -13,6 +13,28 @@ mod startup;
 #[cfg(all(feature = "native-test-seams", any(unix, windows)))]
 mod stable_locks;
 
+#[cfg(unix)]
+fn helper_path(variable: &str) -> anyhow::Result<std::path::PathBuf> {
+    use anyhow::{Context, ensure};
+    use std::os::unix::fs::PermissionsExt;
+
+    let path = match std::env::var_os(variable) {
+        Some(path) => std::path::PathBuf::from(path),
+        None => std::env::current_exe()?
+            .parent()
+            .and_then(std::path::Path::parent)
+            .context("test executable is outside Cargo's target directory")?
+            .join("ejm-harness-exec-fixture"),
+    };
+    ensure!(path.is_absolute(), "test helper path must be absolute");
+    let metadata = path.metadata().context("inspect test helper")?;
+    ensure!(
+        metadata.is_file() && metadata.permissions().mode() & 0o111 != 0,
+        "test helper must name an executable file"
+    );
+    path.canonicalize().context("resolve test helper")
+}
+
 fn private_tempdir() -> std::io::Result<tempfile::TempDir> {
     let mut builder = tempfile::Builder::new();
     #[cfg(unix)]

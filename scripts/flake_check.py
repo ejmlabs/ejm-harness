@@ -6,10 +6,12 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import xml.etree.ElementTree as ET
 from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
+from typing import BinaryIO
 
 
 def outcomes(path: Path) -> dict[tuple[str, str], str]:
@@ -24,12 +26,16 @@ def outcomes(path: Path) -> dict[tuple[str, str], str]:
     if root.tag != "testsuites":
         raise ValueError("not a nextest JUnit report")
     results = {}
+    count = 0
     for suite in root.findall("testsuite"):
         suite_name = suite.get("name")
         if not suite_name:
             raise ValueError("test suite has no name")
         suite_results = []
         for case in suite.findall("testcase"):
+            count += 1
+            if count > 20_000:
+                raise ValueError("too many cases")
             name = case.get("name")
             if not name or case.get("classname") != suite_name:
                 raise ValueError("test case has no matching identity")
@@ -47,6 +53,51 @@ def outcomes(path: Path) -> dict[tuple[str, str], str]:
         raise ValueError("report contains no tests")
     check_counts(root, results.values())
     return results
+
+
+def partial_outcomes(path: Path) -> tuple[dict[tuple[str, str], str], set[tuple[str, str]]]:
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > 50 * 1024 * 1024:
+        raise ValueError("invalid report")
+    text = path.read_text(encoding="utf-8")
+    if re.search(r"<!\s*(?:DOCTYPE|ENTITY)", text, re.IGNORECASE):
+        raise ValueError("unsafe XML")
+    root = ET.fromstring(text)
+    if root.tag != "testsuites":
+        raise ValueError("invalid report root")
+    outcomes: dict[tuple[str, str], str] = {}
+    ambiguous: set[tuple[str, str]] = set()
+    failures: set[tuple[str, str]] = set()
+    count = 0
+    for suite in root.findall("testsuite"):
+        suite_name = suite.get("name")
+        if not suite_name or len(suite_name) > 1024:
+            continue
+        for case in suite.findall("testcase"):
+            count += 1
+            name = case.get("name")
+            if not name or len(name) > 1024:
+                continue
+            key = (suite_name, name)
+            if count > 20_000 and key not in outcomes and key not in ambiguous:
+                continue
+            if case.get("classname") != suite_name:
+                outcomes.pop(key, None)
+                ambiguous.add(key)
+                continue
+            states = [child.tag for child in case if child.tag in ("failure", "error", "skipped")]
+            if "failure" in states:
+                failures.add(key)
+            if (
+                key in outcomes
+                or key in ambiguous
+                or len(states) > 1
+                or any(child.tag.startswith(("flaky", "rerun")) for child in case)
+            ):
+                outcomes.pop(key, None)
+                ambiguous.add(key)
+            else:
+                outcomes[key] = states[0] if states else "passed"
+    return outcomes, failures
 
 
 def check_counts(element: ET.Element, statuses: Iterable[str]) -> None:
@@ -97,26 +148,131 @@ def mixed_tests(first: Path, second: Path, expected: set[tuple[str, str]]) -> li
     return sorted(key for key in a if {a[key], b[key]} == {"passed", "failure"})
 
 
-def run(command: list[str], log: Path) -> int | None:
-    with log.open("w", encoding="utf-8") as stream:
-        try:
-            process = subprocess.Popen(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
-        except OSError as error:
-            print(f"Could not start {command[0]}: {error}", file=stream)
-            return None
-        assert process.stdout is not None
-        for line in process.stdout:
-            sys.stdout.write(line)
-            sys.stdout.flush()
-            stream.write(line)
-        return process.wait()
+def run(command: list[str], log: Path, output: Path | None = None) -> int | None:
+    try:
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE if output else subprocess.STDOUT,
+        )
+    except OSError as error:
+        log.write_text(f"Could not start {command[0]}: {error}\n", encoding="utf-8")
+        return None
+
+    truncated: list[Path] = []
+
+    def capture(pipe: BinaryIO, path: Path, limit: int, echo: bool) -> None:
+        written = 0
+        with path.open("wb") as stream:
+            while chunk := pipe.read(65536):
+                kept = chunk[: max(0, limit - written)]
+                stream.write(kept)
+                if echo and kept:
+                    sys.stdout.buffer.write(kept)
+                    sys.stdout.buffer.flush()
+                written += len(kept)
+                if len(kept) != len(chunk) and path not in truncated:
+                    truncated.append(path)
+
+    assert process.stdout is not None
+    threads = []
+    if output:
+        assert process.stderr is not None
+        thread = threading.Thread(target=capture, args=(process.stderr, log, 4 * 1024 * 1024, True))
+        thread.start()
+        threads.append(thread)
+        capture(process.stdout, output, 50 * 1024 * 1024, False)
+    else:
+        capture(process.stdout, log, 4 * 1024 * 1024, True)
+    code = process.wait()
+    for thread in threads:
+        thread.join()
+    if truncated:
+        print(f"Output exceeded its limit: {truncated[0]}", file=sys.stderr)
+        return None
+    return code
+
+
+def doctest_outcomes(path: Path, expected: Counter[str]) -> tuple[dict[tuple[str, str], str], bool]:
+    results: dict[tuple[str, str], str] = {}
+    ambiguous: set[tuple[str, str]] = set()
+    suites: Counter[str] = Counter()
+    complete = True
+    suite = None
+    running = None
+    statuses: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        heading = re.fullmatch(r"\s*Doc-tests (\S+)\s*", line)
+        count = re.fullmatch(r"running (\d+) tests?", line)
+        case = re.fullmatch(r"test (.+) \.\.\. (ok|FAILED|ignored)", line)
+        summary = re.match(
+            r"test result: (?:ok|FAILED)\. (\d+) passed; (\d+) failed; "
+            r"(\d+) ignored; (\d+) measured; (\d+) filtered out;",
+            line,
+        )
+        if heading:
+            if suite is not None:
+                complete = False
+            suite = heading[1]
+            suites[suite] += 1
+            running = None
+            statuses = []
+        elif count and suite is not None:
+            if running is not None:
+                complete = False
+            running = int(count[1])
+        elif case and suite is not None:
+            key = (suite, case[1])
+            status = {"ok": "passed", "FAILED": "failure", "ignored": "skipped"}[case[2]]
+            statuses.append(status)
+            if key in results or key in ambiguous:
+                results.pop(key, None)
+                ambiguous.add(key)
+                complete = False
+            else:
+                results[key] = status
+        elif summary and suite is not None:
+            passed, failed, ignored, measured, filtered = map(int, summary.groups())
+            counts = Counter(statuses)
+            if (
+                running is None
+                or running != len(statuses)
+                or (passed, failed, ignored) != (counts["passed"], counts["failure"], counts["skipped"])
+                or ignored or measured or filtered
+            ):
+                complete = False
+            suite = None
+    return results, complete and suite is None and suites == expected
+
+
+def doctest_inventory(path: Path, expected: Counter[str]) -> set[tuple[str, str]]:
+    suites: Counter[str] = Counter()
+    results: set[tuple[str, str]] = set()
+    suite = None
+    count = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        heading = re.fullmatch(r"\s*Doc-tests (\S+)\s*", line)
+        case = re.fullmatch(r"(.+): test", line)
+        summary = re.fullmatch(r"(\d+) tests?, 0 benchmarks?", line)
+        if heading:
+            if suite is not None:
+                raise ValueError("missing doctest inventory summary")
+            suite = heading[1]
+            suites[suite] += 1
+            count = 0
+        elif case and suite is not None:
+            key = (suite, case[1])
+            if key in results:
+                raise ValueError("duplicate doctest inventory entry")
+            results.add(key)
+            count += 1
+        elif summary and suite is not None:
+            if int(summary[1]) != count:
+                raise ValueError("incomplete doctest inventory")
+            suite = None
+    if suite is not None or suites != expected:
+        raise ValueError("missing doctest inventory target")
+    return results
 
 
 def main() -> int:
@@ -157,34 +313,54 @@ def main() -> int:
             print(f"Cannot build native test helper: {error}", file=sys.stderr)
             helper_build = None
     inventory_path = output / "inventory.json"
-    with (
-        inventory_path.open("w", encoding="utf-8") as listing,
-        (output / "inventory.log").open("w", encoding="utf-8") as log,
-    ):
-        try:
-            inventory_code = subprocess.run(
-                [
-                    "cargo",
-                    "nextest",
-                    "list",
-                    "--locked",
-                    "--workspace",
-                    "--ignore-default-filter",
-                    "--message-format",
-                    "json",
-                    "--user-config-file",
-                    "none",
-                ],
-                stdout=listing,
-                stderr=log,
-                check=False,
-            ).returncode
-        except OSError as error:
-            print(f"Could not list tests: {error}", file=log)
-            inventory_code = None
+    inventory_code = run(
+        [
+            "cargo",
+            "nextest",
+            "list",
+            "--locked",
+            "--workspace",
+            "--ignore-default-filter",
+            "--message-format",
+            "json",
+            "--user-config-file",
+            "none",
+        ],
+        output / "inventory.log",
+        inventory_path,
+    )
     baseline = []
     attempts = []
     docs = []
+    try:
+        metadata_path = output / "metadata.json"
+        if run(
+            ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"],
+            output / "metadata.log",
+            metadata_path,
+        ) != 0:
+            raise ValueError("cargo metadata did not complete")
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        members = set(metadata["workspace_members"])
+        if any(
+            not target["doctest"]
+            for package in metadata["packages"] if package["id"] in members
+            for target in package["targets"]
+            if any(kind in ("lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro") for kind in target["kind"])
+        ):
+            raise ValueError("workspace library disables doctests")
+        doc_targets = Counter(
+            target["name"].replace("-", "_")
+            for package in metadata["packages"] if package["id"] in members
+            for target in package["targets"] if target["doctest"]
+        )
+    except (OSError, subprocess.CalledProcessError, ValueError, KeyError, TypeError) as error:
+        print(f"Cannot inventory doctest targets: {error}", file=sys.stderr)
+        doc_targets = None
+    doc_inventory_code = run(
+        ["cargo", "test", "--locked", "--workspace", "--doc", "--no-fail-fast", "--color", "never", "--", "--list"],
+        output / "doctest-inventory.log",
+    )
     for number in (1, 2):
         baseline.append(
             run(
@@ -229,7 +405,7 @@ def main() -> int:
         # nextest does not run doctests; keep their logs and exit codes separately.
         docs.append(
             run(
-                ["cargo", "test", "--locked", "--workspace", "--doc", "--color", "never"],
+                ["cargo", "test", "--locked", "--workspace", "--doc", "--no-fail-fast", "--color", "never"],
                 output / f"doctest-{number}.log",
             )
         )
@@ -241,8 +417,8 @@ def main() -> int:
     )
     mixed = []
     try:
-        first = outcomes(output / "attempt-1.xml")
-        second = outcomes(output / "attempt-2.xml")
+        first, _ = partial_outcomes(output / "attempt-1.xml")
+        second, _ = partial_outcomes(output / "attempt-2.xml")
         mixed = sorted(
             key
             for key in first.keys() & second.keys()
@@ -267,6 +443,32 @@ def main() -> int:
         baseline[1] == 0
     )
     docs_differed = all(code is not None for code in docs) and (docs[0] == 0) != (docs[1] == 0)
+    doc_results = []
+    try:
+        if doc_targets is None or doc_inventory_code != 0:
+            raise ValueError("doctest inventory unavailable")
+        expected_docs = doctest_inventory(output / "doctest-inventory.log", doc_targets)
+    except (OSError, UnicodeError, ValueError) as error:
+        print(f"Cannot inventory doctests: {error}", file=sys.stderr)
+        expected_docs = None
+        incomplete = True
+    for name in ("cargo-test-1", "cargo-test-2", "doctest-1", "doctest-2"):
+        try:
+            if doc_targets is None:
+                raise ValueError("doctest inventory unavailable")
+            results, complete = doctest_outcomes(output / f"{name}.log", doc_targets)
+            doc_results.append(results)
+            if not complete or expected_docs is None or results.keys() != expected_docs:
+                raise ValueError("doctest results are incomplete")
+        except (OSError, UnicodeError, ValueError) as error:
+            print(f"Cannot verify doctests in {name}: {error}", file=sys.stderr)
+            incomplete = True
+    doc_keys = set().union(*(results.keys() for results in doc_results))
+    mixed.extend(
+        (f"doctest:{suite}", name)
+        for suite, name in sorted(doc_keys)
+        if {"passed", "failure"} <= {results.get((suite, name)) for results in doc_results}
+    )
     summary = {
         "cargo_test_exit_codes": baseline,
         "cargo_test_inconsistent": baseline_differed,
