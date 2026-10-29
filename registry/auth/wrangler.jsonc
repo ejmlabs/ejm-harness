@@ -1,6 +1,7 @@
 {
     "$schema": "../node_modules/wrangler/config-schema.json",
     "name": "ejm-registry-auth",
+    "account_id": "478a0db3a110d8503c16abbc1db27af4",
     "main": "src/index.ts",
     "compatibility_date": "2026-10-18",
     "compatibility_flags": ["nodejs_compat"],
