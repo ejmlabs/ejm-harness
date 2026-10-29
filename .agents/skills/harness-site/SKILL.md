@@ -46,8 +46,23 @@ for example through `wrangler dev -c site/wrangler.jsonc`.
 
 ## Deploy
 
-Publishing needs explicit user authorization each time. Run
-`wrangler deploy -c site/wrangler.jsonc` from the repository root, then confirm the live
-response over the edge. A freshly created custom domain can be unreachable from a machine that
-cached a miss, so test with `curl --resolve` against another ejmlabs.com edge address before
-assuming a failure. Do not touch the other ejmlabs Workers.
+A push to main runs `.github/workflows/deploy.yml`, the canonical caller of the shared
+`ejmlabs/.github` workflow `deploy-site.yml`. Its build job (no secrets, `contents: read`)
+builds the site from that main commit. Its staging job then runs `wrangler deploy --env staging`,
+which publishes the Worker `ejmlabs-harness-staging` at `harness-staging.ejmlabs.com`. Its
+production job deploys the same built files with the top-level config only after the required
+reviewer (@everettmorgan) approves the run in the GitHub `production` environment.
+
+Approving the production job is the explicit authorization for each publication. Do not run
+`wrangler deploy` from a workstation; a local `wrangler deploy -c site/wrangler.jsonc --dry-run`
+is fine. A newer merge cancels an older production deploy that is still waiting. Deploy jobs run
+Wrangler 4.151.3 pinned in the shared repository, not the `registry/` dependency, and use the
+`CLOUDFLARE_API_TOKEN` secret of the `staging` and `production` GitHub environments.
+
+Staging is public and serves the latest main. After each merge, confirm the staging response over
+the edge, and confirm production the same way after approval. A freshly created custom domain can
+be unreachable from a machine that cached a miss, so test with `curl --resolve` against another
+ejmlabs.com edge address before assuming a failure. Do not touch the other ejmlabs Workers.
+
+To roll back, redeploy an earlier Worker version in Cloudflare, or approve an earlier run's
+production job while it is still available.
