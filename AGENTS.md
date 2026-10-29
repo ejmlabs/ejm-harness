@@ -59,6 +59,7 @@ SDKs. ejm-cli lives in its own sibling repository.
 | SDK packages           | npm `ejm-harness`, Python `ejm_harness`                                                   |
 | Public page            | "harness by ejmlabs" at harness.ejmlabs.com                                               |
 | Hosts                  | `ejm-cli` at `../ejm-cli` and `ejm-ide` at `../ejm-ide`, not part of this repo            |
+| Package registry       | `https://registry.ejmlabs.com`                                                            |
 | Package manifest       | `ejm.package.json`; registry clients require an explicit origin                           |
 
 ## Commands

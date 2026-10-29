@@ -7,8 +7,9 @@
     "compatibility_flags": ["nodejs_compat"],
     "workers_dev": false,
     "preview_urls": false,
+    // No routes. This Worker has no public hostname or custom domain.
     "vars": {
-        // Supply the same authorized REGISTRY_ORIGIN as the public Worker.
+        "REGISTRY_ORIGIN": "https://registry.ejmlabs.com",
         "OPERATOR_SUBJECT_IDS": "",
     },
     "d1_databases": [

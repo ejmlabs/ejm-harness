@@ -39,7 +39,8 @@ Read [the host integration guide](../../../docs/ide-integration.md) and
   and expiry. A false flag or completed summary is not a later admission permit.
 - Keep user-facing names consistent: the program is `ejm-harness`, the CLI is `ejm-cli`, and
   packages use `ejm.package.json`. Registry clients require an explicitly configured
-  origin; preserve each origin's separate credential namespace.
+  origin; preserve each origin's separate credential namespace. The public registry
+  origin is `https://registry.ejmlabs.com`, which hosts must select explicitly.
 
 When a rename or a breaking change is approved, record it with the contributor decision
 record through [harness-maintenance](../harness-maintenance/SKILL.md).

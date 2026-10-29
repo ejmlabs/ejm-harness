@@ -1,10 +1,15 @@
-use anyhow::Result;
-use ejm_harness_packages::{RegistryClient, pack_directory};
+use std::time::Duration;
+
+use anyhow::{Context, Result, bail, ensure};
+use ejm_harness_auth::SecretString;
+use ejm_harness_packages::{
+    PUBLIC_REGISTRY_ORIGIN, RegistryClient, pack_directory, registry_origin_is_public,
+};
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
 use wiremock::{
     Mock, MockServer, ResponseTemplate,
-    matchers::{body_json, method, path},
+    matchers::{body_json, header, method, path},
 };
 
 #[tokio::test]
@@ -101,13 +106,109 @@ async fn cross_origin_download_and_identity_substitution_are_rejected() -> Resul
 }
 
 #[test]
-fn registry_origin_rejects_plain_http_credentials_and_paths() {
+fn registry_origin_rejects_plain_http_credentials_paths_and_the_retired_host() -> Result<()> {
     for origin in [
         "http://registry.example",
         "https://user:secret@registry.example",
         "https://registry.example/publish",
         "https://registry.example/?key=secret",
+        "http://127.0.0.2",
+        "http://127.0.0.2:8787",
     ] {
-        assert!(RegistryClient::new(origin).is_err());
+        let Err(error) = RegistryClient::new(origin) else {
+            bail!("{origin} was accepted");
+        };
+        let message = format!("{error:#}");
+        ensure!(!message.contains("retired"), "{origin}: {message}");
     }
+    for origin in [
+        "https://harness.meetgerry.ai",
+        "https://other.meetgerry.ai",
+        "https://meetgerry.ai",
+        "http://harness.meetgerry.ai",
+        "https://user:secret@harness.meetgerry.ai",
+        "https://harness.meetgerry.ai/publish",
+    ] {
+        let Err(error) = RegistryClient::new(origin) else {
+            bail!("{origin} was accepted");
+        };
+        let message = format!("{error:#}");
+        ensure!(message.contains("retired"), "{origin}: {message}");
+        ensure!(
+            message.contains(PUBLIC_REGISTRY_ORIGIN),
+            "{origin}: {message}"
+        );
+    }
+    RegistryClient::new(PUBLIC_REGISTRY_ORIGIN)?;
+    RegistryClient::new("http://127.0.0.1:8787")?;
+    RegistryClient::new("http://localhost:8787")?;
+    RegistryClient::new("http://[::1]:8787")?;
+    RegistryClient::new("https://notmeetgerry.ai")?;
+    ensure!(registry_origin_is_public("https://registry.ejmlabs.com/")?);
+    ensure!(!registry_origin_is_public("https://notmeetgerry.ai")?);
+    Ok(())
+}
+
+#[tokio::test]
+async fn loopback_http_registry_ignores_http_proxy() -> Result<()> {
+    let token = "loopback-registry-synthetic-bearer";
+    if std::env::var_os("EJM_REGISTRY_PROXY_CHILD").is_some() {
+        let origin = std::env::var("EJM_REGISTRY_PROXY_ORIGIN")?;
+        RegistryClient::new(&origin)?
+            .me(&SecretString::new(token))
+            .await?;
+        return Ok(());
+    }
+    let registry = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/me"))
+        .and(header("authorization", format!("Bearer {token}")))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"id":"proxy-fixture"})))
+        .expect(1)
+        .mount(&registry)
+        .await;
+    let proxy = MockServer::start().await;
+    let output = tokio::time::timeout(
+        Duration::from_secs(20),
+        tokio::process::Command::new(std::env::current_exe()?)
+            .kill_on_drop(true)
+            .env("EJM_REGISTRY_PROXY_CHILD", "1")
+            .env("EJM_REGISTRY_PROXY_ORIGIN", registry.uri())
+            .env("HTTP_PROXY", proxy.uri())
+            .env("http_proxy", proxy.uri())
+            .env("ALL_PROXY", proxy.uri())
+            .env("all_proxy", proxy.uri())
+            .env_remove("NO_PROXY")
+            .env_remove("no_proxy")
+            .env_remove("HTTPS_PROXY")
+            .env_remove("https_proxy")
+            .arg("--exact")
+            .arg("loopback_http_registry_ignores_http_proxy")
+            .arg("--test-threads=1")
+            .output(),
+    )
+    .await
+    .context("loopback proxy child timed out")??;
+    ensure!(
+        !String::from_utf8_lossy(&output.stdout).contains(token)
+            && !String::from_utf8_lossy(&output.stderr).contains(token),
+        "synthetic registry bearer appeared in child output"
+    );
+    ensure!(
+        output.status.success(),
+        "loopback proxy child failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let registry_hits = registry
+        .received_requests()
+        .await
+        .context("registry hits")?;
+    let proxy_hits = proxy.received_requests().await.context("proxy hits")?;
+    ensure!(
+        registry_hits.len() == 1,
+        "registry hits: {}",
+        registry_hits.len()
+    );
+    ensure!(proxy_hits.is_empty(), "proxy hits: {}", proxy_hits.len());
+    Ok(())
 }

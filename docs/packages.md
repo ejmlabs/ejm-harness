@@ -2,8 +2,9 @@
 
 ejm-cli demonstrates the package system. Other Rust, TypeScript, and Python
 hosts can use the same public contracts without terminal dependencies or a
-hosted workspace account. Registry source supports self-service publishing,
-but no public registry endpoint is configured or verified as deployed.
+hosted workspace account. Registry source supports self-service publishing
+at `https://registry.ejmlabs.com`. Both Worker configurations select that
+origin explicitly; deployment remains unverified.
 
 ## Contracts and ownership
 
@@ -215,11 +216,30 @@ For an existing private legacy session, stop older clients and confirm the exact
 registry origin. Rust hosts use `migrate_registry_token(root, origin, true)`
 after that confirmation. CLI users must first check that their revision selects
 that same origin; the older compiled default is not configuration for a new
-service. Never copy a session to another origin. An unconfirmed handoff refuses before key access or source
-changes. Migration validates the source's privacy and origin, commits its
+service. Never copy a session to another origin. An unconfirmed handoff refuses
+before key access or source changes. Migration validates the source's privacy and origin, commits its
 encrypted record and permanent marker, reopens the authenticated state, then
 retires the source. Interrupted cleanup can be retried. A marker survives
 logout and replacement, preventing any stale reimport from a leftover source.
+
+A session for `meetgerry.ai` or a subdomain is not imported and is not sent to
+`https://registry.ejmlabs.com`. `validate_registry_origin` rejects that host.
+`registry_origin_is_public` tells a host whether its explicitly selected origin
+matches `PUBLIC_REGISTRY_ORIGIN`. The credential functions refuse a retired
+origin, so its session is never saved, loaded or imported. Hosts sign in again on
+the new origin.
+
+`RegistryClient::new` owns registry transport. For an accepted plain HTTP
+loopback origin it disables all proxies, including uppercase and lowercase
+`HTTP_PROXY`, `HTTPS_PROXY`, and `ALL_PROXY`. Account bearer requests go directly
+to that origin. HTTPS retains proxy support. Hosts consume this public contract
+through `ejm-harness-packages`; they do not need a second HTTP client. A host
+pinned to an older harness must refuse HTTP loopback access with proxy variables
+set until it adopts and verifies the direct-route contract. The local Wiremock
+regression fixture uses a synthetic account bearer and checks both the direct
+registry request and the absence of proxy requests. These source docs do not
+confirm a host pin update, a published release, or a deployed registry.
+
 An existing vault with a missing key requires recovery of the original OS
 record. Read [credential storage](auth.md#storage-and-renewal) for key setup,
 limits, headless Linux behavior, and the storage trust boundary. Native OS

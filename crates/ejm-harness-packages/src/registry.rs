@@ -1,6 +1,6 @@
 //! Native registry client. Account tokens are never sent to package download hosts.
 
-use anyhow::{Result, ensure};
+use anyhow::{Result, bail, ensure};
 use ejm_harness_auth::SecretString;
 use ejm_harness_package_spec::{
     MAX_ARCHIVE_BYTES, Manifest, archive_sha256, validate_archive, validate_name,
@@ -19,6 +19,8 @@ pub use credentials::{
 };
 pub use login::DeviceCode;
 
+/// Public registry origin. Hosts must select it explicitly; there is no default or fallback.
+pub const PUBLIC_REGISTRY_ORIGIN: &str = "https://registry.ejmlabs.com";
 const MAX_JSON_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -42,10 +44,15 @@ impl RegistryClient {
     /// # Errors
     /// Rejects unsafe origins, credentials in URLs, and HTTP client setup errors.
     pub fn new(origin: &str) -> Result<Self> {
-        let origin = parse_origin(origin)?;
-        let http = client_builder()
-            .user_agent(concat!("ejm-harness/", env!("CARGO_PKG_VERSION")))
-            .build()?;
+        let origin = validate_registry_origin(origin)?;
+        let mut builder =
+            client_builder().user_agent(concat!("ejm-harness/", env!("CARGO_PKG_VERSION")));
+        // Plain HTTP is loopback only. Leave system proxies off so a bearer cannot
+        // travel to an HTTP proxy in cleartext. HTTPS keeps the process proxy environment.
+        if origin.scheme() != "https" {
+            builder = builder.no_proxy();
+        }
+        let http = builder.build()?;
         Ok(Self { origin, http })
     }
 
@@ -209,7 +216,43 @@ impl RegistryClient {
     }
 }
 
-fn parse_origin(value: &str) -> Result<Url> {
+/// Normalize a registry origin and reject `meetgerry.ai`.
+///
+/// The returned URL uses a root path. Loopback HTTP is accepted for local development.
+/// There is no fallback host.
+///
+/// # Errors
+/// Rejects credentials, a query, a fragment, a non-root path, public HTTP, and a retired host.
+pub fn validate_registry_origin(value: &str) -> Result<Url> {
+    // A retired host is reported before generic path, userinfo, or scheme errors.
+    let parsed = Url::parse(value)?;
+    if parsed.host_str().is_some_and(retired_registry_host) {
+        bail!("{}", retired_registry_message());
+    }
+    normalize_origin(value)
+}
+
+/// Whether a validated, explicitly selected origin is [`PUBLIC_REGISTRY_ORIGIN`].
+///
+/// # Errors
+/// Returns the same errors as [`validate_registry_origin`].
+pub fn registry_origin_is_public(value: &str) -> Result<bool> {
+    Ok(validate_registry_origin(value)? == validate_registry_origin(PUBLIC_REGISTRY_ORIGIN)?)
+}
+
+pub(crate) fn retired_registry_message() -> String {
+    format!(
+        "the meetgerry.ai registry is retired; the public registry is {PUBLIC_REGISTRY_ORIGIN}. Select a registry origin explicitly and sign in again. A meetgerry.ai session is never sent or reused"
+    )
+}
+
+pub(crate) fn retired_registry_host(host: &str) -> bool {
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    host == "meetgerry.ai" || host.ends_with(".meetgerry.ai")
+}
+
+/// Origin form stored in the vault. Retired hosts stay addressable so their records can be deleted.
+pub(crate) fn normalize_origin(value: &str) -> Result<Url> {
     let mut origin = Url::parse(value)?;
     ensure!(
         origin.username().is_empty()
