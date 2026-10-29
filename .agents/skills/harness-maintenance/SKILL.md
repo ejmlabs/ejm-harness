@@ -41,6 +41,9 @@ Use the owning code as evidence of current behavior.
   does not justify owning a protocol parser or security primitive.
 - Keep skill descriptions specific. Link maintained contracts instead of copying
   them. Add a rule for a demonstrated failure or a deliberate architecture choice.
+- The shared `ejmlabs-*` skills and the AGENTS.md house rules block are synced from
+  [ejmlabs/.github](https://github.com/ejmlabs/.github). Never edit them here; change them
+  there and sync. A `harness-*` skill may add a stricter rule, never a weaker one.
 - Do not turn an ordinary fix or one user's preference into a new global rule.
   No paid calls, publication, or deployment is implied by a quality change.
 

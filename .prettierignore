@@ -16,3 +16,4 @@ site/.wrangler/
 site/public/design-kit/
 /.github/review-context/
 /review/dependency-sources/ejm-ui/
+/.agents/skills/ejmlabs-*/

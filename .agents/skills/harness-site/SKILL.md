@@ -46,7 +46,8 @@ for example through `wrangler dev -c site/wrangler.jsonc`.
 
 ## Deploy
 
-Publishing needs explicit user authorization each time. Run
+Deploy after the PR merges, from a clean clone at the merge commit, as part of finishing
+through ship ([ejmlabs-cloudflare](../ejmlabs-cloudflare/SKILL.md)). Run
 `wrangler deploy -c site/wrangler.jsonc` from the repository root, then confirm the live
 response over the edge. A freshly created custom domain can be unreachable from a machine that
 cached a miss, so test with `curl --resolve` against another ejmlabs.com edge address before
