@@ -10,12 +10,21 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result, ensure};
-use base64::engine::general_purpose::STANDARD;
+use anyhow::{Context, Result, bail, ensure};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use tokio_util::sync::CancellationToken;
 
-use super::*;
-use crate::{CredentialStore, FileStore, SecretString, StoredCredentials, StoredRegistration};
+use super::{
+    BOOTSTRAP, Backend, LOCK_WAIT, SecretId, SecretVault, VaultKeyStore,
+    format::{decode, encode},
+    key_store::native_entry,
+    lock::Prepared,
+    state::{Migration, VaultState},
+};
+use crate::{
+    CredentialStore, FileStore, SecretString, StoredAuth, StoredCredentials, StoredRegistration,
+    store::wire,
+};
 
 #[derive(Default)]
 struct Keys {

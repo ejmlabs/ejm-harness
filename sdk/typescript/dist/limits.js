@@ -1,0 +1,9 @@
+export const MAX_FRAME = 1024 * 1024;
+export const MAX_OUTPUT = 4 * MAX_FRAME;
+export const MAX_PENDING = 64;
+export const MAX_CONTROL_PENDING = 8;
+export const MAX_NORMAL_PENDING = MAX_PENDING - MAX_CONTROL_PENDING;
+export const MAX_QUEUED = 256;
+export const MAX_PROGRESS_BYTES = 16 * 1024;
+export const CLEANUP_TIMEOUT_MS = 5_000;
+export const SHUTDOWN_TIMEOUT_MS = 5_000;
