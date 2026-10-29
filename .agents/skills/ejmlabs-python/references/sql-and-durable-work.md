@@ -6,7 +6,10 @@ rules hold for any SQL database.
 ## Parameters
 
 ```python
-await cursor.execute("SELECT id FROM items WHERE owner = %s AND id = ANY(%s)", (owner, ids))
+await cursor.execute(
+    "SELECT id FROM items WHERE owner = %s AND id = ANY(%s)",
+    (owner, ids),
+)
 ```
 
 - Every value is a bound parameter. Never format a request value, an id, or a name into SQL.
