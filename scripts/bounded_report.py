@@ -4,6 +4,7 @@
 import hashlib
 import heapq
 import importlib.util
+import io
 import json
 import os
 import selectors
@@ -172,16 +173,20 @@ def capture(mode: str, output: Path, limit: int, command: list[str]) -> int:
             dirty = False
             last_snapshot = time.monotonic()
 
+            def publish(data: bytes) -> None:
+                temporary = output.with_name(output.name + ".tmp")
+                temporary.write_bytes(data)
+                temporary.replace(output)
+
             def snapshot(*, final: bool = False) -> None:
                 nonlocal dirty, last_snapshot
                 if dirty:
-                    stream.seek(0)
-                    stream.truncate()
                     if records is not None:
-                        records.write(stream, partial=not final)
+                        buffer = io.BytesIO()
+                        records.write(buffer, partial=not final)
+                        publish(buffer.getvalue())
                     elif junit is not None:
-                        stream.write(junit.snapshot())
-                    stream.flush()
+                        publish(junit.snapshot())
                     dirty = False
                     last_snapshot = time.monotonic()
 
@@ -223,10 +228,7 @@ def capture(mode: str, output: Path, limit: int, command: list[str]) -> int:
             if junit is not None:
                 projection = junit.finish()
                 if overflow:
-                    stream.seek(0)
-                    stream.truncate()
-                    stream.write(projection)
-                    stream.flush()
+                    publish(projection)
         valid_fifo = mode == "stdout" or (
             fifo.exists() and stat.S_ISFIFO(fifo.stat().st_mode) and fifo.stat().st_ino == identity
         )

@@ -12,6 +12,65 @@ from unittest.mock import patch
 
 
 class BoundedReportTests(unittest.TestCase):
+    def test_interrupted_snapshot_retains_last_complete_evidence(self) -> None:
+        script = Path(__file__).with_name("bounded_report.py")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for mode in ("fifo-jsonl", "fifo-xml"):
+                output = root / mode
+                if mode == "fifo-jsonl":
+                    first = b'{"kind":"start"}\n{"kind":"case","file":"case.rs","name":"early","status":"failed"}\n'
+                    second = b'{"kind":"case","file":"case.rs","name":"later","status":"passed"}\n'
+                    expected = b'"name":"early"'
+                    unexpected = b'"name":"later"'
+                else:
+                    first = (b'<testsuites><testsuite name="suite">' + b" " * 300
+                             + b'<testcase classname="suite" name="early"><failure/></testcase>')
+                    second = b'<testcase classname="suite" name="later"/>'
+                    expected, unexpected = b'name="early"', b'name="later"'
+                producer = (
+                    "import sys,time; out=open(sys.argv[1],'wb',buffering=0); "
+                    "out.write(bytes.fromhex(sys.argv[2])); time.sleep(0.6); "
+                    "out.write(bytes.fromhex(sys.argv[3])); time.sleep(1)"
+                )
+                driver = '''import subprocess, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import bounded_report
+original = Path.replace
+spawn = subprocess.Popen
+child = None
+calls = 0
+def start(*args, **kwargs):
+    global child
+    child = spawn(*args, **kwargs)
+    return child
+subprocess.Popen = start
+def replace(path, target):
+    global calls
+    calls += 1
+    if calls == 2:
+        child.terminate()
+        child.wait(timeout=5)
+        raise SystemExit(77)
+    return original(path, target)
+Path.replace = replace
+bounded_report.capture(sys.argv[2], Path(sys.argv[3]), 256, sys.argv[4:])
+'''
+                result = subprocess.run(
+                    [sys.executable, "-c", driver, str(script.parent), mode, str(output),
+                     sys.executable, "-c", producer, str(output) + ".fifo", first.hex(), second.hex()],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10, check=False,
+                )
+                self.assertEqual(result.returncode, 77)
+                evidence = output.read_bytes()
+                self.assertIn(expected, evidence)
+                self.assertNotIn(unexpected, evidence)
+                if mode == "fifo-jsonl":
+                    self.assertTrue(json.loads(evidence.splitlines()[-1])["incomplete"])
+                else:
+                    self.assertIn(b'incomplete="true"', evidence)
+
     def test_partial_evidence_is_visible_before_producer_exits(self) -> None:
         script = Path(__file__).with_name("bounded_report.py")
         with tempfile.TemporaryDirectory() as directory:

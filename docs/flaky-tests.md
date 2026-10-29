@@ -22,6 +22,8 @@ missing, filtered, ignored, skipped, or extra test makes the comparison
 incomplete. Oversized JUnit reports retain bounded test identities, favoring
 failures and their earlier counterparts, and are marked incomplete. Bounded
 summaries prioritize mixed and failed identities and mark any omitted results.
+If the detector is interrupted, a bounded follow-up compares its persisted
+Cargo, nextest, and doctest outcomes and marks the summary incomplete.
 The workflow provisions an isolated Linux Secret Service for the
 real credential test and builds the native helper needed by executor tests.
 Doctests run separately through Cargo. Each attempt checks all workspace library
