@@ -100,41 +100,21 @@ fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
                 let _ = child.wait();
             }
         }
-        "descendant" | "orphan" | "many-descendants" => descendants(&mode, pid_file)?,
+        "descendant" | "orphan" => descendants(&mode, pid_file)?,
         _ => std::process::exit(2),
     }
     Ok(std::process::ExitCode::SUCCESS)
 }
 
 fn descendants(mode: &str, pid_file: Option<PathBuf>) -> Result<(), Box<dyn std::error::Error>> {
-    let count = if mode == "many-descendants" { 5 } else { 1 };
-    let mut children = Vec::new();
-    let mut pids = vec![std::process::id()];
-    for _ in 0..count {
-        let mut command = std::process::Command::new(std::env::current_exe()?);
-        command.env("EJM_HARNESS_EXEC_FIXTURE", "hold");
-        let child = command.spawn()?;
-        pids.push(child.id());
-        children.push(child);
-    }
-    if mode != "many-descendants"
-        && let Some(path) = pid_file
-    {
-        std::fs::write(
-            path,
-            format!(
-                "{}\n",
-                pids.iter()
-                    .map(ToString::to_string)
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            ),
-        )?;
+    let mut child = std::process::Command::new(std::env::current_exe()?)
+        .env("EJM_HARNESS_EXEC_FIXTURE", "hold")
+        .spawn()?;
+    if let Some(path) = pid_file {
+        std::fs::write(path, format!("{} {}\n", std::process::id(), child.id()))?;
     }
     if mode != "orphan" {
-        for mut child in children {
-            let _ = child.wait();
-        }
+        let _ = child.wait();
     }
     Ok(())
 }
