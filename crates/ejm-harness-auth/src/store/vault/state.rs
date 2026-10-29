@@ -12,9 +12,9 @@ use crate::{SecretString, StoredAuth};
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SecretId {
-    pub(super) product: String,
-    pub(super) purpose: String,
-    pub(super) identity: String,
+    product: String,
+    purpose: String,
+    identity: String,
 }
 
 impl SecretId {

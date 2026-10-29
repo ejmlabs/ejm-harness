@@ -3,8 +3,7 @@ use std::time::Duration;
 use anyhow::{Context, Result, bail, ensure};
 use ejm_harness_auth::SecretString;
 use ejm_harness_packages::{
-    DISCARD_RETIRED_REGISTRY_COMMAND, PUBLIC_REGISTRY_ORIGIN, RegistryClient, pack_directory,
-    registry_origin_is_public,
+    PUBLIC_REGISTRY_ORIGIN, RegistryClient, pack_directory, registry_origin_is_public,
 };
 use serde_json::json;
 use tokio_util::sync::CancellationToken;
@@ -137,10 +136,6 @@ fn registry_origin_rejects_plain_http_credentials_paths_and_the_retired_host() -
         ensure!(message.contains("retired"), "{origin}: {message}");
         ensure!(
             message.contains(PUBLIC_REGISTRY_ORIGIN),
-            "{origin}: {message}"
-        );
-        ensure!(
-            message.contains(DISCARD_RETIRED_REGISTRY_COMMAND),
             "{origin}: {message}"
         );
     }

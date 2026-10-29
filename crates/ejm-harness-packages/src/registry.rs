@@ -15,16 +15,12 @@ mod credentials;
 mod login;
 
 pub use credentials::{
-    RetiredRegistrySession, delete_registry_token, discard_retired_registry_sessions,
-    force_discard_legacy_registry_session, load_registry_token, locate_retired_registry_sessions,
-    migrate_registry_token, retired_registry_session_notice, save_registry_token,
+    delete_registry_token, load_registry_token, migrate_registry_token, save_registry_token,
 };
 pub use login::DeviceCode;
 
 /// Public registry origin. Hosts must select it explicitly; there is no default or fallback.
 pub const PUBLIC_REGISTRY_ORIGIN: &str = "https://registry.ejmlabs.com";
-/// Command the CLI implements for a leftover `meetgerry.ai` session. This crate does not run it.
-pub const DISCARD_RETIRED_REGISTRY_COMMAND: &str = "ejm-cli package discard-retired-session";
 const MAX_JSON_BYTES: usize = 64 * 1024;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -246,7 +242,7 @@ pub fn registry_origin_is_public(value: &str) -> Result<bool> {
 
 pub(crate) fn retired_registry_message() -> String {
     format!(
-        "the meetgerry.ai registry is retired; the public registry is {PUBLIC_REGISTRY_ORIGIN}. Select a registry origin explicitly. The old session is not sent or reused. Discard it with `{DISCARD_RETIRED_REGISTRY_COMMAND}` and sign in again"
+        "the meetgerry.ai registry is retired; the public registry is {PUBLIC_REGISTRY_ORIGIN}. Select a registry origin explicitly and sign in again. A meetgerry.ai session is never sent or reused"
     )
 }
 
@@ -255,7 +251,7 @@ pub(crate) fn retired_registry_host(host: &str) -> bool {
     host == "meetgerry.ai" || host.ends_with(".meetgerry.ai")
 }
 
-/// Origin form stored in the vault. Retired hosts stay addressable so they can be deleted.
+/// Origin form stored in the vault. Retired hosts stay addressable so their records can be deleted.
 pub(crate) fn normalize_origin(value: &str) -> Result<Url> {
     let mut origin = Url::parse(value)?;
     ensure!(

@@ -1,6 +1,6 @@
 # Tasks
 
-Everett confirmed `https://registry.ejmlabs.com` on 2026-10-20. The `AGENTS.md` names table records that origin. Main's `ejm.package.json` manifest and explicitly configured registry-client contract remain in force. Do not deploy, and do not create, delete, or move a tag or GitHub release. The CLI command for a leftover retired session is `ejm-cli package discard-retired-session`.
+Everett confirmed `https://registry.ejmlabs.com` on 2026-10-20. The `AGENTS.md` names table records that origin. Main's `ejm.package.json` manifest and explicitly configured registry-client contract remain in force. Do not deploy, and do not create, delete, or move a tag or GitHub release.
 
 ## 1. ejm-harness client origin
 
@@ -10,9 +10,9 @@ Everett confirmed `https://registry.ejmlabs.com` on 2026-10-20. The `AGENTS.md` 
 
 ## 2. ejm-harness retired sessions
 
-- [x] 2.1 When `registry-session.json` belongs to `meetgerry.ai` or a subdomain, stop blocking other origins with the missing `ejm-cli package migrate-credentials` command. Return a message that the session is for the retired registry, that the token is not sent, and that the host can discard it locally. Verify a fixture with that legacy file performs no HTTP request and does not import the token into the new origin.
-- [x] 2.2 Add a local discard for that retired legacy file and its vault record. An unsafe or unreadable `registry-session.json` is unlinked without following it. Verify the file and vault record are removed with no network request, a later save for the confirmed origin succeeds, and a legacy file for any other origin is refused.
-- [x] 2.3 Keep `migrate_registry_token` for a legacy file whose origin matches the requested origin. Remove `ejm-cli package migrate-credentials --old-clients-stopped` from `credentials.rs` and `docs/packages.md`. Verify the repository no longer contains that command string, and the same-origin handoff still names `migrate_registry_token`.
+- [x] 2.1 Refuse `meetgerry.ai` and its subdomains in `save_registry_token`, `load_registry_token` and `migrate_registry_token` with the retired-registry message. Verify a stored retired record is never loaded, a retired legacy file is not imported for any origin, and no token is stored for either origin.
+- [x] 2.2 Add no discard path. No product shipped against `meetgerry.ai`, so no user holds a retired session.
+- [x] 2.3 Keep `migrate_registry_token` for a legacy file whose origin matches the requested origin. Remove `ejm-cli package migrate-credentials --old-clients-stopped` from `credentials.rs` and `docs/packages.md`; the legacy gate names `migrate_registry_token` instead. Verify the repository no longer contains that command string, and the same-origin handoff still names `migrate_registry_token`.
 
 ## 3. ejm-harness registry configuration and docs
 
@@ -24,7 +24,7 @@ Everett confirmed `https://registry.ejmlabs.com` on 2026-10-20. The `AGENTS.md` 
 
 ## 4. ejm-cli dependency
 
-- [x] 4.1 Do not edit ejm-cli. Its separate change must adopt explicit `RegistryClient::new(origin)` configuration, optional registry clients and the retired-session APIs together.
+- [x] 4.1 Do not edit ejm-cli. Its separate change must adopt explicit `RegistryClient::new(origin)` configuration, optional registry clients and the retired-origin refusal together.
 
 ## 5. ejm-ide, ejm-ui, and ejmlabs
 

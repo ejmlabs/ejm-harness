@@ -60,17 +60,6 @@ impl VaultTransaction {
     pub fn get(&self, id: &SecretId) -> Option<SecretString> {
         self.state.secrets.get(id).cloned()
     }
-
-    /// Identity strings for one product and purpose. Secret values are not returned.
-    #[must_use]
-    pub fn identities(&self, product: &str, purpose: &str) -> Vec<String> {
-        self.state
-            .secrets
-            .keys()
-            .filter(|id| id.product == product && id.purpose == purpose)
-            .map(|id| id.identity.clone())
-            .collect()
-    }
     /// Stage a bounded scoped secret.
     ///
     /// # Errors

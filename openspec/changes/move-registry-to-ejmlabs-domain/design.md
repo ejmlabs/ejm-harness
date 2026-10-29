@@ -10,7 +10,7 @@ The public Worker and the auth Worker both take `REGISTRY_ORIGIN` `https://regis
 
 Wrangler names the public Worker `ejm-registry`, the auth Worker `ejm-registry-auth`, the D1 databases `ejm-registry` and `ejm-registry-auth`, and the R2 bucket `ejm-registry-packages`. Both Wrangler files still use placeholder D1 ids. `https://harness.ejmlabs.com` stays the root custom domain of the static Worker `ejmlabs-harness` (`site/wrangler.jsonc`). `ejm-cli` and `ejm-ide` deploy notes still tell operators not to touch existing account Workers named `gerry-*`, `gerry-marketing`, and `gerry-coming-soon`.
 
-Saved registry sessions are keyed by the exact origin. Before this change, a legacy `registry-session.json` blocked save and load for every origin until that file was migrated, and the error named a CLI command that `ejm-cli` does not implement. A retired-origin legacy file now does not block sign-in to `https://registry.ejmlabs.com`. The host discards it locally. `migrate_registry_token` still refuses a legacy file whose origin does not match the requested origin.
+Saved registry sessions are keyed by the exact origin. A legacy `registry-session.json` blocks save and load for every origin until that file is migrated. This change keeps that gate and stops its error from naming a CLI command. No product has shipped against `meetgerry.ai`, so no user holds a retired legacy file or vault record, and this change adds no discard path for one. `migrate_registry_token` still refuses a legacy file whose origin does not match the requested origin.
 
 The first published harness release stays `0.1.0`. Everett will delete and recreate that version at the fixed commit. Notes for this change belong under `Unreleased` in `CHANGELOG.md`; main's released entries stay unchanged. Tags and GitHub releases stay untouched.
 
@@ -20,7 +20,7 @@ The first published harness release stays `0.1.0`. Everett will delete and recre
 
 - One confirmed `ejmlabs.com` origin for explicitly selected public-registry clients, both Workers' `REGISTRY_ORIGIN`, download URLs, and the GitHub OAuth callback. Schema generation and isolated fixtures use main's reserved example origin.
 - Reject `meetgerry.ai` and its subdomains before any request, with no fallback and no transfer of old sessions.
-- Unblock sign-in to the new origin when a legacy file belongs to the retired origin, and discard that local session without a network call.
+- Never save, load, import or send a session for the retired origin.
 - Stop telling users to run a CLI command that does not exist.
 - Keep same-origin downloads, redirect refusal, host-only cookies, and the private auth Worker.
 
@@ -66,21 +66,19 @@ Worker names in Wrangler are `ejm-registry` and `ejm-registry-auth`. D1 database
 
 ### 3. Reject the retired origin, and do not redirect it
 
-`validate_registry_origin`, which `RegistryClient::new` calls, rejects a host that is `meetgerry.ai` or a subdomain of it, including `harness.meetgerry.ai`, before the generic path, userinfo, and scheme checks. A retired host with a path, userinfo, or `http` scheme still gets the retired-registry message. The error names the public registry, requires explicit origin selection, and names `DISCARD_RETIRED_REGISTRY_COMMAND`. The check is on the parsed host, so `notmeetgerry.ai` remains a normal HTTPS origin. `normalize_origin` still accepts a retired host so a stored vault identity can be deleted. No second origin is tried when the selected connection fails.
+`validate_registry_origin`, which `RegistryClient::new` calls, rejects a host that is `meetgerry.ai` or a subdomain of it, including `harness.meetgerry.ai`, before the generic path, userinfo, and scheme checks. A retired host with a path, userinfo, or `http` scheme still gets the retired-registry message. The error names the public registry and requires explicit origin selection. The check is on the parsed host, so `notmeetgerry.ai` remains a normal HTTPS origin. `normalize_origin` still accepts a retired host so `delete_registry_token` can remove a stored record. No second origin is tried when the selected connection fails.
 
 The old host is not kept as an HTTP redirect. The client treats a 3xx as failure and would not send a credential to the `Location`. A temporary reverse proxy on the old host would also be a second origin, which splits host-only cookies and the exact `Origin` check. The README in this tree says this registry has not been deployed. If Everett later finds that `harness.meetgerry.ai` did issue sessions, those sessions stay unused. Users sign in on the new origin. The old tokens are not copied and not replayed.
 
 A plain HTTP loopback client disables proxies, so a bearer is not sent to an HTTP proxy. An HTTPS client keeps the process proxy environment.
 
-### 4. Discard a retired session locally, and stop citing a missing command
+### 4. Refuse retired sessions, and stop citing a CLI command
 
-`ejm-cli` had no discard command at `c8e2239392f71df82cbef6166b1827c8e5f5f1c5`. On 2026-10-20 the sibling branch `openspec/move-registry-to-ejmlabs-domain` is commit `65525726fa71d5857174fce969c947249d238ae2` and is still a plan. Its tasks still say to add `package migrate-credentials` with a required `--old-clients-stopped` flag, because they were written against harness main, where the error named that missing command. Everett required this harness change to stop naming that command. The command this crate names, and that the CLI change should implement, is `ejm-cli package discard-retired-session` (`DISCARD_RETIRED_REGISTRY_COMMAND`). The CLI task that says to stop and update its change when the harness API differs is the coordination point.
+The harness is not live, so no user holds a `meetgerry.ai` session. This change refuses that origin instead of adding a discard path for files nobody has.
 
-- A legacy file or vault record for `meetgerry.ai` or a subdomain does not block `save_registry_token` or `load_registry_token` for another origin, and it is not imported or re-keyed. `retired_registry_session_notice` returns the discard instruction when one is present.
-- `load_registry_token` and `save_registry_token` for a retired origin fail with that same instruction. The token is not returned and not sent.
-- `locate_retired_registry_sessions` lists those origins without token values. `discard_retired_registry_sessions` deletes the legacy file and the vault records locally, with no HTTP request. A legacy file for any other origin is left alone.
-- An unsafe or unreadable `registry-session.json` (a symlink, a mode other than `0600`, or JSON that does not parse) does not yield a token. Sign-in names the full path and `DISCARD_RETIRED_REGISTRY_COMMAND`. `discard_retired_registry_sessions` and `force_discard_legacy_registry_session` unlink that directory entry without following it and without a network request. A missing file makes force discard return false. A private well-formed file is left in place. `migrate_registry_token` does not delete an unsafe or unreadable file.
-- A same-origin legacy file still uses `migrate_registry_token`. The error names that function. It does not name `ejm-cli package migrate-credentials`.
+- `save_registry_token`, `load_registry_token` and `migrate_registry_token` fail for `meetgerry.ai` or a subdomain with the retired-registry message. The token is not returned, stored, imported or sent.
+- `migrate_registry_token` imports a legacy file only when its origin matches the requested origin, so a retired file is never re-keyed.
+- The legacy gate's error names `migrate_registry_token`. It does not name an `ejm-cli` command.
 - `validate_registry_origin` and `registry_origin_is_public` are the harness API for the CLI's `--registry` and `EJM_CLI_REGISTRY_URL`. The flag, the environment variable, and doctor output stay in the CLI change.
 
 The sentence in `docs/ejm-cli.md` that names `https://harness.meetgerry.ai` belongs to that CLI change. This repo does not edit that repository. `ejm-cli` must adopt the explicit-origin configuration and optional registry-client contract together; updating a harness checkout does not configure its registry or transfer credentials.
@@ -96,8 +94,7 @@ Keep main's entries exactly and add the public-origin and proxy-route notes unde
 ## Risks / Trade-offs
 
 - [`AGENTS.md` names an undecided registry origin] → The names table says `https://registry.ejmlabs.com`. Main's `ejm.package.json` requirement and explicit-origin contract stay in force.
-- [A legacy `registry-session.json` for the retired origin blocks every login] → Sign-in to `https://registry.ejmlabs.com` proceeds. The notice names `ejm-cli package discard-retired-session`. The token is not imported. Same-origin legacy files still require `migrate_registry_token`.
-- [The CLI implements a different discard command name] → This crate publishes `DISCARD_RETIRED_REGISTRY_COMMAND`. The CLI change should use that string. The old `migrate-credentials` command is not named.
+- [A legacy `registry-session.json` for the retired origin blocks every login] → No product shipped against `meetgerry.ai`, so no user has one. Its token is never imported or sent. Removing the file by hand unblocks sign-in.
 - [Someone sets cookie `Domain` to `ejmlabs.com`, or adds a redirect on the old host] → Cookies stay host-only. `validate_registry_origin` rejects the old host. The client already ignores redirects. Tests cover both.
 - [Schema regeneration rewrites auth SQL] → Commit the generator output only. Review the diff. The hostname is not expected to appear in `0001_auth.sql`.
 - [Wrangler resource names] → Config names the Workers `ejm-registry` and `ejm-registry-auth`, the D1 databases `ejm-registry` and `ejm-registry-auth`, and the R2 bucket `ejm-registry-packages`. Placeholder D1 ids stay. Nothing is deployed from this change. Main's Cargo, npm, and product branding stay.
@@ -108,14 +105,14 @@ Keep main's entries exactly and add the public-origin and proxy-route notes unde
 1. Everett confirms the origin. If it is `harness.ejmlabs.com`, move the static site off that hostname under its own authorization before the registry route exists.
 2. Keep client origin selection explicit, apply the rejection rule, set both deployment `REGISTRY_ORIGIN` values, and update the README callback, custom domain and `docs/packages.md`. Keep schema and test origins reserved.
 3. Add the public Worker custom domain in Wrangler. Leave the auth Worker private. Set the Worker, D1, and R2 names to `ejm-registry`, `ejm-registry-auth`, and `ejm-registry-packages` in config only.
-4. Replace the missing-command error, add local discard for a retired origin, and keep same-origin `migrate_registry_token` for every other legacy file.
+4. Refuse the retired origin in the credential functions, stop naming a CLI command in the legacy gate, and keep same-origin `migrate_registry_token`.
 5. Regenerate the auth schema check. Run the focused package tests and `./scripts/check-registry`. Do not deploy.
 6. Keep the changelog notes under `Unreleased`. Leave tags and GitHub releases alone.
 7. The `ejm-cli` change updates its docs and any user-facing command after this harness revision is available. Rollback of this change is reverting the origin constant and the rejection. Stored retired-origin tokens are not restored onto the new origin.
 
 ## Open Questions
 
-1. Whether `harness.meetgerry.ai` ever issued real sessions. The source shows placeholder D1 ids. Either answer uses the same rejection and local discard. Tokens are not copied.
+1. Whether `harness.meetgerry.ai` ever issued real sessions. The source shows placeholder D1 ids. Nothing has shipped against it, so this change refuses it and adds no discard. Tokens are not copied.
 2. Whether `require-https-provider-endpoints` changes the loopback set before a later edit. Until it does, the current three hosts stay.
 
 ## Proxy contract verification and host order

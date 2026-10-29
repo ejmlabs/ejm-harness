@@ -37,8 +37,8 @@ these notes; see [RELEASING.md](RELEASING.md) and the known limits under
   explicitly select a registry origin. Both Workers' `REGISTRY_ORIGIN` and the
   GitHub OAuth callback use the public origin.
   `meetgerry.ai` and its subdomains are rejected, redirects are not followed, and
-  sessions saved for the retired origin are not sent or reused. Discard a leftover
-  session with `ejm-cli package discard-retired-session` and sign in again. These
+  sessions saved for the retired origin are not saved, loaded, imported or sent.
+  Sign in again on the new origin. These
   notes do not deploy a registry, and they do not create or replace a tag or
   GitHub release. Builds from the earlier v0.1.0 tag (commit 8d3dc39) default
   to a retired registry domain and must not be used for registry commands.

@@ -225,16 +225,9 @@ logout and replacement, preventing any stale reimport from a leftover source.
 A session for `meetgerry.ai` or a subdomain is not imported and is not sent to
 `https://registry.ejmlabs.com`. `validate_registry_origin` rejects that host.
 `registry_origin_is_public` tells a host whether its explicitly selected origin
-matches `PUBLIC_REGISTRY_ORIGIN`. `locate_retired_registry_sessions` lists leftover retired
-origins without returning token values. `discard_retired_registry_sessions`
-deletes those local records and does not make a network request. The user-facing
-command is `ejm-cli package discard-retired-session`. An unsafe or unreadable
-`registry-session.json` makes sign-in name that file's path and the same command.
-`force_discard_legacy_registry_session` unlinks that directory entry without
-following it or sending anything on the network, and it leaves a private
-well-formed file in place. Hosts sign in again on the new origin.
-`retired_registry_session_notice` returns that instruction when a leftover retired
-session is present.
+matches `PUBLIC_REGISTRY_ORIGIN`. The credential functions refuse a retired
+origin, so its session is never saved, loaded or imported. Hosts sign in again on
+the new origin.
 
 `RegistryClient::new` owns registry transport. For an accepted plain HTTP
 loopback origin it disables all proxies, including uppercase and lowercase

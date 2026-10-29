@@ -89,31 +89,22 @@ The harness MUST NOT contain the retired `meetgerry.ai` registry as a default or
 
 ### Requirement: Saved sessions for the retired origin are never sent
 
-The harness MUST NOT send a registry session saved for the retired origin to any host, and MUST NOT re-key it to another origin. A legacy session file for the retired origin MUST produce an actionable message instead of permanently blocking sign-in to the current origin. The harness MUST let the host discard that session locally.
+The harness MUST NOT save, load, import or send a registry session for the retired origin, and MUST NOT re-key it to another origin.
+
+#### Scenario: Retired origin in a credential call
+
+- **WHEN** a host saves, loads or migrates a registry session for `https://harness.meetgerry.ai`
+- **THEN** the call fails with the retired-registry message naming the public registry, and no token is stored, returned or sent
 
 #### Scenario: Legacy session file for the retired origin
 
-- **WHEN** the package store holds a legacy registry session for `https://harness.meetgerry.ai` and the user signs in to the explicitly selected public registry
-- **THEN** sign-in is not silently blocked: the user is told that the old session belongs to a retired registry and how to discard it, and the old token is never transmitted
-
-#### Scenario: Discarding the retired session
-
-- **WHEN** the host asks the harness to discard the retired-origin session
-- **THEN** the legacy file or vault record is removed locally without any network request, and sign-in to the explicitly selected public registry can proceed
+- **WHEN** the package store holds a legacy registry session for `https://harness.meetgerry.ai` and the host migrates for another origin
+- **THEN** migration refuses the file as belonging to another origin, and the old token is never imported or transmitted
 
 #### Scenario: Vault record for the retired origin
 
 - **WHEN** the encrypted vault holds a session for the retired origin
 - **THEN** loading a session for the explicitly selected origin does not return it
-
-### Requirement: Unsafe legacy registry files are discarded without being followed
-
-The harness MUST NOT treat an unsafe or unreadable `registry-session.json` as a credential. Sign-in MUST name that file's path and `ejm-cli package discard-retired-session`. Discard MUST unlink that directory entry without following it and without a network request. Force discard MUST leave a private well-formed legacy file in place. `migrate_registry_token` MUST NOT delete an unsafe or unreadable file.
-
-#### Scenario: Unsafe legacy file
-
-- **WHEN** `registry-session.json` is a symlink, is not mode `0600`, or contains a field other than origin and token
-- **THEN** sign-in names the file path and `ejm-cli package discard-retired-session`, the token is not sent, and discard removes the directory entry without following a symlink
 
 ### Requirement: Package integrity is unchanged by the move
 
