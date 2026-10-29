@@ -20,11 +20,15 @@ fn helper_path(variable: &str) -> anyhow::Result<std::path::PathBuf> {
 
     let path = match std::env::var_os(variable) {
         Some(path) => std::path::PathBuf::from(path),
-        None => std::env::current_exe()?
-            .parent()
-            .and_then(std::path::Path::parent)
-            .context("test executable is outside Cargo's target directory")?
-            .join("ejm-harness-exec-fixture"),
+        None => {
+            let current = std::env::current_exe()?;
+            let fixture = current
+                .parent()
+                .and_then(std::path::Path::parent)
+                .context("test executable is outside Cargo's target directory")?
+                .join("ejm-harness-exec-fixture");
+            if fixture.is_file() { fixture } else { current }
+        }
     };
     ensure!(path.is_absolute(), "test helper path must be absolute");
     let metadata = path.metadata().context("inspect test helper")?;
@@ -49,6 +53,22 @@ fn private_tempdir() -> std::io::Result<tempfile::TempDir> {
 fn competing_startup_clients_share_one_stable_lock() {
     use std::{fs::TryLockError, sync::Barrier, thread};
 
+    if let Some(root) = std::env::var_os("EJM_TEST_NATIVE_ROOT") {
+        let args = [
+            super::HELPER_ARG.into(),
+            root,
+            std::env::var_os("EJM_TEST_NATIVE_DOMAIN").unwrap(),
+            std::env::var_os("EJM_TEST_NATIVE_GENERATION").unwrap(),
+            std::env::var_os("EJM_TEST_NATIVE_ACCOUNTED").unwrap(),
+        ];
+        assert_eq!(
+            super::dispatch_helper_args(args.into_iter())
+                .unwrap()
+                .unwrap(),
+            std::process::ExitCode::SUCCESS
+        );
+        return;
+    }
     let root = private_tempdir().unwrap();
     let directory =
         super::wire::directory(&root.path().canonicalize().unwrap(), "startup-race").unwrap();

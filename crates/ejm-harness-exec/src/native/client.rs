@@ -175,13 +175,45 @@ async fn start_helper(
         .helper_executable
         .clone()
         .map_or_else(std::env::current_exe, Ok)?;
-    let mut helper_command = tokio::process::Command::new(executable);
+    let mut helper_command = tokio::process::Command::new(&executable);
+    #[cfg(test)]
+    let test_executable = owner
+        .helper_executable
+        .as_ref()
+        .is_some_and(|_| std::env::current_exe().is_ok_and(|current| current == executable));
+    #[cfg(test)]
+    if test_executable {
+        helper_command
+            .args([
+                "--exact",
+                "native::tests::competing_startup_clients_share_one_stable_lock",
+                "--nocapture",
+            ])
+            .env("EJM_TEST_NATIVE_ROOT", &owner.inner.root)
+            .env("EJM_TEST_NATIVE_DOMAIN", &owner.inner.domain)
+            .env("EJM_TEST_NATIVE_GENERATION", generation.to_string())
+            .env(
+                "EJM_TEST_NATIVE_ACCOUNTED",
+                if accounted { "admitted" } else { "local" },
+            );
+    }
+    #[cfg(test)]
+    if !test_executable {
+        helper_command
+            .arg(HELPER_ARG)
+            .arg(&owner.inner.root)
+            .arg(&owner.inner.domain)
+            .arg(generation.to_string())
+            .arg(if accounted { "admitted" } else { "local" });
+    }
+    #[cfg(not(test))]
     helper_command
         .arg(HELPER_ARG)
         .arg(&owner.inner.root)
         .arg(&owner.inner.domain)
         .arg(generation.to_string())
-        .arg(if accounted { "admitted" } else { "local" })
+        .arg(if accounted { "admitted" } else { "local" });
+    helper_command
         .stdin(Stdio::from(ownership.try_clone()?))
         .stdout(Stdio::null())
         .stderr(Stdio::null());

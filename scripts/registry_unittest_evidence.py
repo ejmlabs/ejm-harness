@@ -123,9 +123,28 @@ def run(report: Path, pattern: str = "test*.py") -> int:
         },
         sort_keys=True,
     )
-    if len(data.encode("utf-8")) > 4 * 1024 * 1024:
-        data = '{"outcomes": {}, "ineligible": [], "incomplete": true}'
+    if (
+        len(data.encode("utf-8")) > 4 * 1024 * 1024
+        or len(result.outcomes) > 20_000
+        or any(len(identity) > 4096 for identity in result.outcomes)
+    ):
         incomplete = True
+        retained: dict[str, str] = {}
+        budget = 4 * 1024 * 1024 - 128
+        for identity, outcome in sorted(result.outcomes.items()):
+            encoded = json.dumps(identity).encode("utf-8")
+            cost = 2 * len(encoded) + 24
+            if len(identity) > 4096 or cost > budget:
+                continue
+            if len(retained) == 20_000:
+                break
+            retained[identity] = outcome
+            budget -= cost
+        data = json.dumps({
+            "outcomes": retained,
+            "ineligible": sorted(result.ineligible.intersection(retained)),
+            "incomplete": True,
+        }, sort_keys=True)
     report.write_text(data, encoding="utf-8")
     return 0 if result.wasSuccessful() and not incomplete else 1
 

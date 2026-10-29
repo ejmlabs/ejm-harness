@@ -260,6 +260,62 @@ class FlakeCheckTests(unittest.TestCase):
             self.assertNotIn(b"thread 'second'", evidence)
             self.assertLessEqual(len(evidence), 65536)
 
+    def test_log_retains_nonpanic_error_after_excess_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            child = (
+                "import sys; sys.stdout.write('x' * 5000000 + "
+                "'\\ntest first ... FAILED\\n' + 'y' * 100000 + "
+                "'\\nError: first failure detail\\n' + 'z' * 100000)"
+            )
+            driver = (
+                "import sys; sys.path.insert(0, sys.argv[1]); from flake_check import run; "
+                "from pathlib import Path; "
+                f"run([sys.executable, '-c', {child!r}], Path(sys.argv[2]))"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", driver, str(Path(__file__).parent), str(root / "log")],
+                capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertIn(b"Error: first failure detail", (root / "log.failure.log").read_bytes())
+            self.assertEqual((root / "log.tail.log").stat().st_size, 65536)
+
+    def test_real_cargo_shared_process_outcomes_are_captured(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            (root / "Cargo.toml").write_text(
+                '[package]\nname = "cargo-fixture"\nversion = "0.1.0"\nedition = "2021"\n',
+                encoding="utf-8",
+            )
+            (root / "src/lib.rs").write_text(
+                '#[cfg(test)] mod tests {\n'
+                '#[test] fn first() { assert_ne!(std::env::var("CASE_RUN").unwrap(), "1"); }\n'
+                '#[test] fn second() { assert_ne!(std::env::var("CASE_RUN").unwrap(), "2"); }\n'
+                '}\n', encoding="utf-8",
+            )
+            script_dir = str(Path(__file__).parent)
+            driver = (
+                "import os,sys; sys.path.insert(0, sys.argv[1]); from flake_check import run; "
+                "from pathlib import Path; os.environ['CASE_RUN']=sys.argv[2]; "
+                "run(['cargo','test','--offline','--lib','--color','never'], "
+                "Path(sys.argv[3]), cargo_results=Path(sys.argv[4]))"
+            )
+            observed = []
+            for number in (1, 2):
+                log, results = root / f"{number}.log", root / f"{number}.json"
+                subprocess.run(
+                    [sys.executable, "-c", driver, script_dir, str(number), str(log), str(results)],
+                    cwd=root, env={**os.environ, "CARGO_TARGET_DIR": str(root / "target")},
+                    capture_output=True, check=True,
+                )
+                observed.append({name: status for _, name, status in json.loads(results.read_text())})
+            self.assertEqual(observed, [
+                {"tests::first": "failure", "tests::second": "passed"},
+                {"tests::first": "passed", "tests::second": "failure"},
+            ])
+
     def test_captured_output_cannot_spoof_a_test_result(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             a, b = self.write_reports(
@@ -457,6 +513,53 @@ if "--doc" not in sys.argv:
             self.assertEqual(summary["mixed"], [])
             self.assertIn(
                 "shared-process test failed", (root / "evidence/cargo-test-1.log").read_text()
+            )
+
+    def test_cli_compares_cargo_cases_when_both_runs_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fake_rustc(root)
+            cargo = root / "cargo"
+            cargo.write_text(
+                '''#!/usr/bin/env python3
+import sys, tomllib
+from pathlib import Path
+if sys.argv[1:3] == ["nextest", "list"]:
+    print('{"test-count":1,"rust-suites":{"pkg::suite":{"binary-id":"pkg::suite","status":"listed","testcases":{"x":{"ignored":false,"filter-match":{"status":"matches"}}}}}}')
+    raise SystemExit(0)
+if sys.argv[1] == "nextest":
+    config = Path(sys.argv[sys.argv.index("--config-file") + 1])
+    output = Path(tomllib.loads(config.read_text())["profile"]["ci"]["junit"]["path"])
+    attrs = " tests='1' failures='0' errors='0' skipped='0'"
+    output.write_text("<testsuites" + attrs + "><testsuite name='pkg::suite'" + attrs
+                      + "><testcase classname='pkg::suite' name='x'/></testsuite></testsuites>")
+    raise SystemExit(0)
+if sys.argv[1] == "test" and "--doc" not in sys.argv:
+    marker = Path("baseline-ran")
+    first = not marker.exists()
+    marker.touch()
+    print("     Running unittests src/lib.rs (target/debug/deps/example-123)")
+    print("running 2 tests")
+    print("test tests::a ... " + ("FAILED" if first else "ok"))
+    print("test tests::b ... " + ("ok" if first else "FAILED"))
+    print("test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out")
+    raise SystemExit(101)
+''', encoding="utf-8",
+            )
+            fake_doctests(cargo)
+            cargo.chmod(0o755)
+            env = {**os.environ, "PATH": str(root) + os.pathsep + os.environ.get("PATH", "")}
+            result = subprocess.run(
+                [sys.executable, str(Path(__file__).with_name("flake_check.py")), str(root / "evidence")],
+                cwd=root, env=env, capture_output=True, check=False,
+            )
+            summary = json.loads((root / "evidence/summary.json").read_text())
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(summary["cargo_test_exit_codes"], [101, 101])
+            self.assertTrue(summary["cargo_test_inconsistent"])
+            self.assertEqual(
+                [name for suite, name in summary["mixed"] if suite.startswith("cargo:")],
+                ["tests::a", "tests::b"],
             )
 
     def test_missing_reports_and_build_failures_are_incomplete(self) -> None:

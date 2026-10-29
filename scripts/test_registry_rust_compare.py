@@ -9,6 +9,30 @@ from pathlib import Path
 
 
 class RegistryRustCompareTests(unittest.TestCase):
+    def test_truncated_multibyte_suffix_keeps_completed_case(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            listing = root / "inventory.json"
+            listing.write_text("{}")
+            first, second = root / "first.xml", root / "second.xml"
+            first.write_bytes(
+                b'<testsuites><testsuite name="suite">'
+                b'<testcase classname="suite" name="flip"><failure/></testcase>'
+                b'<testcase classname="suite" name="\xc3'
+            )
+            second.write_text('<testsuites><testsuite name="suite">'
+                              '<testcase classname="suite" name="flip"/>'
+                              '</testsuite></testsuites>')
+            summary = root / "summary.json"
+            result = subprocess.run([
+                sys.executable, "-I", str(Path(__file__).with_name("registry_rust_compare.py")),
+                str(listing), str(first), str(second), str(summary),
+            ], capture_output=True, check=False)
+            data = json.loads(summary.read_text())
+            self.assertEqual(result.returncode, 1)
+            self.assertTrue(data["incomplete"])
+            self.assertEqual(data["mixed"], [["suite", "flip"]])
+
     def test_truncated_report_keeps_completed_comparable_case(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

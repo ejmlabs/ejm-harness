@@ -34,7 +34,7 @@ jobs:
           tar -xzf "$archive" -C "$bindir" cargo-nextest
           "$bindir/cargo-nextest" --version
           echo "$bindir" >> "$GITHUB_PATH"
-      - run: PYTHONPATH=scripts python3 -B -m unittest test_bounded_report test_flake_check test_registry_rust_compare test_registry_vitest_compare
+      - run: PYTHONPATH=scripts python3 -B -m unittest test_bounded_report test_flake_check test_registry_rust_compare test_registry_unittest_evidence test_registry_vitest_compare
       - name: Compare two independent Rust test runs
         timeout-minutes: 50
         run: scripts/with-secret-service python3 scripts/flake_check.py "$RUNNER_TEMP/harness-flakes"
@@ -96,6 +96,9 @@ jobs:
           npm ci --ignore-scripts
           npm --prefix registry ci --ignore-scripts
           npm --prefix registry run build
+      - name: Verify Vitest evidence reporter
+        if: always() && !cancelled()
+        run: PYTHONPATH=scripts python3 -B -m unittest test_registry_vitest_reporter
       - name: Prepare evidence directory
         if: always() && !cancelled()
         run: mkdir -p "$RUNNER_TEMP/registry-flakes"
@@ -178,13 +181,13 @@ jobs:
         if: always() && !cancelled()
         timeout-minutes: 4
         working-directory: registry
-        run: python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/worker-1.json" 4194304 -- node node_modules/vitest/vitest.mjs run --retry=0 --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/registry-flakes/worker-1.json.fifo"
+        run: EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/worker-1.json.fifo" python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/worker-1.json" 4194304 -- node node_modules/vitest/vitest.mjs run --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
       - name: Run registry Worker tests, second attempt
         id: worker_second
         if: always() && !cancelled()
         timeout-minutes: 4
         working-directory: registry
-        run: python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/worker-2.json" 4194304 -- node node_modules/vitest/vitest.mjs run --retry=0 --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/registry-flakes/worker-2.json.fifo"
+        run: EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/worker-2.json.fifo" python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/worker-2.json" 4194304 -- node node_modules/vitest/vitest.mjs run --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
       - name: Compare registry Worker outcomes
         if: always() && !cancelled()
         timeout-minutes: 1
@@ -197,13 +200,13 @@ jobs:
         if: always() && !cancelled()
         timeout-minutes: 4
         working-directory: registry
-        run: python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/auth-1.json" 4194304 -- node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/registry-flakes/auth-1.json.fifo"
+        run: EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/auth-1.json.fifo" python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/auth-1.json" 4194304 -- node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
       - name: Run auth Worker tests, second attempt
         id: auth_second
         if: always() && !cancelled()
         timeout-minutes: 4
         working-directory: registry
-        run: python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/auth-2.json" 4194304 -- node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/registry-flakes/auth-2.json.fifo"
+        run: EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/auth-2.json.fifo" python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/auth-2.json" 4194304 -- node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
       - name: Compare auth Worker outcomes
         if: always() && !cancelled()
         timeout-minutes: 1

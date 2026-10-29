@@ -58,8 +58,8 @@ def outcomes(path: Path) -> dict[tuple[str, str], str]:
 def partial_outcomes(path: Path) -> tuple[dict[tuple[str, str], str], set[tuple[str, str]]]:
     if path.is_symlink() or not path.is_file() or path.stat().st_size > 50 * 1024 * 1024:
         raise ValueError("invalid report")
-    text = path.read_text(encoding="utf-8")
-    if re.search(r"<!\s*(?:DOCTYPE|ENTITY)", text, re.IGNORECASE):
+    text = path.read_bytes()
+    if re.search(rb"<!\s*(?:DOCTYPE|ENTITY)", text, re.IGNORECASE):
         raise ValueError("unsafe XML")
     try:
         root = ET.fromstring(text)
@@ -175,7 +175,9 @@ def mixed_tests(first: Path, second: Path, expected: set[tuple[str, str]]) -> li
     return sorted(key for key in a if {a[key], b[key]} == {"passed", "failure"})
 
 
-def run(command: list[str], log: Path, output: Path | None = None) -> int | None:
+def run(
+    command: list[str], log: Path, output: Path | None = None, cargo_results: Path | None = None
+) -> int | None:
     try:
         process = subprocess.Popen(
             command,
@@ -192,19 +194,83 @@ def run(command: list[str], log: Path, output: Path | None = None) -> int | None
         written = 0
         search_tail = b""
         failure: bytes | None = None
+        diagnostic: bytes | None = None
+        tail = b""
+        line_buffer = b""
+        dropping_line = False
+        suite = None
+        remaining = 0
+        seen: dict[tuple[str, str], str] = {}
+        ambiguous: set[tuple[str, str]] = set()
+        result_bytes = 0
         with path.open("wb") as stream:
             while chunk := pipe.read(65536):
+                if echo:
+                    tail = (tail + chunk)[-65536:]
                 if echo and failure is None:
                     candidate = search_tail + chunk
                     marker = re.search(
-                        rb"(?m)^thread '[^\r\n]{0,512}'(?: \([^\r\n]{0,64}\))? panicked at",
+                        rb"(?m)^(?:thread '[^\r\n]{0,512}'(?: \([^\r\n]{0,64}\))? panicked at|"
+                        rb"Error:|error: test failed|[ \t]*FAIL \[|test [^\r\n]{1,1024} \.\.\. FAILED|"
+                        rb"---- [^\r\n]{1,1024} stdout ----|Caused by:|process didn't exit successfully)",
                         candidate,
                     )
                     if marker:
                         failure = candidate[max(0, marker.start() - 1024) :][:65536]
-                    search_tail = candidate[-2048:]
                 elif failure is not None and len(failure) < 65536:
                     failure += chunk[: 65536 - len(failure)]
+                if echo and diagnostic is None:
+                    candidate = search_tail + chunk
+                    marker = re.search(
+                        rb"(?m)^(?:thread '[^\r\n]{0,512}'(?: \([^\r\n]{0,64}\))? panicked at|"
+                        rb"Error:|Caused by:|error:|process didn't exit successfully|"
+                        rb"[^\r\n]{0,512}(?:signal:|timed out|timeout))",
+                        candidate,
+                    )
+                    if marker:
+                        diagnostic = candidate[max(0, marker.start() - 1024) :][:65536]
+                elif diagnostic is not None and len(diagnostic) < 65536:
+                    diagnostic += chunk[: 65536 - len(diagnostic)]
+                if echo:
+                    search_tail = (search_tail + chunk)[-2048:]
+                if cargo_results is not None and echo:
+                    line_buffer += chunk
+                    while b"\n" in line_buffer:
+                        line, line_buffer = line_buffer.split(b"\n", 1)
+                        if dropping_line or len(line) > 4096:
+                            dropping_line = False
+                            continue
+                        heading = re.fullmatch(rb"\s*Running (?:unittests |tests/).+ \(.+\)", line)
+                        count = re.fullmatch(rb"running (\d+) tests?", line)
+                        case = re.fullmatch(rb"test (.+) \.\.\. (ok|FAILED|ignored)", line)
+                        if heading:
+                            suite = line.strip().decode("utf-8", "replace")
+                            remaining = 0
+                        elif count and suite is not None:
+                            remaining = int(count[1])
+                        elif case and suite is not None and remaining:
+                            remaining -= 1
+                            name = case[1].decode("utf-8", "replace")
+                            key = (suite, name)
+                            state = {
+                                b"ok": "passed",
+                                b"FAILED": "failure",
+                                b"ignored": "skipped",
+                            }[case[2]]
+                            if key in seen or key in ambiguous:
+                                seen.pop(key, None)
+                                ambiguous.add(key)
+                            elif len(name) <= 1024 and len(suite) <= 2048:
+                                size = len(json.dumps([suite, name, state], ensure_ascii=False).encode()) + 1
+                                if len(seen) < 20_000 and result_bytes + size <= 3 * 1024 * 1024:
+                                    seen[key] = state
+                                    result_bytes += size
+                        elif line.startswith(b"test result:"):
+                            suite = None
+                            remaining = 0
+                    if len(line_buffer) > 4096:
+                        line_buffer = b""
+                        dropping_line = True
                 kept = chunk[: max(0, limit - written)]
                 stream.write(kept)
                 if echo and kept:
@@ -213,8 +279,19 @@ def run(command: list[str], log: Path, output: Path | None = None) -> int | None
                 written += len(kept)
                 if len(kept) != len(chunk) and path not in truncated:
                     truncated.append(path)
-        if failure is not None:
-            path.with_name(path.name + ".failure.log").write_bytes(failure)
+        if failure is not None and diagnostic is not None and diagnostic in failure:
+            diagnostic = None
+        if failure is not None or diagnostic is not None:
+            path.with_name(path.name + ".failure.log").write_bytes(
+                b"\n".join(part for part in (failure, diagnostic) if part is not None)
+            )
+        if echo and path in truncated:
+            path.with_name(path.name + ".tail.log").write_bytes(tail)
+        if cargo_results is not None and echo:
+            cargo_results.write_text(
+                json.dumps([[*key, state] for key, state in seen.items()], ensure_ascii=False),
+                encoding="utf-8",
+            )
 
     assert process.stdout is not None
     threads = []
@@ -408,6 +485,7 @@ def main() -> int:
             run(
                 ["cargo", "test", "--locked", "--workspace", "--no-fail-fast", "--color", "never"],
                 output / f"cargo-test-{number}.log",
+                cargo_results=output / f"cargo-test-{number}.json",
             )
         )
         report = output / f"attempt-{number}.xml"
@@ -490,6 +568,25 @@ def main() -> int:
     baseline_differed = all(code is not None for code in baseline) and (baseline[0] == 0) != (
         baseline[1] == 0
     )
+    try:
+        cargo_a, cargo_b = (
+            {
+                (suite, name): status
+                for suite, name, status in json.loads(
+                    (output / f"cargo-test-{number}.json").read_text(encoding="utf-8")
+                )
+            }
+            for number in (1, 2)
+        )
+        cargo_mixed = sorted(
+            (f"cargo:{suite}", name)
+            for suite, name in cargo_a.keys() & cargo_b.keys()
+            if {cargo_a[suite, name], cargo_b[suite, name]} == {"passed", "failure"}
+        )
+        mixed.extend(cargo_mixed)
+        baseline_differed |= bool(cargo_mixed)
+    except (OSError, ValueError, TypeError):
+        incomplete = True
     docs_differed = all(code is not None for code in docs) and (docs[0] == 0) != (docs[1] == 0)
     doc_results = []
     try:

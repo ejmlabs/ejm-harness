@@ -479,12 +479,35 @@ mod tests {
         use anyhow::Context;
         use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System};
 
+        if let Some(mode) = std::env::var_os("EJM_TEST_PROCESS_BUDGET_FIXTURE") {
+            if mode == "spawn" {
+                let mut children = Vec::new();
+                for _ in 0..5 {
+                    children.push(
+                        std::process::Command::new(std::env::current_exe()?)
+                            .args(["--exact", "monitor::tests::observed_process_budget_abuse_is_stopped_and_released", "--nocapture"])
+                            .env("EJM_TEST_PROCESS_BUDGET_FIXTURE", "hold")
+                            .spawn()?,
+                    );
+                }
+                for mut child in children {
+                    let _ = child.wait();
+                }
+            } else if mode == "hold" {
+                loop {
+                    std::thread::sleep(Duration::from_secs(1));
+                }
+            } else {
+                anyhow::bail!("unknown process-budget fixture mode");
+            }
+            return Ok(());
+        }
         let directory = tempfile::tempdir()?;
         let governor = Arc::new(crate::Governor::new(crate::ResourceLimits::default())?);
         *lock(&governor.monitor.violation_witness) = Some(Vec::new());
         let executor = crate::Executor::new(governor.clone(), directory.path().join("artifacts"))?;
         let current = std::env::current_exe()?;
-        let program = current
+        let fixture = current
             .parent()
             .and_then(std::path::Path::parent)
             .context("test executable is outside Cargo's target directory")?
@@ -492,15 +515,28 @@ mod tests {
                 "ejm-harness-exec-fixture{}",
                 std::env::consts::EXE_SUFFIX
             ));
+        let use_fixture = fixture.is_file();
+        let program = if use_fixture { fixture } else { current };
         let mut request = crate::CommandRequest {
             program: program.to_string_lossy().into_owned(),
             cwd: directory.path().to_owned(),
             timeout_ms: 5_000,
             ..crate::CommandRequest::default()
         };
-        request
-            .env
-            .insert("EJM_HARNESS_EXEC_FIXTURE".into(), "many-descendants".into());
+        if use_fixture {
+            request
+                .env
+                .insert("EJM_HARNESS_EXEC_FIXTURE".into(), "many-descendants".into());
+        } else {
+            request.args = vec![
+                "--exact".into(),
+                "monitor::tests::observed_process_budget_abuse_is_stopped_and_released".into(),
+                "--nocapture".into(),
+            ];
+            request
+                .env
+                .insert("EJM_TEST_PROCESS_BUDGET_FIXTURE".into(), "spawn".into());
+        }
         request.reservation.processes = 5;
         request.reservation.memory_bytes = 256 * 1024 * 1024;
         let error = executor
@@ -512,11 +548,7 @@ mod tests {
         let pids = lock(&governor.monitor.violation_witness)
             .clone()
             .context("process budget witness was not installed")?;
-        assert_eq!(
-            pids.len(),
-            6,
-            "root and all five children must be observed"
-        );
+        assert_eq!(pids.len(), 6, "root and all five children must be observed");
         tokio::time::timeout(Duration::from_secs(5), async {
             loop {
                 let mut system = System::new();

@@ -39,9 +39,72 @@ def bounded_message(message: str) -> str:
     return message[:4096] + "\n...\n" + message[-4096:]
 
 
+def stream_report(
+    path: Path, root: Path
+) -> tuple[dict[str, str], set[str], set[str], bool, dict[str, str] | None]:
+    outcomes: dict[str, str] = {}
+    ambiguous: set[str] = set()
+    failures: set[str] = set()
+    diagnostic = None
+    incomplete = False
+    finished = False
+    with path.open("rb") as stream:
+        if stream.readline() != b'{"kind":"start"}\n':
+            raise ValueError("invalid report header")
+        for number, line in enumerate(stream, 1):
+            if not line.endswith(b"\n"):
+                incomplete = True
+                break
+            try:
+                record = json.loads(line, object_pairs_hook=unique)
+                if not isinstance(record, dict):
+                    raise ValueError("invalid report record")
+                if record.get("kind") == "end":
+                    if finished or type(record.get("incomplete")) is not bool:
+                        raise ValueError("invalid report end")
+                    incomplete |= record["incomplete"]
+                    finished = True
+                    continue
+                if finished or record.get("kind") != "case":
+                    raise ValueError("invalid report record")
+                file, name, status = record["file"], record["name"], record["status"]
+                if not isinstance(file, str) or not isinstance(name, str):
+                    raise ValueError("invalid identity")
+                key = identity(file, name, root)
+                if number > MAX_TESTS:
+                    incomplete = True
+                    if key not in outcomes and key not in ambiguous:
+                        continue
+                if status not in ("passed", "failed", "skipped"):
+                    outcomes.pop(key, None)
+                    ambiguous.add(key)
+                    incomplete = True
+                    continue
+                if status == "failed":
+                    failures.add(key)
+                    if diagnostic is None:
+                        message = record.get("message", "")
+                        diagnostic = {"test": key, "message": bounded_message(message if isinstance(message, str) else "")}
+                if key in outcomes or key in ambiguous:
+                    outcomes.pop(key, None)
+                    ambiguous.add(key)
+                    incomplete = True
+                else:
+                    outcomes[key] = status
+                incomplete |= status == "skipped"
+            except (ValueError, KeyError, TypeError, OSError, RecursionError):
+                incomplete = True
+    return outcomes, ambiguous, failures, incomplete or not finished or not outcomes, diagnostic
+
+
 def report(
     path: Path, root: Path
 ) -> tuple[dict[str, str], set[str], set[str], bool, dict[str, str] | None]:
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_BYTES:
+        raise ValueError("missing or oversized report")
+    with path.open("rb") as stream:
+        if stream.readline(32) == b'{"kind":"start"}\n':
+            return stream_report(path, root)
     data = read(path)
     if not isinstance(data, dict) or not isinstance(data.get("testResults"), list):
         raise ValueError("invalid Vitest report")

@@ -12,6 +12,27 @@ from registry_vitest_compare import compare
 
 
 class RegistryVitestCompareTests(unittest.TestCase):
+    def test_truncated_record_stream_keeps_earlier_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = str(root / "worker.test.ts")
+            listing = root / "inventory.json"
+            listing.write_text(json.dumps([{"file": file, "name": "flip"}]))
+            first, second = root / "first.json", root / "second.json"
+            for path, state in ((first, "failed"), (second, "passed")):
+                lines = [
+                    {"kind": "start"},
+                    {"kind": "case", "file": file, "name": "flip", "status": state,
+                     "message": "first failure"},
+                ]
+                path.write_bytes(b"".join(
+                    json.dumps(line, separators=(",", ":")).encode() + b"\n" for line in lines
+                ) + b'{"kind":"case","name":"\xc3')
+            result = compare(listing, first, second, root)
+            self.assertTrue(result["incomplete"])
+            self.assertEqual(result["mixed"], ['["worker.test.ts","flip"]'])
+            self.assertEqual(result["first_diagnostic"]["message"], "first failure")
+
     def test_first_failure_diagnostic_is_bounded_and_retains_assertion(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
