@@ -34,7 +34,7 @@ jobs:
           tar -xzf "$archive" -C "$bindir" cargo-nextest
           "$bindir/cargo-nextest" --version
           echo "$bindir" >> "$GITHUB_PATH"
-      - run: python3 -B -m unittest discover -s scripts -p 'test_flake_check.py'
+      - run: PYTHONPATH=scripts python3 -B -m unittest test_bounded_report test_flake_check test_registry_rust_compare test_registry_vitest_compare
       - name: Compare two independent Rust test runs
         timeout-minutes: 50
         run: scripts/with-secret-service python3 scripts/flake_check.py "$RUNNER_TEMP/harness-flakes"
@@ -103,7 +103,7 @@ jobs:
         if: always() && !cancelled()
         timeout-minutes: 6
         working-directory: registry
-        run: cargo nextest list --locked --lib --ignore-default-filter --message-format json --user-config-file none > "$RUNNER_TEMP/registry-flakes/rust-inventory.json"
+        run: python3 -I ../scripts/bounded_report.py stdout "$RUNNER_TEMP/registry-flakes/rust-inventory.json" 52428800 -- cargo nextest list --locked --lib --ignore-default-filter --message-format json --user-config-file none
       - name: Run registry Rust tests, first attempt
         id: rust_first
         if: always() && !cancelled()
@@ -111,8 +111,8 @@ jobs:
         working-directory: registry
         shell: bash
         run: |
-          printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = false\n' "$RUNNER_TEMP/registry-flakes/rust-1.xml" > "$RUNNER_TEMP/registry-flakes/rust-1.toml"
-          cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-1.toml" --user-config-file none --no-tests fail --no-fail-fast
+          printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = false\n' "$RUNNER_TEMP/registry-flakes/rust-1.xml.fifo" > "$RUNNER_TEMP/registry-flakes/rust-1.toml"
+          python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/rust-1.xml" 52428800 -- cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-1.toml" --user-config-file none --no-tests fail --no-fail-fast
       - name: Run registry Rust tests, second attempt
         id: rust_second
         if: always() && !cancelled()
@@ -120,8 +120,8 @@ jobs:
         working-directory: registry
         shell: bash
         run: |
-          printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = false\n' "$RUNNER_TEMP/registry-flakes/rust-2.xml" > "$RUNNER_TEMP/registry-flakes/rust-2.toml"
-          cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-2.toml" --user-config-file none --no-tests fail --no-fail-fast
+          printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = false\n' "$RUNNER_TEMP/registry-flakes/rust-2.xml.fifo" > "$RUNNER_TEMP/registry-flakes/rust-2.toml"
+          python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/rust-2.xml" 52428800 -- cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-2.toml" --user-config-file none --no-tests fail --no-fail-fast
       - name: Compare registry Rust outcomes
         if: always() && !cancelled()
         timeout-minutes: 1
@@ -161,7 +161,7 @@ jobs:
           collector=$(mktemp .registry-inventory.XXXXXX.mjs)
           trap 'rm -f -- "$collector"' EXIT
           cp ../scripts/registry_vitest_inventory.mjs "$collector"
-          node "$collector" > "$RUNNER_TEMP/registry-flakes/worker-inventory.json"
+          python3 -I ../scripts/bounded_report.py stdout "$RUNNER_TEMP/registry-flakes/worker-inventory.json" 4194304 -- node "$collector"
       - name: Collect auth Worker inventory
         if: always() && !cancelled()
         timeout-minutes: 5
@@ -172,19 +172,19 @@ jobs:
           collector=$(mktemp .registry-inventory.XXXXXX.mjs)
           trap 'rm -f -- "$collector"' EXIT
           cp ../scripts/registry_vitest_inventory.mjs "$collector"
-          node "$collector" vitest.auth.config.ts > "$RUNNER_TEMP/registry-flakes/auth-inventory.json"
+          python3 -I ../scripts/bounded_report.py stdout "$RUNNER_TEMP/registry-flakes/auth-inventory.json" 4194304 -- node "$collector" vitest.auth.config.ts
       - name: Run registry Worker tests, first attempt
         id: worker_first
         if: always() && !cancelled()
         timeout-minutes: 4
         working-directory: registry
-        run: node node_modules/vitest/vitest.mjs run --retry=0 --reporter=json --outputFile="$RUNNER_TEMP/registry-flakes/worker-1.json"
+        run: python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/worker-1.json" 4194304 -- node node_modules/vitest/vitest.mjs run --retry=0 --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/registry-flakes/worker-1.json.fifo"
       - name: Run registry Worker tests, second attempt
         id: worker_second
         if: always() && !cancelled()
         timeout-minutes: 4
         working-directory: registry
-        run: node node_modules/vitest/vitest.mjs run --retry=0 --reporter=json --outputFile="$RUNNER_TEMP/registry-flakes/worker-2.json"
+        run: python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/worker-2.json" 4194304 -- node node_modules/vitest/vitest.mjs run --retry=0 --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/registry-flakes/worker-2.json.fifo"
       - name: Compare registry Worker outcomes
         if: always() && !cancelled()
         timeout-minutes: 1
@@ -197,13 +197,13 @@ jobs:
         if: always() && !cancelled()
         timeout-minutes: 4
         working-directory: registry
-        run: node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=json --outputFile="$RUNNER_TEMP/registry-flakes/auth-1.json"
+        run: python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/auth-1.json" 4194304 -- node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/registry-flakes/auth-1.json.fifo"
       - name: Run auth Worker tests, second attempt
         id: auth_second
         if: always() && !cancelled()
         timeout-minutes: 4
         working-directory: registry
-        run: node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=json --outputFile="$RUNNER_TEMP/registry-flakes/auth-2.json"
+        run: python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/auth-2.json" 4194304 -- node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=default --reporter=json --outputFile.json="$RUNNER_TEMP/registry-flakes/auth-2.json.fifo"
       - name: Compare auth Worker outcomes
         if: always() && !cancelled()
         timeout-minutes: 1

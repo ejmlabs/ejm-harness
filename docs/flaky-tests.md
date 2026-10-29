@@ -23,5 +23,6 @@ targets, rejects ignored or filtered cases, and compares individual outcomes.
 The separate scheduled registry job repeats Rust, schema, registry Worker and
 authentication Worker tests. Each suite uses independent attempts and an
 inventory; incomplete, skipped or failed cases keep the job failed. The job
-uploads bounded summaries and schema outcomes, without raw Worker failure text.
+uploads bounded summaries, including excerpts of Worker failure messages, and
+schema outcomes.
 Hosted timing, service cleanup and artifact upload need verification after push.

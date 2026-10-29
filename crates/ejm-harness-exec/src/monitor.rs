@@ -25,6 +25,8 @@ pub(crate) const SAMPLE_INTERVAL: Duration = Duration::from_millis(100);
 #[derive(Default)]
 pub(crate) struct ProcessMonitor {
     state: Mutex<State>,
+    #[cfg(test)]
+    violation_witness: Mutex<Option<Vec<u32>>>,
 }
 
 #[derive(Default)]
@@ -235,6 +237,14 @@ impl ProcessMonitor {
                 continue;
             }
             job.update(sample, &children);
+            #[cfg(test)]
+            if lock(&job.usage).violation
+                == Some("observed command tree process count exceeded its reservation")
+                && let Some(witness) = lock(&self.violation_witness).as_mut()
+                && witness.is_empty()
+            {
+                *witness = job.tracked.keys().copied().collect();
+            }
         }
     }
 }
@@ -455,12 +465,82 @@ mod tests {
         (
             ProcessMonitor {
                 state: Mutex::new(state),
+                ..ProcessMonitor::default()
             },
             ProcessSample {
                 current: processes,
                 ..ProcessSample::default()
             },
         )
+    }
+
+    #[tokio::test]
+    async fn observed_process_budget_abuse_is_stopped_and_released() -> anyhow::Result<()> {
+        use anyhow::Context;
+        use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System};
+
+        let directory = tempfile::tempdir()?;
+        let governor = Arc::new(crate::Governor::new(crate::ResourceLimits::default())?);
+        *lock(&governor.monitor.violation_witness) = Some(Vec::new());
+        let executor = crate::Executor::new(governor.clone(), directory.path().join("artifacts"))?;
+        let current = std::env::current_exe()?;
+        let program = current
+            .parent()
+            .and_then(std::path::Path::parent)
+            .context("test executable is outside Cargo's target directory")?
+            .join(format!(
+                "ejm-harness-exec-fixture{}",
+                std::env::consts::EXE_SUFFIX
+            ));
+        let mut request = crate::CommandRequest {
+            program: program.to_string_lossy().into_owned(),
+            cwd: directory.path().to_owned(),
+            timeout_ms: 5_000,
+            ..crate::CommandRequest::default()
+        };
+        request
+            .env
+            .insert("EJM_HARNESS_EXEC_FIXTURE".into(), "many-descendants".into());
+        request.reservation.processes = 5;
+        request.reservation.memory_bytes = 256 * 1024 * 1024;
+        let error = executor
+            .run(request, CancellationToken::new())
+            .await
+            .err()
+            .context("process budget violation did not stop the fixture")?;
+        assert!(error.to_string().contains("process count"), "{error:#}");
+        let pids = lock(&governor.monitor.violation_witness)
+            .clone()
+            .context("process budget witness was not installed")?;
+        assert_eq!(
+            pids.len(),
+            6,
+            "root and all five children must be observed"
+        );
+        tokio::time::timeout(Duration::from_secs(5), async {
+            loop {
+                let mut system = System::new();
+                let ids: Vec<Pid> = pids.iter().copied().map(Pid::from_u32).collect();
+                system.refresh_processes_specifics(
+                    ProcessesToUpdate::Some(&ids),
+                    true,
+                    ProcessRefreshKind::nothing(),
+                );
+                if governor.snapshot() == crate::GovernorSnapshot::default()
+                    && ids.iter().all(|pid| {
+                        system
+                            .process(*pid)
+                            .is_none_or(|process| process.status() == ProcessStatus::Zombie)
+                    })
+                {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .context("all command resources were not cleaned up")?;
+        Ok(())
     }
 
     #[test]

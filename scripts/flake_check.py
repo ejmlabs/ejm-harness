@@ -61,7 +61,34 @@ def partial_outcomes(path: Path) -> tuple[dict[tuple[str, str], str], set[tuple[
     text = path.read_text(encoding="utf-8")
     if re.search(r"<!\s*(?:DOCTYPE|ENTITY)", text, re.IGNORECASE):
         raise ValueError("unsafe XML")
-    root = ET.fromstring(text)
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        root = ET.Element("testsuites")
+        parser = ET.XMLPullParser(events=("start", "end"))
+        stack = []
+        suite = None
+        for offset in range(0, len(text), 8192):
+            broken = False
+            try:
+                parser.feed(text[offset : offset + 8192])
+            except ET.ParseError:
+                broken = True
+            try:
+                for event, element in parser.read_events():
+                    if event == "start":
+                        stack.append(element.tag)
+                        if stack == ["testsuites", "testsuite"]:
+                            suite = ET.SubElement(root, "testsuite", element.attrib)
+                    else:
+                        if stack == ["testsuites", "testsuite", "testcase"] and suite is not None:
+                            suite.append(element)
+                        if stack:
+                            stack.pop()
+            except ET.ParseError:
+                broken = True
+            if broken:
+                break
     if root.tag != "testsuites":
         raise ValueError("invalid report root")
     outcomes: dict[tuple[str, str], str] = {}
@@ -163,8 +190,21 @@ def run(command: list[str], log: Path, output: Path | None = None) -> int | None
 
     def capture(pipe: BinaryIO, path: Path, limit: int, echo: bool) -> None:
         written = 0
+        search_tail = b""
+        failure: bytes | None = None
         with path.open("wb") as stream:
             while chunk := pipe.read(65536):
+                if echo and failure is None:
+                    candidate = search_tail + chunk
+                    marker = re.search(
+                        rb"(?m)^thread '[^\r\n]{0,512}'(?: \([^\r\n]{0,64}\))? panicked at",
+                        candidate,
+                    )
+                    if marker:
+                        failure = candidate[max(0, marker.start() - 1024) :][:65536]
+                    search_tail = candidate[-2048:]
+                elif failure is not None and len(failure) < 65536:
+                    failure += chunk[: 65536 - len(failure)]
                 kept = chunk[: max(0, limit - written)]
                 stream.write(kept)
                 if echo and kept:
@@ -173,6 +213,8 @@ def run(command: list[str], log: Path, output: Path | None = None) -> int | None
                 written += len(kept)
                 if len(kept) != len(chunk) and path not in truncated:
                     truncated.append(path)
+        if failure is not None:
+            path.with_name(path.name + ".failure.log").write_bytes(failure)
 
     assert process.stdout is not None
     threads = []
@@ -372,13 +414,19 @@ def main() -> int:
         config = output / f"attempt-{number}.toml"
         config.write_text(
             "[profile.ci.junit]\npath = "
-            + json.dumps(str(report))
+            + json.dumps(str(report) + ".fifo")
             + "\nstore-failure-output = false\n",
             encoding="utf-8",
         )
         attempts.append(
             run(
                 [
+                    sys.executable,
+                    str(Path(__file__).with_name("bounded_report.py")),
+                    "fifo",
+                    str(report),
+                    str(50 * 1024 * 1024),
+                    "--",
                     "cargo",
                     "nextest",
                     "run",

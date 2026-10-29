@@ -12,6 +12,29 @@ from registry_vitest_compare import compare
 
 
 class RegistryVitestCompareTests(unittest.TestCase):
+    def test_first_failure_diagnostic_is_bounded_and_retains_assertion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = str(root / "worker.test.ts")
+            listing = root / "inventory.json"
+            listing.write_text(json.dumps([{"file": file, "name": "case"}]))
+            reports = [root / "first.json", root / "second.json"]
+            for path in reports:
+                path.write_text(json.dumps({
+                    "testResults": [{"name": file, "assertionResults": [{
+                        "fullName": "case", "status": "failed",
+                        "failureMessages": ["failure start\n" + "x" * 100000 + "\nassertion detail"],
+                    }]}],
+                    "numTotalTests": 1, "numPassedTests": 0, "numFailedTests": 1,
+                    "numPendingTests": 0, "numTodoTests": 0, "success": False,
+                }))
+            result = compare(listing, *reports, root)
+            for field in ("first_diagnostic", "second_diagnostic"):
+                message = result[field]["message"]
+                self.assertTrue(message.startswith("failure start"))
+                self.assertTrue(message.endswith("assertion detail"))
+                self.assertLess(len(message), 9000)
+
     def test_failed_attempt_cannot_be_reported_as_complete(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

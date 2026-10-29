@@ -503,58 +503,6 @@ async fn deadline_terminates_a_command_tree() {
     wait_for_cleanup(&governor, &pids).await;
 }
 
-#[tokio::test]
-async fn observed_process_budget_abuse_is_stopped_and_released() {
-    let (directory, governor, executor) = executor(ResourceLimits::default());
-    let path = directory.path().join("pids");
-    let mut request = fixture_request("many-descendants", directory.path());
-    request.reservation.processes = 2;
-    request.reservation.memory_bytes = 256 * 1024 * 1024;
-    request.env.insert(
-        "EJM_HARNESS_EXEC_PID_FILE".into(),
-        path.to_string_lossy().into_owned(),
-    );
-    let error = executor
-        .run(request, CancellationToken::new())
-        .await
-        .unwrap_err();
-    assert!(error.to_string().contains("process count"), "{error:#}");
-    let mut pids = parse_pids(&std::fs::read_to_string(&path).unwrap());
-    assert_eq!(pids.len(), 2);
-    for index in 0..5 {
-        if !path.with_extension(format!("{index}.pending")).exists() {
-            break;
-        }
-        let records: Vec<u32> = ["parent", "child"]
-            .into_iter()
-            .filter_map(|source| {
-                let text =
-                    std::fs::read_to_string(path.with_extension(format!("{index}.{source}")))
-                        .ok()?;
-                if !text.ends_with('\n') {
-                    return None;
-                }
-                let values = parse_pids(&text);
-                if values.len() == 1 {
-                    values.first().copied()
-                } else {
-                    None
-                }
-            })
-            .collect();
-        assert!(
-            !records.is_empty(),
-            "spawned child identity was not recorded"
-        );
-        assert!(records.iter().all(|pid| *pid == records[0]));
-        if index == 0 {
-            assert_eq!(records[0], pids[1]);
-        }
-        pids.push(records[0]);
-    }
-    wait_for_cleanup(&governor, &pids).await;
-}
-
 fn parse_pids(text: &str) -> Vec<u32> {
     text.split_whitespace()
         .map(|part| part.parse().unwrap())

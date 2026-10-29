@@ -33,7 +33,15 @@ def identity(file: str, name: str, root: Path) -> str:
     )
 
 
-def report(path: Path, root: Path) -> tuple[dict[str, str], set[str], set[str], bool]:
+def bounded_message(message: str) -> str:
+    if len(message) <= 8192:
+        return message
+    return message[:4096] + "\n...\n" + message[-4096:]
+
+
+def report(
+    path: Path, root: Path
+) -> tuple[dict[str, str], set[str], set[str], bool, dict[str, str] | None]:
     data = read(path)
     if not isinstance(data, dict) or not isinstance(data.get("testResults"), list):
         raise ValueError("invalid Vitest report")
@@ -43,6 +51,7 @@ def report(path: Path, root: Path) -> tuple[dict[str, str], set[str], set[str], 
     counts = {"passed": 0, "failed": 0, "pending": 0, "skipped": 0, "todo": 0}
     incomplete = False
     total = 0
+    diagnostic = None
     for suite in data["testResults"]:
         if (
             not isinstance(suite, dict)
@@ -76,6 +85,14 @@ def report(path: Path, root: Path) -> tuple[dict[str, str], set[str], set[str], 
             if state == "failed":
                 failures.add(key)
                 suite_failed = True
+                if diagnostic is None:
+                    messages = case.get("failureMessages")
+                    message = (
+                        next((item for item in messages if isinstance(item, str)), "")
+                        if isinstance(messages, list)
+                        else ""
+                    )
+                    diagnostic = {"test": key, "message": bounded_message(message)}
             if key in outcomes or key in ambiguous:
                 outcomes.pop(key, None)
                 ambiguous.add(key)
@@ -86,6 +103,12 @@ def report(path: Path, root: Path) -> tuple[dict[str, str], set[str], set[str], 
                 incomplete = True
         if suite.get("status") == "failed" and not suite_failed:
             incomplete = True
+            if diagnostic is None:
+                message = suite.get("message")
+                if isinstance(message, str):
+                    diagnostic = {
+                        "test": suite["name"][:1024], "message": bounded_message(message)
+                    }
     expected_counts = {
         "numTotalTests": total,
         "numPassedTests": counts["passed"],
@@ -100,7 +123,7 @@ def report(path: Path, root: Path) -> tuple[dict[str, str], set[str], set[str], 
         incomplete = True
     if type(data.get("success")) is not bool or data["success"] != (counts["failed"] == 0):
         incomplete = True
-    return outcomes, ambiguous, failures, incomplete
+    return outcomes, ambiguous, failures, incomplete, diagnostic
 
 
 def compare(listing: Path, first: Path, second: Path, root: Path) -> dict[str, Any]:
@@ -129,7 +152,7 @@ def compare(listing: Path, first: Path, second: Path, root: Path) -> dict[str, A
         try:
             parsed.append(report(path, root))
         except (OSError, ValueError, TypeError, RecursionError):
-            parsed.append(({}, set(), set(), True))
+            parsed.append(({}, set(), set(), True, None))
     a, b = parsed
     incomplete |= a[3] or b[3] or expected is None or set(a[0]) != expected or set(b[0]) != expected
     common = a[0].keys() & b[0].keys() - a[1] - b[1]
@@ -139,6 +162,8 @@ def compare(listing: Path, first: Path, second: Path, root: Path) -> dict[str, A
         "mixed": mixed,
         "first_failed": sorted(a[2]),
         "second_failed": sorted(b[2]),
+        "first_diagnostic": a[4],
+        "second_diagnostic": b[4],
     }
 
 
@@ -164,7 +189,15 @@ def main() -> int:
     encoded = json.dumps(result, ensure_ascii=True, separators=(",", ":")) + "\n"
     if len(encoded.encode("utf-8")) > MAX_BYTES:
         result["incomplete"] = True
-        encoded = '{"incomplete":true,"reason":"summary too large"}\n'
+        encoded = json.dumps(
+            {
+                "incomplete": True,
+                "reason": "summary too large",
+                "first_diagnostic": result["first_diagnostic"],
+                "second_diagnostic": result["second_diagnostic"],
+            },
+            ensure_ascii=True,
+        ) + "\n"
     summary.write_text(encoded, encoding="utf-8")
     for key in result["mixed"]:
         print("flaky-test:", key)

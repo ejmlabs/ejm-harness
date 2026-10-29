@@ -234,6 +234,32 @@ class FlakeCheckTests(unittest.TestCase):
             self.assertIn(b"Output exceeded its limit", result.stderr)
             self.assertTrue(result.stdout.endswith(b"None\n"))
 
+    def test_log_preserves_first_panic_after_excess_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = Path(__file__).with_name("flake_check.py")
+            child_program = (
+                "import sys; sys.stdout.write('x' * 5000000 + "
+                "\"\\nthread 'first' panicked at fixture.rs:1:\\nassertion detail\\n\" + "
+                "'y' * 5000000 + \"\\nthread 'second' panicked at fixture.rs:2:\\nother\\n\")"
+            )
+            program = (
+                "import sys; sys.path.insert(0, sys.argv[1]); from flake_check import run; "
+                "from pathlib import Path; "
+                f"run([sys.executable, '-c', {child_program!r}], "
+                "Path(sys.argv[2]))"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", program, str(script.parent), str(root / "log")],
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0)
+            evidence = (root / "log.failure.log").read_bytes()
+            self.assertIn(b"assertion detail", evidence)
+            self.assertNotIn(b"thread 'second'", evidence)
+            self.assertLessEqual(len(evidence), 65536)
+
     def test_captured_output_cannot_spoof_a_test_result(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             a, b = self.write_reports(

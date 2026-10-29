@@ -10,9 +10,6 @@ fn main() -> Result<std::process::ExitCode, Box<dyn std::error::Error>> {
     }
     let mode = std::env::var("EJM_HARNESS_EXEC_FIXTURE")?;
     let pid_file = std::env::var_os("EJM_HARNESS_EXEC_PID_FILE").map(PathBuf::from);
-    if let Some(path) = std::env::var_os("EJM_HARNESS_EXEC_CHILD_PID_FILE") {
-        std::fs::write(path, format!("{}\n", std::process::id()))?;
-    }
     match mode.as_str() {
         "private-input" => {
             let err = std::thread::spawn(|| -> std::io::Result<()> {
@@ -71,36 +68,12 @@ fn descendants(mode: &str, pid_file: Option<PathBuf>) -> Result<(), Box<dyn std:
     let count = if mode == "many-descendants" { 5 } else { 1 };
     let mut children = Vec::new();
     let mut pids = vec![std::process::id()];
-    for index in 0..count {
+    for _ in 0..count {
         let mut command = std::process::Command::new(std::env::current_exe()?);
         command.env("EJM_HARNESS_EXEC_FIXTURE", "hold");
-        if mode == "many-descendants"
-            && let Some(path) = &pid_file
-        {
-            std::fs::write(path.with_extension(format!("{index}.pending")), "")?;
-            command.env(
-                "EJM_HARNESS_EXEC_CHILD_PID_FILE",
-                path.with_extension(format!("{index}.child")),
-            );
-        }
         let child = command.spawn()?;
-        if mode == "many-descendants"
-            && let Some(path) = &pid_file
-        {
-            std::fs::write(
-                path.with_extension(format!("{index}.parent")),
-                format!("{}\n", child.id()),
-            )?;
-        }
         pids.push(child.id());
         children.push(child);
-        if mode == "many-descendants"
-            && pids.len() == 2
-            && let Some(path) = &pid_file
-        {
-            // Publish before the next child can trigger the process limit.
-            std::fs::write(path, format!("{} {}\n", pids[0], pids[1]))?;
-        }
     }
     if mode != "many-descendants"
         && let Some(path) = pid_file
