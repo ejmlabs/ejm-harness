@@ -158,8 +158,10 @@ impl Executor {
 
     /// Retain host ownership, such as a workspace write guard, through cleanup.
     ///
-    /// The retained value moves into the supervisor after admission. Dropping
-    /// the caller cannot release it while its child or drainers are still live.
+    /// The retained value moves into the supervisor after admission and remains
+    /// there through its cleanup attempts, even if the caller is dropped. On
+    /// Unix, cleanup does not confirm that every descendant has exited; a
+    /// descendant may still be alive when the retained value is released.
     ///
     /// # Errors
     /// Returns the same request, admission, execution, and output errors as [`Self::run`].
@@ -197,8 +199,7 @@ impl Executor {
             admission = self.admit_command(&request, &cancel) => admission?,
         };
 
-        // Own the process and the lease in a separate task. Dropping the caller's
-        // future cancels it, but cannot drop those resources before cleanup.
+        // Keep the process and lease in a supervisor when the caller is dropped.
         let local_cancel = cancel.child_token();
         let _cancel_on_drop = CancelOnDrop(local_cancel.clone());
         let executor = self.clone();
@@ -441,7 +442,7 @@ async fn reap(child: &mut NativeChild, status: Option<ExitStatus>) -> Result<Exi
             child.kill().await.context("reap killed command")
         }
     };
-    // A command's background children cannot outlive its execution scope.
+    // Attempt to stop background children after the direct child exits.
     let cleanup = child.kill().await.context("clean up command descendants");
     let status = status?;
     cleanup?;

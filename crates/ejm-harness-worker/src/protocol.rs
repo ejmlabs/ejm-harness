@@ -79,6 +79,9 @@ pub struct ConfigureParams {
     pub allow_write: bool,
     #[serde(default)]
     pub allow_shell: bool,
+    /// Require enforced process-tree cancellation for the granted shell.
+    #[serde(default)]
+    pub require_shell_process_tree_cancellation: bool,
     pub resources: Option<ResourceLimits>,
     pub max_sessions: Option<usize>,
     pub max_model_requests: Option<usize>,

@@ -749,7 +749,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Focused release-profile measurement for the private sampler traversal."]
     fn sampler_traversal_cost() {
         for jobs in [4, 32, 128] {
             let (monitor, processes) = fixture(jobs, 4096);

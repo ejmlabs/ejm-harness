@@ -93,7 +93,7 @@ Tools:
 - `ToolOutput: Default`: `content: String`, `data: Value`, `is_error: bool`, `artifact: Option<PathBuf>`.
 - `ToolContext: Clone`: `session_id: String`, `run_id: String`, `cwd: PathBuf`, `cancel: CancellationToken`, `governor: Arc<Governor>`; `progress(&self, call_id: &str, message: String) -> async Result<()>`.
 - Registered tools are grants. CLI defaults to read-only tools. `--allow-write` and `--allow-shell` enable effects for this CLI process. SDK host opts in to registering each tool. Model output cannot grant tools.
-- `ejm_harness_coding::tools(config: CodingConfig) -> Result<Vec<Arc<dyn Tool>>>`; `CodingConfig {allow_write: bool, allow_shell: bool, artifact_dir: PathBuf}` with Default.
+- `ejm_harness_coding::tools(config: CodingConfig) -> Result<Vec<Arc<dyn Tool>>>`; `CodingConfig {allow_write: bool, allow_shell: bool, artifact_dir: PathBuf}` with Default. `tools_with_shell_process_tree_cancellation(config, bool)` optionally requires enforced process-tree cancellation for every shell invocation.
 
 Extensibility: public ContextPolicy and RunStrategy traits and `Harness::with_policies` enable bounded preparation and step choices without copying the driver. No plugin executes implicitly from repository contents.
 
@@ -105,7 +105,12 @@ Client request: `{id: string, method: string, params: object}`. Response: `{id, 
 
 Handshake first: `hello {protocol: 1}` -> `{protocol: 1, version: "0.1.1", capabilities: ["tools", "cancel", "steer", "queue", "replay"]}`.
 
-`configure {state_dir?, provider?: ProviderConfig, tools?: ToolDefinition[], allow_write?: bool, allow_shell?: bool, resources?: ResourceLimits, max_sessions?, max_model_requests?, max_steps?, context_max_bytes?, run_timeout_ms?, max_repeated_calls?, max_input_tokens?, max_output_tokens?, max_store_bytes?, system_prompt?}` -> `{configured: true}`. Exactly once before sessions. Default uses echo and read tools. Never log api_key. Worker registers callbacks as Rust Tool implementations.
+The `shell_process_tree_cancellation` capability advertises support for the
+strict shell configuration option, not an enforced native executor capability.
+SDKs require it before configuring strict mode; older workers remain compatible
+when that option is false or absent.
+
+`configure {state_dir?, provider?: ProviderConfig, tools?: ToolDefinition[], allow_write?: bool, allow_shell?: bool, require_shell_process_tree_cancellation?: bool, resources?: ResourceLimits, max_sessions?, max_model_requests?, max_steps?, context_max_bytes?, run_timeout_ms?, max_repeated_calls?, max_input_tokens?, max_output_tokens?, max_store_bytes?, system_prompt?}` -> `{configured: true}`. Exactly once before sessions. Default uses echo and read tools. The optional shell process-tree requirement defaults to false and fails before launch unless the executor reports enforced process-tree cancellation. Never log api_key. Worker registers callbacks as Rust Tool implementations.
 
 `ProviderConfig` is a tagged union:
 

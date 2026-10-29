@@ -140,6 +140,11 @@
             }
           ]
         },
+        "require_shell_process_tree_cancellation": {
+          "description": "Require enforced process-tree cancellation for the granted shell.",
+          "type": "boolean",
+          "default": false
+        },
         "resources": {
           "anyOf": [
             {

@@ -203,11 +203,11 @@ The deadline is reported as monitored because a native process in an
 uninterruptible kernel operation may defer termination.
 
 On Unix, commands enter their own process group before exec. Cleanup signals
-that group, escalates to kill, and waits for the direct child. Observed
-descendants are also killed after checking their recorded identities, including
-children whose original parent has exited. Background children are cleaned up
-even after an otherwise successful command. The caller cannot leave a daemon
-behind by appending `&`.
+that group, escalates to kill, and waits for the direct child. It also attempts
+to kill sampled descendants after checking their recorded identities, including
+children whose original parent has exited. This is best effort: signalling does
+not confirm that every descendant has exited, and background processes can
+outlive cleanup, including after an otherwise successful command.
 
 Windows commands start suspended, join a kill-on-close Job Object, and resume
 only after assignment. Cleanup kills the Job, reaps the root, and retains the
@@ -374,8 +374,10 @@ processes beyond the supported native scope.
 
 After admission, a Rust supervisor task owns the command and its lease. Dropping
 `Executor::run`, including an engine cancelling a tool future, cancels that
-supervisor. The supervisor retains the lease until child cleanup and output
-drainer cleanup finish. It does not retry a command after cancellation or failure.
+supervisor. The supervisor retains the lease while it attempts child cleanup and
+finishes or aborts output drainers. On Unix, a descendant may still be alive when
+the lease is released, including when cleanup reports an error. It does not retry
+a command after cancellation or failure.
 Host applications must keep the Tokio runtime alive to complete cleanup during
 shutdown. After preventing new submissions and signalling every run's
 cancellation token, call `Governor::wait_jobs_idle()` to await queue removals and
@@ -387,9 +389,18 @@ and native blocking tools holding leases. Legacy hosts without resident memory
 leases can continue to use `wait_idle()` directly.
 
 Hosts that serialize workspace effects can use `Executor::run_with_retained`
-to move an owned guard into the supervisor. The guard stays alive through child
-and drainer cleanup even when the caller future is dropped. Ordinary `run`
-uses the same path with an empty retained value.
+to move an owned guard into the supervisor. The guard stays alive through the
+supervisor's cleanup attempts even when the caller future is dropped. On Unix,
+that does not guarantee all descendants have stopped before the guard is released.
+Ordinary `run` uses the same path with an empty retained value.
+
+Rust hosts can register the coding tools with
+`tools_with_shell_process_tree_cancellation(config, true)` for the shell. A
+native executor currently reports this capability as monitored, so strict shell
+calls fail before admission and launch. The existing `tools` registration keeps
+its default requirements. Worker and SDK hosts opt in with
+`require_shell_process_tree_cancellation: true`. This is a fail-closed policy,
+not a new native containment backend.
 
 This generic guard remains in the caller process. It cannot be serialized into
 the shared helper. Dropped futures retain it through the caller supervisor's
@@ -487,7 +498,7 @@ neither 128 supported concurrent native jobs nor full-system throughput. Its
 focused command is:
 
 ```sh
-CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 cargo test -p ejm-harness-exec --release --lib sampler_traversal_cost --locked -- --ignored --nocapture
+CARGO_BUILD_JOBS=2 CARGO_INCREMENTAL=0 cargo test -p ejm-harness-exec --release --lib sampler_traversal_cost --locked -- --nocapture
 ```
 
 ### Observation dependency footprint

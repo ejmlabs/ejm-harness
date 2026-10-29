@@ -4,12 +4,7 @@
     reason = "Test fixtures and assertions must fail at their call site."
 )]
 
-use std::{
-    io::{Read, Write},
-    path::{Path, PathBuf},
-    sync::Arc,
-    time::Duration,
-};
+use std::{path::Path, sync::Arc, time::Duration};
 
 use ejm_harness_exec::{
     CommandRequest, Executor, Governor, GovernorSnapshot, RequiredCapabilities, Reservation,
@@ -110,16 +105,7 @@ async fn cancellation_reaps_a_command_that_never_reads_private_input() {
 
 fn fixture_request(mode: &str, directory: &Path) -> CommandRequest {
     let mut request = CommandRequest {
-        program: std::env::current_exe()
-            .unwrap()
-            .to_string_lossy()
-            .into_owned(),
-        args: vec![
-            "--exact".into(),
-            "fixture".into(),
-            "--ignored".into(),
-            "--nocapture".into(),
-        ],
+        program: env!("CARGO_BIN_EXE_ejm-harness-exec-fixture").into(),
         cwd: directory.to_path_buf(),
         timeout_ms: 5_000,
         ..CommandRequest::default()
@@ -146,8 +132,9 @@ fn live(pid: u32) -> bool {
 async fn wait_for_file(path: &Path) -> String {
     timeout(Duration::from_secs(5), async {
         loop {
+            // The final newline marks a complete fixture write, not just file creation.
             if let Ok(text) = tokio::fs::read_to_string(path).await
-                && !text.trim().is_empty()
+                && text.ends_with('\n')
             {
                 return text;
             }
@@ -409,7 +396,13 @@ struct CleanupProbe {
 
 impl Drop for CleanupProbe {
     fn drop(&mut self) {
-        let cleaned = self.pids.lock().unwrap().iter().all(|pid| !live(*pid));
+        let pids = self.pids.lock().unwrap();
+        // Unix reaps the root and attempts descendant cleanup; it cannot prove
+        // every descendant has exited before releasing the retained guard.
+        #[cfg(unix)]
+        let cleaned = pids.first().is_some_and(|pid| !live(*pid));
+        #[cfg(not(unix))]
+        let cleaned = !pids.is_empty() && pids.iter().all(|pid| !live(*pid));
         if let Some(sender) = self.dropped.take() {
             let _ = sender.send(cleaned);
         }
@@ -417,7 +410,7 @@ impl Drop for CleanupProbe {
 }
 
 #[tokio::test]
-async fn dropping_the_run_future_retains_host_ownership_until_child_cleanup() {
+async fn dropping_the_run_future_retains_guard_through_root_cleanup() {
     let (directory, governor, executor) = executor(ResourceLimits::default());
     let path = directory.path().join("pids");
     let mut request = fixture_request("descendant", directory.path());
@@ -437,6 +430,7 @@ async fn dropping_the_run_future_retains_host_ownership_until_child_cleanup() {
             .await
     });
     let pids = parse_pids(&wait_for_file(&path).await);
+    assert_eq!(pids.len(), 2, "fixture must report its root and descendant");
     tracked.lock().unwrap().clone_from(&pids);
     assert!(matches!(
         dropped.try_recv(),
@@ -448,7 +442,8 @@ async fn dropping_the_run_future_retains_host_ownership_until_child_cleanup() {
         timeout(Duration::from_secs(5), dropped)
             .await
             .unwrap()
-            .unwrap()
+            .unwrap(),
+        "retained guard was released before the required process cleanup"
     );
     wait_for_cleanup(&governor, &pids).await;
 }
@@ -475,7 +470,7 @@ async fn normal_parent_exit_cleans_children_that_keep_pipes_open() {
     wait_for_cleanup(&governor, &pids).await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn deadline_terminates_a_command_tree() {
     let (directory, governor, executor) = executor(ResourceLimits::default());
     let path = directory.path().join("pids");
@@ -485,12 +480,26 @@ async fn deadline_terminates_a_command_tree() {
         "EJM_HARNESS_EXEC_PID_FILE".into(),
         path.to_string_lossy().into_owned(),
     );
-    let result = executor
-        .run(request, CancellationToken::new())
-        .await
-        .unwrap();
+    let running =
+        tokio::spawn(async move { executor.run(request, CancellationToken::new()).await });
+    let started = std::time::Instant::now();
+    let pids = loop {
+        if let Ok(text) = std::fs::read_to_string(&path)
+            && text.ends_with('\n')
+        {
+            break parse_pids(&text);
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "fixture became ready"
+        );
+        tokio::task::yield_now().await;
+    };
+    assert_eq!(pids.len(), 2);
+    tokio::time::advance(Duration::from_millis(200)).await;
+    tokio::time::resume();
+    let result = running.await.unwrap().unwrap();
     assert!(result.timed_out);
-    let pids = parse_pids(&std::fs::read_to_string(path).unwrap());
     wait_for_cleanup(&governor, &pids).await;
 }
 
@@ -510,7 +519,39 @@ async fn observed_process_budget_abuse_is_stopped_and_released() {
         .await
         .unwrap_err();
     assert!(error.to_string().contains("process count"), "{error:#}");
-    let pids = parse_pids(&std::fs::read_to_string(path).unwrap());
+    let mut pids = parse_pids(&std::fs::read_to_string(&path).unwrap());
+    assert_eq!(pids.len(), 2);
+    for index in 0..5 {
+        if !path.with_extension(format!("{index}.pending")).exists() {
+            break;
+        }
+        let records: Vec<u32> = ["parent", "child"]
+            .into_iter()
+            .filter_map(|source| {
+                let text =
+                    std::fs::read_to_string(path.with_extension(format!("{index}.{source}")))
+                        .ok()?;
+                if !text.ends_with('\n') {
+                    return None;
+                }
+                let values = parse_pids(&text);
+                if values.len() == 1 {
+                    values.first().copied()
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert!(
+            !records.is_empty(),
+            "spawned child identity was not recorded"
+        );
+        assert!(records.iter().all(|pid| *pid == records[0]));
+        if index == 0 {
+            assert_eq!(records[0], pids[1]);
+        }
+        pids.push(records[0]);
+    }
     wait_for_cleanup(&governor, &pids).await;
 }
 
@@ -518,93 +559,4 @@ fn parse_pids(text: &str) -> Vec<u32> {
     text.split_whitespace()
         .map(|part| part.parse().unwrap())
         .collect()
-}
-
-/// Run this ignored test only in a child process controlled by the executor.
-#[test]
-#[ignore = "subprocess fixture"]
-fn fixture() {
-    let mode = std::env::var("EJM_HARNESS_EXEC_FIXTURE").expect("fixture mode");
-    let pid_file = std::env::var_os("EJM_HARNESS_EXEC_PID_FILE").map(PathBuf::from);
-    match mode.as_str() {
-        "private-input" => {
-            let err = std::thread::spawn(|| {
-                let mut stderr = std::io::stderr().lock();
-                stderr.write_all(&vec![b'e'; 1024 * 1024]).unwrap();
-                stderr.write_all(b"\nSTDERR_END\n").unwrap();
-            });
-            std::io::stdout()
-                .write_all(&vec![b'o'; 1024 * 1024])
-                .unwrap();
-            let mut input = Vec::new();
-            std::io::stdin().read_to_end(&mut input).unwrap();
-            err.join().unwrap();
-            println!(
-                "INPUT_LEN={} PATH_REMOVED={}",
-                input.len(),
-                std::env::var_os("PATH").is_none()
-            );
-        }
-        "blocked-input" => {
-            if let Some(path) = pid_file {
-                std::fs::write(path, std::process::id().to_string()).unwrap();
-            }
-            loop {
-                std::thread::sleep(Duration::from_secs(1));
-            }
-        }
-        "noisy" => {
-            let err = std::thread::spawn(|| {
-                let mut stderr = std::io::stderr().lock();
-                stderr.write_all(&vec![b'e'; 1024 * 1024]).unwrap();
-                stderr.write_all(b"\nSTDERR_END\n").unwrap();
-            });
-            std::io::stdout()
-                .write_all(&vec![b'o'; 1024 * 1024])
-                .unwrap();
-            err.join().unwrap();
-            std::io::stdout().write_all(b"\nSTDOUT_END\n").unwrap();
-        }
-        "binary" => std::io::stdout()
-            .write_all(&vec![0xff_u8; 1024 * 1024])
-            .unwrap(),
-        "ready" => {
-            if let Some(path) = pid_file {
-                std::fs::write(path, std::process::id().to_string()).unwrap();
-            }
-        }
-        "hold" => loop {
-            std::thread::sleep(Duration::from_secs(1));
-        },
-        "descendant" | "orphan" | "many-descendants" => {
-            let count = if mode == "many-descendants" { 5 } else { 1 };
-            let mut children = Vec::new();
-            let mut pids = vec![std::process::id()];
-            for _ in 0..count {
-                let child = std::process::Command::new(std::env::current_exe().unwrap())
-                    .args(["--exact", "fixture", "--ignored", "--nocapture"])
-                    .env("EJM_HARNESS_EXEC_FIXTURE", "hold")
-                    .spawn()
-                    .unwrap();
-                pids.push(child.id());
-                children.push(child);
-            }
-            if let Some(path) = pid_file {
-                std::fs::write(
-                    path,
-                    pids.iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                )
-                .unwrap();
-            }
-            if mode != "orphan" {
-                for mut child in children {
-                    let _ = child.wait();
-                }
-            }
-        }
-        _ => std::process::exit(2),
-    }
 }

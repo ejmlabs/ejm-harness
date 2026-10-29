@@ -1,0 +1,3 @@
+# Design
+
+Use the executor's existing `RequiredCapabilities` and admission check. A new registration function accepts only a process-tree cancellation boolean, while the existing function delegates with that requirement disabled. Worker configuration maps the optional `require_shell_process_tree_cancellation` boolean to the same requirement. The host controls the requirement at registration; a tool call cannot weaken it. Native platforms that report monitored process-tree cleanup reject a required enforced guarantee before admission and process launch. This is not an implementation of hard containment.

@@ -147,6 +147,14 @@ class AsyncHarness(Transport):
             isinstance(provider, dict) and provider.get("kind") == "package"
         )
         capabilities = hello.get("capabilities")
+        if self._config.get("require_shell_process_tree_cancellation") and (
+            not isinstance(capabilities, list)
+            or "shell_process_tree_cancellation" not in capabilities
+        ):
+            raise HarnessError(
+                "protocol",
+                "update ejm-harness-worker to a version that supports strict shell cancellation",
+            )
         if packages_requested and (
             not isinstance(capabilities, list) or "packages" not in capabilities
         ):

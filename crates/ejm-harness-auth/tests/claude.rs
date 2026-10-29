@@ -157,10 +157,16 @@ async fn malformed_oversized_and_failed_status_never_exposes_output() {
 async fn cancelled_and_dropped_auth_callers_reap_their_process() {
     for dropped in [false, true] {
         let (directory, client) = fixture("{}", 0, "hang");
+        // Cancellation, rather than the client's deadline, must end this operation.
+        let client = client.with_timeout(Duration::from_secs(30)).unwrap();
         let cancel = CancellationToken::new();
         let child_cancel = cancel.clone();
-        let task = tokio::spawn(async move { client.status(child_cancel).await });
-        let pids = ready(&directory.path().join("ready")).await;
+        let mut task = tokio::spawn(async move { client.status(child_cancel).await });
+        let ready_path = directory.path().join("ready");
+        let pids = tokio::select! {
+            result = &mut task => panic!("auth operation ended before fixture readiness: {result:?}"),
+            pids = ready(&ready_path) => pids,
+        };
         assert_eq!(pids.len(), 2);
         if dropped {
             task.abort();
@@ -185,6 +191,8 @@ async fn signout_committed_before_cancellation_remains_observable() {
         0,
         "commit-logout",
     );
+    // The test triggers cancellation after the logout has committed.
+    let client = client.with_timeout(Duration::from_secs(30)).unwrap();
     let cancel = CancellationToken::new();
     let child_cancel = cancel.clone();
     let task = tokio::spawn(async move { client.logout(child_cancel).await });

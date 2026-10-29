@@ -67,18 +67,25 @@ unverified gate.
 `OwnedChild`. The caller configures its cwd, argv, environment, and stdio.
 The adapter supplies native process ownership:
 
-| Platform        | Mechanism                              | Cleanup                                                                                            |
-| --------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| macOS and Linux | A fresh Unix process group before exec | Signal the group and reap the root. The executor also kills identity-checked sampled descendants.  |
-| Windows         | A kill-on-close Job Object             | Spawn suspended, assign to the Job, then resume. Confirm empty Job membership, then reap the root. |
+| Platform        | Mechanism                              | Cleanup                                                                                                      |
+| --------------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| macOS and Linux | A fresh Unix process group before exec | Signal the group and reap the root. The executor also attempts to kill identity-checked sampled descendants. |
+| Windows         | A kill-on-close Job Object             | Spawn suspended, assign to the Job, then resume. Confirm empty Job membership, then reap the root.           |
 
 `wait()` and `try_wait()` report the direct child's status. Always finish with
-`kill().await`, including after a successful root exit, to stop remaining
-descendants. A cached exit status remains available after that cleanup.
+`kill().await`, including after a successful root exit, to attempt to stop
+remaining descendants. A cached exit status remains available after cleanup.
 `start_kill()` and `Drop` only initiate termination. Keep the owned child, pipe
 tasks, and workspace or admission leases alive until cleanup finishes. Use the
 host's existing Tokio runtime rather than creating a runtime or thread per
 child.
+
+On Unix, `kill().await` does not confirm that every group member or sampled
+descendant has exited. Descendants can escape the group and be missed by
+sampling, and signalling is asynchronous. A guard or lease can therefore be
+released while a descendant remains alive, including if cleanup reports an
+error. The identity check for sampled descendants reduces PID reuse risk but
+is not atomic with signalling.
 
 Darwin can briefly report permission denied while a terminated Unix group is
 disappearing. After reaping the root, cleanup retries that specific error up to

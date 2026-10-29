@@ -13,11 +13,21 @@ mod startup;
 #[cfg(all(feature = "native-test-seams", any(unix, windows)))]
 mod stable_locks;
 
+fn private_tempdir() -> std::io::Result<tempfile::TempDir> {
+    let mut builder = tempfile::Builder::new();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        builder.permissions(std::fs::Permissions::from_mode(0o700));
+    }
+    builder.tempdir()
+}
+
 #[test]
 fn competing_startup_clients_share_one_stable_lock() {
     use std::{fs::TryLockError, sync::Barrier, thread};
 
-    let root = tempfile::tempdir().unwrap();
+    let root = private_tempdir().unwrap();
     let directory =
         super::wire::directory(&root.path().canonicalize().unwrap(), "startup-race").unwrap();
     let barrier = Barrier::new(8);
@@ -50,7 +60,7 @@ fn competing_startup_clients_share_one_stable_lock() {
 fn hard_linked_startup_lock_is_rejected_without_replacement() {
     use rightkit_fs::{FsError, handle::ReadOptions};
 
-    let root = tempfile::tempdir().unwrap();
+    let root = private_tempdir().unwrap();
     let directory =
         super::wire::directory(&root.path().canonicalize().unwrap(), "interrupted-publish")
             .unwrap();
@@ -173,7 +183,7 @@ async fn domain_selection_is_shared_and_existing_readiness_stays_fixed() {
     }
 
     tokio::time::timeout(Duration::from_secs(8), async {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = private_tempdir().unwrap();
         let root = temp.path().canonicalize().unwrap().join("state");
         let (initial_server, handle, initial_ad) = serving_domain(&root, "fixture", true).await;
         let (changed_server, _, changed_ad) = serving_domain(&root, "changed", true).await;
@@ -235,7 +245,7 @@ async fn parked_readiness_shares_one_connection_and_pins_its_generation() {
     use super::{NativeCommand, wire};
 
     tokio::time::timeout(Duration::from_secs(8), async {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = private_tempdir().unwrap();
         let root = temp.path().canonicalize().unwrap().join("state");
         let (server, handle, ad) = serving_owner(&root).await;
         let mut guards = Vec::new();
@@ -270,7 +280,7 @@ async fn stale_readiness_cannot_launch_in_a_replacement_generation() {
     use super::NativeCommand;
 
     tokio::time::timeout(Duration::from_secs(8), async {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = private_tempdir().unwrap();
         let root = temp.path().canonicalize().unwrap().join("state");
         let (server, handle, _) = serving_owner(&root).await;
         let ready = handle.ready().await.unwrap();
@@ -314,7 +324,7 @@ async fn staged_demand_precedes_helper_readiness_and_spawn_failure_releases_witn
     use std::{
         fs::TryLockError,
         sync::{
-            Arc,
+            Arc, Mutex,
             atomic::{AtomicBool, Ordering},
         },
         time::Duration,
@@ -326,10 +336,15 @@ async fn staged_demand_precedes_helper_readiness_and_spawn_failure_releases_witn
     struct Probe {
         governor: Arc<Governor>,
         observed: AtomicBool,
+        witness: Mutex<Option<rightkit_fs::FileKey>>,
     }
     impl NativeOwnerAdmission for Probe {
         fn admit(&self, request: &NativeOwnerRequest) -> anyhow::Result<NativeOwnerPermit> {
             let witness = std::fs::File::open(request.lifetime_path())?;
+            *self.witness.lock().unwrap() = Some(rightkit_fs::FileKey::of_file(
+                &witness,
+                request.lifetime_path(),
+            )?);
             self.observed.store(
                 self.governor.snapshot().running == 0
                     && self.governor.snapshot().queued == 1
@@ -343,7 +358,7 @@ async fn staged_demand_precedes_helper_readiness_and_spawn_failure_releases_witn
     }
 
     tokio::time::timeout(Duration::from_secs(3), async {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = private_tempdir().unwrap();
         let root = temp.path().canonicalize().unwrap().join("state");
         let governor = Arc::new(Governor::new(ResourceLimits::default()).unwrap());
         governor
@@ -352,6 +367,7 @@ async fn staged_demand_precedes_helper_readiness_and_spawn_failure_releases_witn
         let probe = Arc::new(Probe {
             governor: governor.clone(),
             observed: AtomicBool::new(false),
+            witness: Mutex::new(None),
         });
         let owner = NativeOwner::new(&root, "fixture")
             .unwrap()
@@ -385,9 +401,29 @@ async fn staged_demand_precedes_helper_readiness_and_spawn_failure_releases_witn
         assert_eq!(governor.snapshot().queued, 0);
         let directory = wire::directory(&root, "fixture").unwrap();
         let witness = wire::stable_lock(&directory, "owner.lock").unwrap();
-        witness.try_lock().unwrap();
+        assert_eq!(
+            Some(
+                rightkit_fs::FileKey::of_file(&witness, &directory.path().join("owner.lock"))
+                    .unwrap()
+            ),
+            *probe.witness.lock().unwrap()
+        );
+        // Require the same witness to become available within the test deadline.
+        loop {
+            match witness.try_lock() {
+                Ok(()) => break,
+                Err(TryLockError::WouldBlock) => {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+                Err(TryLockError::Error(error)) => {
+                    return Err(error);
+                }
+            }
+        }
+        Ok::<(), std::io::Error>(())
     })
     .await
+    .unwrap()
     .unwrap();
 }
 
@@ -424,7 +460,7 @@ async fn reused_helper_readiness_is_released_before_waiting_after_failed_activat
     }
 
     tokio::time::timeout(Duration::from_secs(6), async {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = private_tempdir().unwrap();
         let root = temp.path().canonicalize().unwrap().join("state");
         let (server, handle, _) = serving_domain(&root, "fixture", true).await;
         let governor = Arc::new(Governor::new(ResourceLimits::default()).unwrap());
@@ -476,7 +512,7 @@ async fn lost_readiness_reply_rediscovers_before_submitting_a_launch() {
     use std::time::Duration;
 
     tokio::time::timeout(Duration::from_secs(10), async {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = private_tempdir().unwrap();
         let root = temp.path().canonicalize().unwrap().join("state");
         let (server, handle, mut cached) = serving_owner(&root).await;
         let stale = tokio::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
@@ -530,7 +566,7 @@ async fn lost_launch_reply_reconciles_without_replay() {
     use std::time::Duration;
 
     tokio::time::timeout(Duration::from_secs(10), async {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = private_tempdir().unwrap();
         let root = temp.path().canonicalize().unwrap().join("state");
         let (server, handle, ad) = serving_owner(&root).await;
         let mut transport = wire::connect(&ad).await.unwrap();
@@ -610,7 +646,7 @@ async fn incompatible_requests_are_rejected_before_native_effects() {
     use std::time::Duration;
 
     tokio::time::timeout(Duration::from_secs(10), async {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = private_tempdir().unwrap();
         let root = temp.path().canonicalize().unwrap().join("state");
         let (server, handle, ad) = serving_owner(&root).await;
         let marker = temp.path().join("effects");
@@ -699,7 +735,7 @@ async fn placement_change_after_prepare_blocks_effects_and_does_not_block_query(
     use std::time::Duration;
 
     tokio::time::timeout(Duration::from_secs(10), async {
-        let temp = tempfile::tempdir().unwrap();
+        let temp = private_tempdir().unwrap();
         let root = temp.path().canonicalize().unwrap().join("state");
         let (server, handle, ad) = serving_owner(&root).await;
         let mut transport = wire::connect(&ad).await.unwrap();

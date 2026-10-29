@@ -18,7 +18,27 @@ python3 scripts/check-policy.py --self-test
 python3 scripts/check-policy.py
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) ;;
+    *)
+        native_target_dir=${CARGO_TARGET_DIR:-"$project_root/target"}
+        case "$native_target_dir" in
+            /*) ;;
+            *) native_target_dir="$project_root/$native_target_dir" ;;
+        esac
+        native_host=$(rustc --print host-tuple)
+        test -n "$native_host"
+        cargo build --locked -p ejm-harness-exec --example native_owner_helper --target-dir "$native_target_dir" --target "$native_host"
+        EJM_NATIVE_STARTUP_HELPER="$native_target_dir/$native_host/debug/examples/native_owner_helper"
+        EJM_NATIVE_OCCUPANCY_HELPER="$EJM_NATIVE_STARTUP_HELPER"
+        export EJM_NATIVE_STARTUP_HELPER EJM_NATIVE_OCCUPANCY_HELPER
+        ;;
+esac
+if [ "$(uname -s)" = Linux ]; then
+    scripts/with-secret-service cargo test --workspace --locked
+else
+    cargo test --workspace --locked
+fi
 python3 -B -m unittest discover -s crates/ejm-harness-packages/runtime -p test_hosts.py
 cargo build --workspace --all-targets --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked

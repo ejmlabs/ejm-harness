@@ -477,6 +477,10 @@ export interface ConfigureParams {
   max_store_bytes?: number | null;
   packages?: PackageConfig[];
   provider?: ProviderConfig | null;
+  /**
+   * Require enforced process-tree cancellation for the granted shell.
+   */
+  require_shell_process_tree_cancellation?: boolean;
   resources?: ResourceLimits | null;
   run_timeout_ms?: number | null;
   state_dir?: string | null;

@@ -78,6 +78,58 @@ test("package configuration rejects workers that do not advertise package suppor
   }
 });
 
+test("strict shell configuration requires worker capability before configure", async () => {
+  const request = Harness.prototype.request;
+  const state = await mkdtemp(path.join(os.tmpdir(), "ejm-harness-sdk-ts-"));
+  let capabilities;
+  let configured;
+  Harness.prototype.request = async function (method, ...args) {
+    if (method === "configure") configured = true;
+    const result = await request.call(this, method, ...args);
+    return method === "hello" ? { ...result, capabilities } : result;
+  };
+  try {
+    for (capabilities of [undefined, [], "shell_process_tree_cancellation"]) {
+      for (const allowShell of [false, true]) {
+        configured = false;
+        await assert.rejects(
+          Harness.create({
+            workerPath,
+            state_dir: state,
+            allow_shell: allowShell,
+            require_shell_process_tree_cancellation: true,
+          }),
+          { code: "protocol", message: /strict shell process-tree cancellation/ },
+        );
+        assert.equal(configured, false);
+      }
+    }
+    capabilities = [];
+    for (const strict of [undefined, false]) {
+      configured = false;
+      const harness = await Harness.create({
+        workerPath,
+        state_dir: state,
+        require_shell_process_tree_cancellation: strict,
+      });
+      assert.equal(configured, true);
+      await harness.close();
+    }
+    capabilities = ["shell_process_tree_cancellation"];
+    configured = false;
+    const harness = await Harness.create({
+      workerPath,
+      state_dir: state,
+      require_shell_process_tree_cancellation: true,
+    });
+    assert.equal(configured, true);
+    await harness.close();
+  } finally {
+    Harness.prototype.request = request;
+    await rm(state, { recursive: true, force: true });
+  }
+});
+
 test("trusted packages share tools, hooks, provider, commands, and widgets through one runtime", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "ejm-harness-package-sdk-ts-"));
   const manifest = {

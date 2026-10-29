@@ -379,11 +379,14 @@ async fn configure(
             ProviderConfig::Package { package, name } => packages.pool.provider(&package, &name)?,
             provider => configure_provider(provider)?,
         };
-        let mut tools = ejm_harness_coding::tools(ejm_harness_coding::CodingConfig {
-            allow_write: params.allow_write,
-            allow_shell: params.allow_shell,
-            artifact_dir: config.state_dir.join("artifacts"),
-        })?;
+        let mut tools = ejm_harness_coding::tools_with_shell_process_tree_cancellation(
+            ejm_harness_coding::CodingConfig {
+                allow_write: params.allow_write,
+                allow_shell: params.allow_shell,
+                artifact_dir: config.state_dir.join("artifacts"),
+            },
+            params.require_shell_process_tree_cancellation,
+        )?;
         for definition in params.tools {
             tools.push(Arc::new(CallbackTool {
                 definition,
@@ -794,6 +797,7 @@ impl Connection {
                                     "packages",
                                     "package_provider",
                                     "package_hooks",
+                                    "shell_process_tree_cancellation",
                                 ]
                                 .map(String::from)
                                 .to_vec(),
@@ -1012,7 +1016,59 @@ fn timestamp_ms() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ejm_harness::{Effect, ModelResponse, RunStatus, SessionOptions};
+    use ejm_harness::{Effect, EventKind, ModelResponse, RunStatus, SessionOptions};
+
+    #[tokio::test]
+    async fn configured_strict_shell_fails_before_launch() -> Result<()> {
+        for strict in [false, true] {
+            let directory = tempfile::tempdir()?;
+            let (tx, _rx) = mpsc::channel(MAX_PENDING);
+            let outbound = Outbound {
+                tx,
+                bytes: Arc::new(Semaphore::new(OUTPUT_BYTES)),
+                disconnected: CancellationToken::new(),
+            };
+            let params: ConfigureParams = serde_json::from_value(json!({
+                "state_dir": directory.path().join("state"),
+                "allow_shell": true,
+                "require_shell_process_tree_cancellation": strict,
+                "max_steps": 2,
+                "provider": {
+                    "kind": "replay",
+                    "responses": [
+                        {"tool_calls": [{"id": "call", "name": "shell", "arguments": {"command": "echo marker > marker"}}]},
+                        {"content": "Done."}
+                    ]
+                }
+            }))?;
+            let (harness, _broker, _packages) = configure(params, outbound).await?;
+            let session = harness
+                .create_session(SessionOptions {
+                    cwd: directory.path().to_owned(),
+                    title: "shell requirement".into(),
+                })
+                .await?;
+            let mut run = harness.start(&session.id, "run shell".into()).await?;
+            let summary = tokio::time::timeout(Duration::from_secs(5), run.wait()).await??;
+            assert_eq!(summary.status, RunStatus::Completed);
+            let output = harness
+                .events(&session.id, 0, 100)
+                .await?
+                .into_iter()
+                .find_map(|event| match event.kind {
+                    EventKind::ToolFinished { output, .. } => Some(output),
+                    _ => None,
+                })
+                .context("shell result was not journaled")?;
+            assert_eq!(directory.path().join("marker").exists(), !strict);
+            assert_eq!(output.is_error, strict);
+            if strict {
+                assert!(output.content.contains("process_tree_cancellation"));
+            }
+            harness.shutdown().await?;
+        }
+        Ok(())
+    }
 
     #[test]
     fn native_provider_configuration_is_local_and_validated() -> Result<()> {
@@ -1259,15 +1315,19 @@ mod tests {
             .await?["error"]["code"],
             "protocol"
         );
-        assert_eq!(
-            rpc(
-                &mut reader,
-                &mut client_write,
-                "hello",
-                json!({"protocol":1})
-            )
-            .await?["result"]["protocol"],
-            1
+        let hello = rpc(
+            &mut reader,
+            &mut client_write,
+            "hello",
+            json!({"protocol":1}),
+        )
+        .await?;
+        assert_eq!(hello["result"]["protocol"], 1);
+        assert!(
+            hello["result"]["capabilities"]
+                .as_array()
+                .context("missing capabilities")?
+                .contains(&json!("shell_process_tree_cancellation"))
         );
         assert_eq!(
             rpc(

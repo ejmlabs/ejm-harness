@@ -40,6 +40,17 @@ impl Default for CodingConfig {
 /// # Errors
 /// Reserved for invalid coding tool configuration.
 pub fn tools(config: CodingConfig) -> Result<Vec<Arc<dyn Tool>>> {
+    tools_with_shell_process_tree_cancellation(config, false)
+}
+
+/// Register coding tools with optional enforced shell process-tree cancellation.
+///
+/// # Errors
+/// Reserved for invalid coding tool configuration.
+pub fn tools_with_shell_process_tree_cancellation(
+    config: CodingConfig,
+    require_process_tree_cancellation: bool,
+) -> Result<Vec<Arc<dyn Tool>>> {
     let mut result: Vec<Arc<dyn Tool>> = vec![
         Arc::new(NativeTool(Kind::Read)),
         Arc::new(NativeTool(Kind::List)),
@@ -54,6 +65,7 @@ pub fn tools(config: CodingConfig) -> Result<Vec<Arc<dyn Tool>>> {
     if config.allow_shell {
         result.push(Arc::new(ShellTool {
             artifact_dir: config.artifact_dir,
+            require_process_tree_cancellation,
         }));
     }
     Ok(result)
@@ -82,7 +94,102 @@ impl BoundedLines {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ejm_harness::Effect;
+    use anyhow::Context;
+    use async_trait::async_trait;
+    use ejm_harness::{
+        Effect, EventKind, Harness, HarnessConfig, ModelDelta, ModelRequest, ModelResponse,
+        Provider, Role, RunStatus, SessionOptions, ToolCall,
+    };
+    use serde_json::json;
+
+    struct ShellProvider;
+
+    #[async_trait]
+    impl Provider for ShellProvider {
+        async fn stream(
+            &self,
+            request: ModelRequest,
+            _cancel: tokio_util::sync::CancellationToken,
+            _deltas: tokio::sync::mpsc::Sender<ModelDelta>,
+        ) -> Result<ModelResponse> {
+            if request
+                .messages
+                .last()
+                .is_some_and(|m| m.role == Role::Tool)
+            {
+                Ok(ModelResponse {
+                    content: "Done.".into(),
+                    ..Default::default()
+                })
+            } else {
+                Ok(ModelResponse {
+                    tool_calls: vec![ToolCall {
+                        id: "shell-fixture".into(),
+                        name: "shell".into(),
+                        arguments: json!({"command":"echo marker > marker"}),
+                    }],
+                    ..Default::default()
+                })
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn shell_requirements_fail_before_launch_and_default_remains_available() -> Result<()> {
+        for (explicit, strict) in [(false, false), (true, false), (true, true)] {
+            let temp = tempfile::tempdir()?;
+            let workspace = temp.path().join("workspace");
+            std::fs::create_dir(&workspace)?;
+            let config = CodingConfig {
+                allow_shell: true,
+                artifact_dir: temp.path().join("artifacts"),
+                ..Default::default()
+            };
+            std::fs::create_dir(&config.artifact_dir)?;
+            let registered = if explicit {
+                tools_with_shell_process_tree_cancellation(config, strict)?
+            } else {
+                tools(config)?
+            };
+            let harness = Harness::new(
+                HarnessConfig {
+                    state_dir: temp.path().join("state"),
+                    max_steps: 2,
+                    run_timeout_ms: 5000,
+                    ..Default::default()
+                },
+                Arc::new(ShellProvider),
+                registered,
+            )?;
+            let session = harness
+                .create_session(SessionOptions {
+                    cwd: workspace.clone(),
+                    title: "shell requirement".into(),
+                })
+                .await?;
+            let mut run = harness
+                .start(&session.id, "Run the shell fixture".into())
+                .await?;
+            let result = run.wait().await?;
+            harness.shutdown().await?;
+            assert_eq!(result.status, RunStatus::Completed, "{:?}", result.error);
+            let output = harness
+                .events(&session.id, 0, 100)
+                .await?
+                .into_iter()
+                .find_map(|event| match event.kind {
+                    EventKind::ToolFinished { output, .. } => Some(output),
+                    _ => None,
+                })
+                .context("shell result was not journaled")?;
+            assert_eq!(workspace.join("marker").exists(), !strict);
+            assert_eq!(output.is_error, strict);
+            if strict {
+                assert!(output.content.contains("process_tree_cancellation"));
+            }
+        }
+        Ok(())
+    }
 
     #[test]
     fn effect_grants_are_explicit() -> Result<()> {

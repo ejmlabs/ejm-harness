@@ -673,7 +673,6 @@ fn unsupported_nested_provider_versions_are_rejected() -> Result<()> {
 }
 
 #[tokio::test]
-#[ignore = "uses the native user credential service; run explicitly on each supported OS"]
 async fn native_os_key_service_round_trip() -> Result<()> {
     let root = tempfile::tempdir()?;
     let vault = SecretVault::open(root.path().join("native-key-fixture"))?;
@@ -932,7 +931,6 @@ async fn macos_allow_acls_and_inherited_creation_are_rejected() -> Result<()> {
 }
 
 #[test]
-#[ignore = "explicit local vault measurement; uses a synthetic injected key"]
 fn vault_save_reopen_profile() -> Result<()> {
     // Keep OS key-service latency separate from repeatable file/format costs.
     // Run this exact test alone under the native process resource profiler.
