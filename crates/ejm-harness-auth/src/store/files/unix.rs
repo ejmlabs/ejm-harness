@@ -27,17 +27,7 @@ pub(crate) struct RawTransaction {
 impl PrivateDirectory {
     pub(crate) fn open(path: &Path) -> Result<Self> {
         let owner = rustix::process::geteuid().as_raw();
-        match fs::symlink_metadata(path) {
-            Ok(metadata) => check_directory(&metadata, owner)?,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                DirBuilder::new()
-                    .recursive(true)
-                    .mode(0o700)
-                    .create(path)
-                    .context("create private credential directory")?;
-            }
-            Err(error) => return Err(error).context("inspect credential directory"),
-        }
+        ensure_directory(path, owner)?;
         let before = fs::symlink_metadata(path)?;
         check_directory(&before, owner)?;
         #[cfg(target_os = "macos")]
@@ -78,23 +68,7 @@ impl PrivateDirectory {
             "credential directory changed during open"
         );
         let lock_path = path.join(".lock");
-        match OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&lock_path)
-        {
-            Ok(file) => {
-                check_file(&file.metadata()?, owner)?;
-                file.sync_all().context("synchronize new credential lock")?;
-                directory
-                    .sync_all()
-                    .context("synchronize credential directory")?;
-            }
-            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}
-            Err(error) => return Err(error).context("create credential lock"),
-        }
+        create_lock(&lock_path, &directory, owner)?;
         let lock_anchor = open_private_file(&lock_path, owner, true)?;
         let location = Arc::new(Location {
             path,
@@ -156,6 +130,11 @@ impl Location {
         Ok(())
     }
 
+    fn validate_entry(&self, name: &str, max: usize) -> Result<()> {
+        self.validate()?;
+        self.check_entry(name, max)
+    }
+
     fn check_entry(&self, name: &str, max: usize) -> Result<()> {
         match fs::symlink_metadata(self.path.join(name)) {
             Ok(metadata) => {
@@ -176,8 +155,7 @@ impl Location {
 
 impl RawTransaction {
     pub(crate) fn remove(&self, name: &str, max: usize) -> Result<()> {
-        self.location.validate()?;
-        self.location.check_entry(name, max)?;
+        self.location.validate_entry(name, max)?;
         fs::remove_file(self.location.path.join(name))
             .context("retire credential bootstrap marker")?;
         self.location
@@ -188,8 +166,7 @@ impl RawTransaction {
     }
 
     pub(crate) fn read(&self, name: &str, max: usize) -> Result<Option<Zeroizing<Vec<u8>>>> {
-        self.location.validate()?;
-        self.location.check_entry(name, max)?;
+        self.location.validate_entry(name, max)?;
         let path = self.location.path.join(name);
         if !path.try_exists().context("inspect credential file")? {
             return Ok(None);
@@ -213,8 +190,7 @@ impl RawTransaction {
 
     pub(crate) fn write(&self, name: &str, bytes: &[u8], max: usize) -> Result<()> {
         ensure!(bytes.len() <= max, "credential file exceeds size limit");
-        self.location.validate()?;
-        self.location.check_entry(name, max)?;
+        self.location.validate_entry(name, max)?;
         let mut temporary = tempfile::Builder::new()
             .prefix(".vault-")
             .tempfile_in(&self.location.path)
@@ -236,8 +212,7 @@ impl RawTransaction {
             .directory
             .sync_all()
             .context("synchronize credential replacement directory")?;
-        self.location.validate()?;
-        self.location.check_entry(name, max)?;
+        self.location.validate_entry(name, max)?;
         temporary
             .persist(self.location.path.join(name))
             .map_err(|_| anyhow::anyhow!("atomically replace credential state"))?;
@@ -245,8 +220,39 @@ impl RawTransaction {
             .directory
             .sync_all()
             .context("synchronize saved credential state")?;
-        self.location.validate()?;
-        self.location.check_entry(name, max)
+        self.location.validate_entry(name, max)
+    }
+}
+
+fn ensure_directory(path: &Path, owner: u32) -> Result<()> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => check_directory(&metadata, owner),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(path)
+            .context("create private credential directory"),
+        Err(error) => Err(error).context("inspect credential directory"),
+    }
+}
+
+fn create_lock(lock_path: &Path, directory: &File, owner: u32) -> Result<()> {
+    match OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(lock_path)
+    {
+        Ok(file) => {
+            check_file(&file.metadata()?, owner)?;
+            file.sync_all().context("synchronize new credential lock")?;
+            directory
+                .sync_all()
+                .context("synchronize credential directory")
+        }
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+        Err(error) => Err(error).context("create credential lock"),
     }
 }
 
