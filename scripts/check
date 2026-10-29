@@ -18,7 +18,7 @@ python3 scripts/check-policy.py --self-test
 python3 scripts/check-policy.py
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
+cargo test --workspace --locked --no-fail-fast
 python3 -B -m unittest discover -s crates/ejm-harness-packages/runtime -p test_hosts.py
 cargo build --workspace --all-targets --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
