@@ -13,6 +13,11 @@ readme.workspace = true
 [lints]
 workspace = true
 
+[[example]]
+name = "native_key_fixture"
+path = "tests/fixtures/native_key_fixture.rs"
+edition = "2021"
+
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true
@@ -47,7 +52,7 @@ processkit = { version = "=3.3.4", default-features = false, features = ["proces
 dbus-secret-service-keyring-store = { version = "=1.0.1", default-features = false, features = ["crypto-rust"] }
 
 [target.'cfg(unix)'.dependencies]
-rustix = { workspace = true, features = ["process", "fs", "net"] }
+rustix = { workspace = true, features = ["process", "fs"] }
 
 [dev-dependencies]
 wiremock.workspace = true

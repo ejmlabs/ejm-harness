@@ -23,7 +23,8 @@ gate also run a real native credential-service round trip. They need an
 isolated Secret Service on Linux, an unlocked default Keychain on macOS, or
 a Windows logon session with Credential Manager available. On Linux, the test
 starts its own isolated Secret Service, including for direct Cargo invocations;
-it requires `dbus-daemon`, `gnome-keyring-daemon`, and `gdbus`. An
+it requires `dbus-daemon`, `gnome-keyring-daemon`, and `gdbus` in
+`/usr/bin` or `/bin`. An
 unavailable service fails the test; hosted runner availability and ephemeral
 service cleanup remain unverified on each platform. Real persistent use also
 needs the platform credential service. Cargo, npm, and Python development locks

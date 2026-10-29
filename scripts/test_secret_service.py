@@ -1,7 +1,6 @@
 import contextlib
 import json
 import os
-import select
 import shutil
 import socket
 import subprocess
@@ -156,61 +155,58 @@ class SecretServiceTests(unittest.TestCase):
                     cleanup.callback(shutil.rmtree, fake_dir)
                     (fake_dir / "r").mkdir(mode=0o700)
                     (fake_dir / "data").mkdir(mode=0o700)
-                    fake_fd = os.open(fake_dir / "r", os.O_RDONLY | os.O_DIRECTORY)
-                    fake_socket = socket.socket(socket.AF_UNIX)
-                    fake_socket.bind(f"/proc/{os.getpid()}/fd/{fake_fd}/b")
-                    fake_socket.listen()
-                    fake_socket.settimeout(0.1)
-
-                    def forward() -> None:
-                        while not stopped.is_set():
-                            try:
-                                client, _ = fake_socket.accept()
-                            except TimeoutError:
-                                continue
-                            with client, socket.socket(socket.AF_UNIX) as ambient:
-                                connected = False
-                                while not stopped.is_set():
-                                    ready, _, _ = select.select(
-                                        [client, ambient] if connected else [client], [], [], 0.1
-                                    )
-                                    if not ready:
-                                        continue
-                                    data = ready[0].recv(65536)
-                                    if not data:
-                                        break
-                                    if not connected:
-                                        ambient.connect(address)
-                                        connected = True
-                                    (ambient if ready[0] is client else client).sendall(data)
-
-                    forwarder = threading.Thread(target=forward)
-                    forwarder.start()
-                    try:
-                        forged = subprocess.run(
-                            ["sh", "-c", 'exec 3< "$FAKE_RUNTIME"; '
-                             'export XDG_RUNTIME_DIR="/proc/$$/fd/3"; '
-                             'export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/b"; '
-                             '"$TEST_EXECUTABLE" --exact '
-                             'store::vault::tests::native_os_key_service_round_trip; '
-                             'status=$?; exit "$status"'],
-                            cwd=ROOT,
-                            env={**env, "EJM_AUTH_SECRET_SERVICE_TEST_CHILD": "1",
-                                 "XDG_DATA_HOME": str(fake_dir / "data"),
-                                 "FAKE_RUNTIME": str(fake_dir / "r"),
-                                 "TEST_EXECUTABLE": executables[0],
-                                 "EJM_TEST_SECRET_BUS_PID": str(os.getpid()),
-                                 "EJM_TEST_SECRET_SERVICE_PID": str(os.getpid())},
-                            text=True,
-                            capture_output=True,
-                            timeout=20,
-                            check=False,
-                        )
-                    finally:
-                        stopped.set()
-                        forwarder.join()
-                        fake_socket.close()
-                        os.close(fake_fd)
+                    fake_bin = fake_dir / "bin"
+                    fake_bin.mkdir()
+                    for name in ("dbus-daemon", "gnome-keyring-daemon"):
+                        (fake_bin / name).symlink_to(sys.executable)
+                    fake_gdbus = fake_bin / "gdbus"
+                    fake_gdbus.write_text(
+                        "#!/bin/sh\nprintf '(uint32 %s,)\\n' \"$EJM_TEST_SECRET_SERVICE_PID\"\n",
+                        encoding="utf-8",
+                    )
+                    fake_gdbus.chmod(0o700)
+                    forwarder = fake_dir / "forward.py"
+                    forwarder.write_text(
+                        "import os, socket\n"
+                        "server = socket.socket(socket.AF_UNIX)\n"
+                        "server.bind(os.environ['XDG_RUNTIME_DIR'] + '/b')\n"
+                        "server.listen()\n"
+                        "while True:\n"
+                        "    client, _ = server.accept()\n"
+                        "    with client:\n"
+                        "        data = client.recv(65536)\n"
+                        "        if data:\n"
+                        "            with socket.socket(socket.AF_UNIX) as ambient:\n"
+                        "                ambient.connect(os.environ['FAKE_AMBIENT'])\n"
+                        "                ambient.sendall(data)\n",
+                        encoding="utf-8",
+                    )
+                    forged = subprocess.run(
+                        ["sh", "-c", 'exec 3< "$FAKE_RUNTIME"; '
+                         'export XDG_RUNTIME_DIR="/proc/$$/fd/3"; '
+                         'export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/b"; '
+                         '"$FAKE_DAEMON" "$FAKE_FORWARDER" & bus=$!; '
+                         "trap 'kill \"$bus\" 2>/dev/null || :; wait \"$bus\" 2>/dev/null || :' EXIT; "
+                         'export EJM_TEST_SECRET_BUS_PID="$bus" EJM_TEST_SECRET_SERVICE_PID="$bus"; '
+                         'for i in 1 2 3 4 5 6 7 8 9 10; do '
+                         'test -S "$XDG_RUNTIME_DIR/b" && break; sleep .1; done; '
+                         'test -S "$XDG_RUNTIME_DIR/b" || exit 1; '
+                         '"$TEST_EXECUTABLE" --exact '
+                         'store::vault::tests::native_os_key_service_round_trip'],
+                        cwd=ROOT,
+                        env={**env, "EJM_AUTH_SECRET_SERVICE_TEST_CHILD": "1",
+                             "PATH": str(fake_bin) + os.pathsep + os.environ["PATH"],
+                             "XDG_DATA_HOME": str(fake_dir / "data"),
+                             "FAKE_RUNTIME": str(fake_dir / "r"),
+                             "FAKE_AMBIENT": address,
+                             "FAKE_DAEMON": str(fake_bin / "dbus-daemon"),
+                             "FAKE_FORWARDER": str(forwarder),
+                             "TEST_EXECUTABLE": executables[0]},
+                        text=True,
+                        capture_output=True,
+                        timeout=600,
+                        check=False,
+                    )
             finally:
                 stopped.set()
                 observer.join()
@@ -219,8 +215,8 @@ class SecretServiceTests(unittest.TestCase):
             self.assertFalse(contacted.is_set(), "credential test contacted the ambient bus")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("1 passed", result.stdout)
-            self.assertNotEqual(forged.returncode, 0, forged.stdout + forged.stderr)
-            self.assertIn("unexpected isolated service process", forged.stdout + forged.stderr)
+            self.assertEqual(forged.returncode, 0, forged.stdout + forged.stderr)
+            self.assertIn("1 passed", forged.stdout)
 
 
 if __name__ == "__main__":

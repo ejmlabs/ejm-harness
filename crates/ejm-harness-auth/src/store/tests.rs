@@ -15,12 +15,14 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    BOOTSTRAP, Backend, LOCK_WAIT, SecretId, SecretVault, VaultKeyStore,
+    BOOTSTRAP, LOCK_WAIT, SecretId, SecretVault, VaultKeyStore,
     format::{decode, encode},
-    key_store::native_entry,
     lock::Prepared,
     state::{Migration, VaultState},
 };
+#[cfg(not(target_os = "linux"))]
+use super::{Backend, key_store::native_entry};
+
 use crate::{
     CredentialStore, FileStore, SecretString, StoredAuth, StoredCredentials, StoredRegistration,
     store::wire,
@@ -672,146 +674,58 @@ fn unsupported_nested_provider_versions_are_rejected() -> Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn native_os_key_service_round_trip() -> Result<()> {
+    let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let target = project.join("target/auth-native-fixture");
+    let cargo = Path::new(env!("CARGO"));
+    let tools = cargo
+        .parent()
+        .context("Cargo executable has no tool directory")?;
+    let trusted_path = std::env::join_paths([tools, Path::new("/usr/bin"), Path::new("/bin")])?;
+    let status = std::process::Command::new(cargo)
+        .args([
+            "build",
+            "--locked",
+            "-p",
+            "ejm-harness-auth",
+            "--example",
+            "native_key_fixture",
+            "--target-dir",
+        ])
+        .arg(&target)
+        .env("CARGO_BUILD_JOBS", "2")
+        .env("PATH", trusted_path)
+        .env("RUSTC", tools.join("rustc"))
+        .env_remove("CARGO_BUILD_TARGET")
+        .env_remove("RUSTC_WRAPPER")
+        .env_remove("RUSTC_WORKSPACE_WRAPPER")
+        .env_remove("CARGO_BUILD_RUSTC_WRAPPER")
+        .env_remove("CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER")
+        .env_remove("RUSTFLAGS")
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
+        .env_remove("CARGO_BUILD_RUSTFLAGS")
+        .env_remove("LD_PRELOAD")
+        .env_remove("LD_LIBRARY_PATH")
+        .status()
+        .context("build isolated native key fixture")?;
+    ensure!(status.success(), "native key fixture build failed");
+    let status = std::process::Command::new(target.join("debug/examples/native_key_fixture"))
+        .env("PATH", "/usr/bin:/bin")
+        .env_remove("LD_PRELOAD")
+        .env_remove("LD_LIBRARY_PATH")
+        .env_remove("DBUS_SESSION_BUS_ADDRESS")
+        .env_remove("GNOME_KEYRING_CONTROL")
+        .status()
+        .context("run isolated native key fixture")?;
+    ensure!(status.success(), "isolated native key fixture failed");
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
 #[tokio::test]
 async fn native_os_key_service_round_trip() -> Result<()> {
-    #[cfg(target_os = "linux")]
-    {
-        use std::os::unix::{
-            fs::{FileTypeExt, MetadataExt},
-            net::UnixStream,
-        };
-
-        const CHILD: &str = "EJM_AUTH_SECRET_SERVICE_TEST_CHILD";
-        if std::env::var_os(CHILD).is_none() {
-            let wrapper =
-                Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/with-secret-service");
-            let output = std::process::Command::new(wrapper)
-                .arg(std::env::current_exe()?)
-                .args([
-                    "--exact",
-                    "store::vault::tests::native_os_key_service_round_trip",
-                    "--nocapture",
-                ])
-                .env(CHILD, "1")
-                .output()
-                .context("run isolated native key fixture")?;
-            ensure!(
-                output.status.success()
-                    && String::from_utf8_lossy(&output.stdout).contains("1 passed"),
-                "isolated native key fixture failed: {} {}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            );
-            return Ok(());
-        }
-
-        let wrapper_pid = rustix::process::getppid()
-            .context("missing service wrapper")?
-            .as_raw_pid();
-        let runtime = std::env::var_os("XDG_RUNTIME_DIR")
-            .context("isolated native key fixture requires a runtime directory")?;
-        let runtime = Path::new(&runtime);
-        ensure!(
-            runtime == Path::new(&format!("/proc/{wrapper_pid}/fd/3")),
-            "isolated native key fixture requires its wrapper descriptor"
-        );
-        let runtime_dir = fs::canonicalize(runtime)?;
-        let service_dir = runtime_dir
-            .parent()
-            .context("missing private service directory")?;
-        let project = fs::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../.."))?;
-        let name = service_dir.file_name().and_then(|name| name.to_str());
-        ensure!(
-            runtime_dir.file_name() == Some(std::ffi::OsStr::new("r"))
-                && service_dir.parent() == Some(project.as_path())
-                && name.is_some_and(|name| {
-                    name.strip_prefix(".s.").is_some_and(|suffix| {
-                        suffix.len() == 8 && suffix.bytes().all(|byte| byte.is_ascii_alphanumeric())
-                    })
-                }),
-            "isolated native key fixture requires its wrapper directory"
-        );
-        let service_metadata = fs::symlink_metadata(service_dir)?;
-        let owner = rustix::process::geteuid().as_raw();
-        ensure!(
-            service_metadata.is_dir()
-                && service_metadata.uid() == owner
-                && service_metadata.mode() & 0o7777 == 0o700,
-            "isolated native key fixture requires a private wrapper directory"
-        );
-        ensure!(
-            std::env::var_os("XDG_DATA_HOME").as_deref()
-                == Some(service_dir.join("data").as_os_str()),
-            "isolated native key fixture requires its private data directory"
-        );
-        let data_metadata = fs::symlink_metadata(service_dir.join("data"))?;
-        ensure!(
-            data_metadata.is_dir() && data_metadata.uid() == owner,
-            "isolated native key fixture requires a private data directory"
-        );
-        let metadata = fs::symlink_metadata(&runtime_dir)?;
-        ensure!(
-            metadata.is_dir() && metadata.uid() == owner && metadata.mode() & 0o7777 == 0o700,
-            "isolated native key fixture requires a private runtime directory"
-        );
-        let socket = runtime.join("b");
-        let expected = format!("unix:path={}", socket.display());
-        ensure!(
-            std::env::var_os("DBUS_SESSION_BUS_ADDRESS").as_deref()
-                == Some(std::ffi::OsStr::new(&expected)),
-            "isolated native key fixture requires its private bus"
-        );
-        let metadata = fs::symlink_metadata(&socket)?;
-        ensure!(
-            metadata.file_type().is_socket() && metadata.uid() == owner,
-            "isolated native key fixture requires its private bus socket"
-        );
-        let bus_pid: i32 = std::env::var("EJM_TEST_SECRET_BUS_PID")?.parse()?;
-        let service_pid: i32 = std::env::var("EJM_TEST_SECRET_SERVICE_PID")?.parse()?;
-        let connection = UnixStream::connect(&socket)?;
-        let peer = rustix::net::sockopt::socket_peercred(&connection)?;
-        ensure!(
-            peer.pid.as_raw_pid() == bus_pid && peer.uid.as_raw() == owner,
-            "unexpected bus peer"
-        );
-        for (pid, program) in [
-            (bus_pid, "dbus-daemon"),
-            (service_pid, "gnome-keyring-daemon"),
-        ] {
-            let proc_dir = format!("/proc/{pid}");
-            let executable = fs::canonicalize(which::which(program)?)?;
-            let status = fs::read_to_string(format!("{proc_dir}/status"))?;
-            ensure!(
-                fs::read_link(format!("{proc_dir}/exe"))? == executable
-                    && status.lines().any(|line| line
-                        .strip_prefix("PPid:")
-                        .and_then(|value| value.trim().parse::<i32>().ok())
-                        == Some(wrapper_pid)),
-                "unexpected isolated service process"
-            );
-        }
-        let output = std::process::Command::new("gdbus")
-            .args([
-                "call",
-                "--session",
-                "--timeout",
-                "10",
-                "--dest",
-                "org.freedesktop.DBus",
-                "--object-path",
-                "/org/freedesktop/DBus",
-                "--method",
-                "org.freedesktop.DBus.GetConnectionUnixProcessID",
-                "org.freedesktop.secrets",
-            ])
-            .output()?;
-        ensure!(
-            output.status.success()
-                && String::from_utf8_lossy(&output.stdout).trim()
-                    == format!("(uint32 {service_pid},)"),
-            "unexpected Secret Service owner"
-        );
-    }
     let root = tempfile::tempdir()?;
     let vault = SecretVault::open(root.path().join("native-key-fixture"))?;
     let identity = match &vault.backend {
