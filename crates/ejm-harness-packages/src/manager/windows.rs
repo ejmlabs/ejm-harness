@@ -42,6 +42,9 @@ fn protect(directory: &StateDir) -> Result<()> {
 impl NativeStore {
     pub(super) fn open(path: &Path) -> Result<Self> {
         let directory = private_directory(path)?;
+        // A child this call creates keeps DELETE access, which later StateDir
+        // pins through `objects` do not share (os error 32). Reopen it without.
+        drop(directory.child("objects")?);
         let objects = directory.child("objects")?;
         protect(&objects)?;
         if !directory.exists(LOCK)? {
