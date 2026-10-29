@@ -222,7 +222,8 @@ class SecretServiceTests(unittest.TestCase):
                             'test -S "$XDG_RUNTIME_DIR/b" && break; sleep .1; done; '
                             'test -S "$XDG_RUNTIME_DIR/b" || exit 1; '
                             '"$TEST_EXECUTABLE" --exact '
-                            "store::vault::tests::native_os_key_service_round_trip",
+                            "store::vault::tests::native_os_key_service_round_trip && "
+                            'if "$FIXTURE" isolated-child; then exit 1; fi',
                         ],
                         cwd=ROOT,
                         env={
@@ -235,6 +236,10 @@ class SecretServiceTests(unittest.TestCase):
                             "FAKE_DAEMON": str(fake_bin / "dbus-daemon"),
                             "FAKE_FORWARDER": str(forwarder),
                             "TEST_EXECUTABLE": executables[0],
+                            "FIXTURE": str(
+                                ROOT
+                                / "target/auth-native-fixture/debug/examples/native_key_fixture"
+                            ),
                         },
                         text=True,
                         capture_output=True,

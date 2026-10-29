@@ -16,7 +16,6 @@ workspace = true
 [[example]]
 name = "native_key_fixture"
 path = "tests/fixtures/native_key_fixture.rs"
-edition = "2021"
 
 [dependencies]
 anyhow.workspace = true
