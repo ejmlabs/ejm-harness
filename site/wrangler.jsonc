@@ -7,4 +7,13 @@
     "preview_urls": false,
     "assets": { "directory": "./public" },
     "routes": [{ "pattern": "harness.ejmlabs.com", "custom_domain": true }],
+    "env": {
+        "staging": {
+            "name": "ejmlabs-harness-staging",
+            "workers_dev": false,
+            "preview_urls": false,
+            "assets": { "directory": "./public" },
+            "routes": [{ "pattern": "harness-staging.ejmlabs.com", "custom_domain": true }],
+        },
+    },
 }

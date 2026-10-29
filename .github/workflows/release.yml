@@ -24,7 +24,7 @@ jobs:
   verify:
     permissions:
       actions: read
-    uses: ejmlabs/.github/.github/workflows/verify-build.yml@451ef7d1ef46373b6018a1fbcacc331e15e1d093
+    uses: ejmlabs/.github/.github/workflows/verify-build.yml@54823630beb44af17124287fece93a750ee40340
     with:
       commit: ${{ inputs.commit }}
       build-workflow: build.yml
@@ -35,11 +35,11 @@ jobs:
       contents: write
       pull-requests: read
       statuses: read
-    uses: ejmlabs/.github/.github/workflows/draft-release.yml@451ef7d1ef46373b6018a1fbcacc331e15e1d093
+    uses: ejmlabs/.github/.github/workflows/draft-release.yml@54823630beb44af17124287fece93a750ee40340
     with:
       commit: ${{ inputs.commit }}
       version: ${{ inputs.version }}
-      standards-ref: "451ef7d1ef46373b6018a1fbcacc331e15e1d093"
+      standards-ref: "54823630beb44af17124287fece93a750ee40340"
   attach:
     needs: release
     permissions:
@@ -47,7 +47,7 @@ jobs:
       actions: read
       id-token: write
       attestations: write
-    uses: ejmlabs/.github/.github/workflows/attach-assets.yml@451ef7d1ef46373b6018a1fbcacc331e15e1d093
+    uses: ejmlabs/.github/.github/workflows/attach-assets.yml@54823630beb44af17124287fece93a750ee40340
     with:
       commit: ${{ inputs.commit }}
       version: ${{ inputs.version }}
