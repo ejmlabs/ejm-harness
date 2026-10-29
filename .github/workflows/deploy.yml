@@ -1,0 +1,11 @@
+name: Deploy site
+on:
+  push:
+    branches: [main]
+permissions: {}
+jobs:
+  deploy:
+    permissions:
+      contents: read
+      actions: read
+    uses: ejmlabs/.github/.github/workflows/deploy-site.yml@5b7c9836fa4fa91e197baf584d7c74981660bb12

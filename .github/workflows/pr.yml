@@ -2,18 +2,15 @@ name: Human-admitted PR checks
 on:
   issue_comment:
     types: [created, edited, deleted]
-  pull_request_target:
-    types: [unlabeled]
 permissions: {}
 jobs:
   governance:
-    if: ${{ github.event.issue.pull_request || github.event_name == 'pull_request_target' }}
+    if: ${{ github.event.issue.pull_request }}
     permissions:
       contents: read
       pull-requests: write
       statuses: write
       actions: write
-    uses: ejmlabs/.github/.github/workflows/governance.yml@54823630beb44af17124287fece93a750ee40340
+    uses: ejmlabs/.github/.github/workflows/governance.yml@5b7c9836fa4fa91e197baf584d7c74981660bb12
     secrets:
-      XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
       EJM_HARNESS_TOKEN: ${{ secrets.EJM_HARNESS_TOKEN }}
