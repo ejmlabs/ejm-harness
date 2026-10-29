@@ -37,7 +37,8 @@ The separate scheduled registry job repeats Rust, schema, registry Worker and
 authentication Worker tests. Each suite uses independent attempts and an
 inventory; incomplete, skipped or failed cases keep the job failed. The job
 uploads bounded summaries, including excerpts of Worker failure messages, and
-schema outcomes. Completed schema outcomes are saved atomically after each test
+schema outcomes. Schema snapshots retain a bounded first failure diagnostic as
+soon as it is observed. Completed outcomes are saved atomically after each test
 and remain incomplete until the suite finishes. Worker results are recorded as each test finishes, so an
 overflow marks the attempt incomplete. Worker and schema reports prioritize
 failed identities and their counterparts from earlier attempts, then retain

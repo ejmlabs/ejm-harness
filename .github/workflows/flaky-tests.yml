@@ -34,7 +34,7 @@ jobs:
           tar -xzf "$archive" -C "$bindir" cargo-nextest
           "$bindir/cargo-nextest" --version
           echo "$bindir" >> "$GITHUB_PATH"
-      - run: PYTHONPATH=scripts python3 -B -m unittest test_bounded_report test_evidence_identity test_flake_check test_nextest_evidence test_registry_rust_compare test_registry_unittest_evidence test_registry_vitest_compare
+      - run: PYTHONPATH=scripts python3 -B -m unittest test_bounded_report test_check_registry test_evidence_identity test_flake_check test_nextest_evidence test_registry_rust_compare test_registry_unittest_evidence test_registry_vitest_compare test_secret_service
       - name: Compare two independent Rust test runs
         timeout-minutes: 50
         run: scripts/with-secret-service python3 scripts/flake_check.py "$RUNNER_TEMP/harness-flakes"

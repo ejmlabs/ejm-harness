@@ -22,6 +22,7 @@ class EvidenceResult(unittest.TextTestResult):
         self.completed: set[str] = set()
         self.ineligible: set[str] = set()
         self.fixture_failures: set[str] = set()
+        self.first_diagnostic: dict[str, str | bool] | None = None
         write_evidence(self, True)
 
     def startTest(self, test: unittest.case.TestCase) -> None:
@@ -52,6 +53,18 @@ class EvidenceResult(unittest.TextTestResult):
         else:
             self.outcomes[identity] = state
 
+    def diagnostic(self, test: unittest.case.TestCase, message: str) -> bool:
+        if self.first_diagnostic is not None:
+            return False
+        identity = test.id()
+        truncated = len(identity) > 1024 or len(message) > 8192
+        self.first_diagnostic = {
+            "test": identity[:1024],
+            "message": message if len(message) <= 8192 else message[:4096] + "\n...\n" + message[-4096:],
+            "truncated": truncated,
+        }
+        return True
+
     def failure(self, test: unittest.case.TestCase, err: Any) -> None:  # noqa: ANN401 - unittest callback
         identity = test.id()
         if identity not in self.started:
@@ -70,11 +83,17 @@ class EvidenceResult(unittest.TextTestResult):
 
     def addFailure(self, test: unittest.case.TestCase, err: Any) -> None:  # noqa: ANN401 - unittest callback
         super().addFailure(test, err)
+        captured = self.diagnostic(test, self.failures[-1][1])
         self.failure(test, err)
+        if captured:
+            write_evidence(self, True)
 
     def addError(self, test: unittest.case.TestCase, err: Any) -> None:  # noqa: ANN401 - unittest callback
         super().addError(test, err)
+        captured = self.diagnostic(test, self.errors[-1][1])
         self.failure(test, err)
+        if captured:
+            write_evidence(self, True)
 
     def addSkip(self, test: unittest.case.TestCase, reason: str) -> None:
         super().addSkip(test, reason)
@@ -90,6 +109,8 @@ class EvidenceResult(unittest.TextTestResult):
     def addUnexpectedSuccess(self, test: unittest.case.TestCase) -> None:
         super().addUnexpectedSuccess(test)
         self.record(test, "failed")
+        if self.diagnostic(test, "Unexpected success"):
+            write_evidence(self, True)
 
     def addSubTest(
         self,
@@ -97,21 +118,26 @@ class EvidenceResult(unittest.TextTestResult):
         subtest: unittest.case.TestCase,
         err: Any,  # noqa: ANN401 - unittest callback
     ) -> None:
+        failures = len(self.failures)
         super().addSubTest(test, subtest, err)
         if err is not None:
             self.record(test, "failed")
+            message = self.failures[-1][1] if len(self.failures) > failures else self.errors[-1][1]
+            if self.diagnostic(subtest, message):
+                write_evidence(self, True)
 
 
 def write_evidence(result: EvidenceResult, incomplete: bool) -> bool:
     outcomes = {key: value for key, value in result.outcomes.items() if key in result.completed}
-    data = json.dumps(
-        {
-            "outcomes": outcomes,
-            "ineligible": sorted(result.ineligible),
-            "incomplete": incomplete,
-        },
-        sort_keys=True,
-    )
+    incomplete |= bool(result.first_diagnostic and result.first_diagnostic["truncated"])
+    payload: dict[str, Any] = {
+        "outcomes": outcomes,
+        "ineligible": sorted(result.ineligible),
+        "incomplete": incomplete,
+    }
+    if result.first_diagnostic is not None:
+        payload["first_diagnostic"] = result.first_diagnostic
+    data = json.dumps(payload, sort_keys=True)
     if (
         len(data.encode("utf-8")) > 4 * 1024 * 1024
         or len(outcomes) > 20_000
@@ -119,7 +145,8 @@ def write_evidence(result: EvidenceResult, incomplete: bool) -> bool:
     ):
         incomplete = True
         retained: dict[str, str] = {}
-        budget = 4 * 1024 * 1024 - 128
+        base = {**payload, "outcomes": {}, "ineligible": [], "incomplete": True}
+        budget = 4 * 1024 * 1024 - len(json.dumps(base, sort_keys=True).encode("utf-8")) - 128
         reference: set[str] = set()
         reference_path = os.environ.get("EJM_REGISTRY_SCHEMA_REFERENCE")
         if reference_path:
@@ -144,9 +171,9 @@ def write_evidence(result: EvidenceResult, incomplete: bool) -> bool:
             retained[identity] = outcome
             budget -= cost
         data = json.dumps({
+            **base,
             "outcomes": retained,
             "ineligible": sorted(result.ineligible.intersection(retained)),
-            "incomplete": True,
         }, sort_keys=True)
     temporary = result.report.with_name(result.report.name + ".tmp")
     temporary.write_text(data, encoding="utf-8")
@@ -201,13 +228,29 @@ def compare(first: Path, second: Path, original: Path | None = None) -> int:
             raise ValueError("Invalid unittest evidence file")
         record = json.loads(path.read_bytes(), object_pairs_hook=unique_pairs)
         record_incomplete = False
-        if isinstance(record, dict) and set(record) == {"outcomes", "ineligible", "incomplete"}:
+        if isinstance(record, dict) and set(record) in (
+            {"outcomes", "ineligible", "incomplete"},
+            {"outcomes", "ineligible", "incomplete", "first_diagnostic"},
+        ):
             if (
                 not isinstance(record["ineligible"], list)
                 or not all(isinstance(key, str) for key in record["ineligible"])
                 or not isinstance(record["incomplete"], bool)
             ):
                 raise ValueError("Invalid unittest completeness")
+            if "first_diagnostic" in record:
+                diagnostic = record["first_diagnostic"]
+                if (
+                    not isinstance(diagnostic, dict)
+                    or set(diagnostic) != {"test", "message", "truncated"}
+                    or not isinstance(diagnostic["test"], str)
+                    or len(diagnostic["test"]) > 1024
+                    or not isinstance(diagnostic["message"], str)
+                    or len(diagnostic["message"]) > 8197
+                    or not isinstance(diagnostic["truncated"], bool)
+                    or (diagnostic["truncated"] and not record["incomplete"])
+                ):
+                    raise ValueError("Invalid unittest diagnostic")
             ineligible.update(record["ineligible"])
             record_incomplete = record["incomplete"]
             incomplete |= record_incomplete
