@@ -8,10 +8,19 @@ import time
 import unittest
 import xml.etree.ElementTree as ET
 from collections import Counter
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
-from flake_check import bounded_summary, doctest_inventory, doctest_outcomes, inventory, mixed_tests, outcomes, partial_outcomes
+from flake_check import (
+    bounded_summary,
+    doctest_inventory,
+    doctest_outcomes,
+    inventory,
+    mixed_tests,
+    outcomes,
+    partial_outcomes,
+)
 
 
 def report(cases: list[tuple[str, str]]) -> str:
@@ -39,7 +48,7 @@ def fake_rustc(root: Path) -> None:
 def fake_doctests(cargo: Path) -> None:
     source = cargo.read_text(encoding="utf-8")
     if source.startswith("#!/usr/bin/env python3\n"):
-        preamble = '''import json, os, sys
+        preamble = """import json, os, sys
 if sys.argv[1] == "metadata":
     print(json.dumps({"workspace_members": ["pkg"], "packages": [{"id": "pkg",
           "targets": [{"name": "pkg", "kind": ["lib"], "doctest": True}]}]}))
@@ -48,23 +57,32 @@ if sys.argv[1] == "test":
     if "--list" in sys.argv:
         print("   Doc-tests pkg\\n\\nsrc/lib.rs - example (line 1): test\\n1 test, 0 benchmarks")
         raise SystemExit(0)
-    status = os.environ.get("FAKE_DOCTEST_STATUS" if "--doc" in sys.argv else "FAKE_BASELINE_DOCTEST_STATUS", "ok")
+    status = os.environ.get(
+        "FAKE_DOCTEST_STATUS" if "--doc" in sys.argv else "FAKE_BASELINE_DOCTEST_STATUS", "ok"
+    )
     print("   Doc-tests pkg\\n\\nrunning 1 test\\ntest src/lib.rs - example (line 1) ... " + status)
     print("test result: ok. " + str(int(status == "ok")) + " passed; 0 failed; "
-          + str(int(status == "ignored")) + " ignored; 0 measured; 0 filtered out; finished in 0.00s")
+          + str(int(status == "ignored"))
+          + " ignored; 0 measured; 0 filtered out; finished in 0.00s")
     if "--doc" in sys.argv:
         raise SystemExit(0)
-'''
+"""
         cargo.write_text(source.replace("\n", "\n" + preamble, 1), encoding="utf-8")
 
 
 class FlakeCheckTests(unittest.TestCase):
     def test_bounded_summary_retains_mixed_and_failures(self) -> None:
         records = [f"{index:05}" + "x" * 900 for index in range(2500)]
-        encoded, truncated = bounded_summary({
-            "incomplete": False, "mixed": records, "first_failed": records,
-            "second_failed": records, "first_diagnostic": {"message": "failure"},
-        }, ("mixed", "first_failed", "second_failed"))
+        encoded, truncated = bounded_summary(
+            {
+                "incomplete": False,
+                "mixed": records,
+                "first_failed": records,
+                "second_failed": records,
+                "first_diagnostic": {"message": "failure"},
+            },
+            ("mixed", "first_failed", "second_failed"),
+        )
         result = json.loads(encoded)
         self.assertTrue(truncated)
         self.assertLessEqual(len(encoded.encode()), 4 * 1024 * 1024)
@@ -117,15 +135,21 @@ class FlakeCheckTests(unittest.TestCase):
             passing = (
                 "   Doc-tests pkg\n\nrunning 1 test\n"
                 "test src/lib.rs - example (line 1) ... ok\n"
-                "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n"
+                "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; "
+                "0 filtered out; finished in 0.00s\n"
             )
             path.write_text(passing, encoding="utf-8")
             self.assertEqual(doctest_outcomes(path, Counter({"pkg": 1}))[1], True)
-            ignored = passing.replace("... ok", "... ignored").replace("1 passed; 0 failed; 0 ignored", "0 passed; 0 failed; 1 ignored")
+            ignored = passing.replace("... ok", "... ignored").replace(
+                "1 passed; 0 failed; 0 ignored", "0 passed; 0 failed; 1 ignored"
+            )
             for value, targets in [
                 (ignored, Counter({"pkg": 1})),
                 (passing, Counter({"pkg": 1, "missing": 1})),
-                (passing.replace("test src/lib.rs - example (line 1) ... ok\n", ""), Counter({"pkg": 1})),
+                (
+                    passing.replace("test src/lib.rs - example (line 1) ... ok\n", ""),
+                    Counter({"pkg": 1}),
+                ),
                 (passing.replace("0 filtered out", "1 filtered out"), Counter({"pkg": 1})),
             ]:
                 path.write_text(value, encoding="utf-8")
@@ -140,7 +164,8 @@ class FlakeCheckTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / "src/lib.rs").write_text(
-                '/// ```\n/// assert!(true);\n/// ```\n/// ```ignore\n/// assert!(true);\n/// ```\npub fn sample() {}\n',
+                "/// ```\n/// assert!(true);\n/// ```\n"
+                "/// ```ignore\n/// assert!(true);\n/// ```\npub fn sample() {}\n",
                 encoding="utf-8",
             )
             result = subprocess.run(
@@ -265,7 +290,9 @@ class FlakeCheckTests(unittest.TestCase):
                     "sys.stdout.flush(); "
                     + (
                         "sys.stdout.write('x' * 4200000 + '\\nTAIL_SENTINEL\\n'); "
-                        "sys.stdout.flush(); " if overflow else ""
+                        "sys.stdout.flush(); "
+                        if overflow
+                        else ""
                     )
                     + "time.sleep(60)"
                 )
@@ -277,10 +304,17 @@ class FlakeCheckTests(unittest.TestCase):
                 )
                 runner = subprocess.Popen(
                     [
-                        sys.executable, "-c", driver, str(script.parent), str(log), str(results),
-                        child, str(pid_file),
+                        sys.executable,
+                        "-c",
+                        driver,
+                        str(script.parent),
+                        str(log),
+                        str(results),
+                        child,
+                        str(pid_file),
                     ],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
                 try:
                     deadline = time.monotonic() + 10
@@ -289,12 +323,16 @@ class FlakeCheckTests(unittest.TestCase):
                         tail = log.with_name(log.name + ".tail.log")
                         partial = results.with_name(results.name + ".partial")
                         if (
-                            pid_file.exists() and log.exists() and results.exists()
-                            and failure.exists() and partial.exists()
+                            pid_file.exists()
+                            and log.exists()
+                            and results.exists()
+                            and failure.exists()
+                            and partial.exists()
                             and b"live detail" in failure.read_bytes()
-                            and (not overflow or (
-                                tail.exists() and b"TAIL_SENTINEL" in tail.read_bytes()
-                            ))
+                            and (
+                                not overflow
+                                or (tail.exists() and b"TAIL_SENTINEL" in tail.read_bytes())
+                            )
                         ):
                             break
                         self.assertIsNone(runner.poll(), "capture exited before the child")
@@ -307,10 +345,8 @@ class FlakeCheckTests(unittest.TestCase):
                     self.assertEqual(records[0][1:], ["broken", "failure"])
                 finally:
                     if pid_file.exists():
-                        try:
+                        with suppress(ProcessLookupError):
                             os.kill(int(pid_file.read_text()), signal.SIGTERM)
-                        except ProcessLookupError:
-                            pass
                     try:
                         runner.wait(timeout=10)
                     except subprocess.TimeoutExpired:
@@ -321,12 +357,19 @@ class FlakeCheckTests(unittest.TestCase):
                 results = root / f"completed-{code}.json"
                 completed = subprocess.run(
                     [
-                        sys.executable, "-c", driver, str(script.parent),
-                        str(root / f"completed-{code}.log"), str(results),
+                        sys.executable,
+                        "-c",
+                        driver,
+                        str(script.parent),
+                        str(root / f"completed-{code}.log"),
+                        str(results),
                         f"print('running 0 tests'); raise SystemExit({code})",
                         str(root / "unused.pid"),
                     ],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10, check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=10,
+                    check=False,
                 )
                 self.assertEqual(completed.returncode, 0)
                 self.assertFalse(results.with_name(results.name + ".partial").exists())
@@ -372,7 +415,8 @@ class FlakeCheckTests(unittest.TestCase):
             )
             result = subprocess.run(
                 [sys.executable, "-c", driver, str(Path(__file__).parent), str(root / "log")],
-                capture_output=True, check=False,
+                capture_output=True,
+                check=False,
             )
             self.assertEqual(result.returncode, 0)
             self.assertIn(b"Error: first failure detail", (root / "log.failure.log").read_bytes())
@@ -388,14 +432,25 @@ class FlakeCheckTests(unittest.TestCase):
             driver = (
                 "import sys; sys.path.insert(0, sys.argv[1]); import flake_check; "
                 "from pathlib import Path; "
-                "flake_check.IdentityFilter = type('Collisions', (), {'add': lambda self, value: True}); "
+                "flake_check.IdentityFilter = "
+                "type('Collisions', (), {'add': lambda self, value: True}); "
                 "print(flake_check.run([sys.executable, '-c', sys.argv[4]], "
                 "Path(sys.argv[2]), cargo_results=Path(sys.argv[3])))"
             )
             result = subprocess.run(
-                [sys.executable, "-c", driver, str(Path(__file__).parent),
-                 str(root / "log"), str(root / "results.json"), child],
-                capture_output=True, text=True, timeout=10, check=False,
+                [
+                    sys.executable,
+                    "-c",
+                    driver,
+                    str(Path(__file__).parent),
+                    str(root / "log"),
+                    str(root / "results.json"),
+                    child,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
             )
             self.assertEqual(result.returncode, 0)
             self.assertTrue(result.stdout.endswith("0\n"))
@@ -411,10 +466,11 @@ class FlakeCheckTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / "src/lib.rs").write_text(
-                '#[cfg(test)] mod tests {\n'
+                "#[cfg(test)] mod tests {\n"
                 '#[test] fn first() { assert_ne!(std::env::var("CASE_RUN").unwrap(), "1"); }\n'
                 '#[test] fn second() { assert_ne!(std::env::var("CASE_RUN").unwrap(), "2"); }\n'
-                '}\n', encoding="utf-8",
+                "}\n",
+                encoding="utf-8",
             )
             script_dir = str(Path(__file__).parent)
             driver = (
@@ -428,14 +484,21 @@ class FlakeCheckTests(unittest.TestCase):
                 log, results = root / f"{number}.log", root / f"{number}.json"
                 subprocess.run(
                     [sys.executable, "-c", driver, script_dir, str(number), str(log), str(results)],
-                    cwd=root, env={**os.environ, "CARGO_TARGET_DIR": str(root / "target")},
-                    capture_output=True, check=True,
+                    cwd=root,
+                    env={**os.environ, "CARGO_TARGET_DIR": str(root / "target")},
+                    capture_output=True,
+                    check=True,
                 )
-                observed.append({name: status for _, name, status in json.loads(results.read_text())})
-            self.assertEqual(observed, [
-                {"tests::first": "failure", "tests::second": "passed"},
-                {"tests::first": "passed", "tests::second": "failure"},
-            ])
+                observed.append(
+                    {name: status for _, name, status in json.loads(results.read_text())}
+                )
+            self.assertEqual(
+                observed,
+                [
+                    {"tests::first": "failure", "tests::second": "passed"},
+                    {"tests::first": "passed", "tests::second": "failure"},
+                ],
+            )
 
     def test_late_cargo_and_doctest_failures_survive_outcome_overflow(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -457,24 +520,41 @@ class FlakeCheckTests(unittest.TestCase):
                 "[print('test case_%05d ... ok' % n) for n in range(40002)]; "
                 "print('test case_20001 ... FAILED'); "
                 "print('test last ... ' + status); "
-                "print('test result: FAILED. 40002 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out;'); "
+                "print('test result: FAILED. 40002 passed; 2 failed; 0 ignored; "
+                "0 measured; 0 filtered out;'); "
                 "print('   Doc-tests example'); print('running 1 test'); "
                 "print('test src/lib.rs - last ... ' + status); "
-                "print('test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out;')"
+                "print('test result: FAILED. 0 passed; 1 failed; 0 ignored; "
+                "0 measured; 0 filtered out;')"
             )
             outcomes = []
             for number, state in ((1, "FAILED"), (2, "ok")):
                 path = root / f"{number}.json"
                 result = subprocess.run(
-                    [sys.executable, "-c", driver, str(Path(__file__).parent),
-                     str(root / f"{number}.log"), str(root / "1.json"), child, state, str(path)],
-                    capture_output=True, text=True, check=True,
+                    [
+                        sys.executable,
+                        "-c",
+                        driver,
+                        str(Path(__file__).parent),
+                        str(root / f"{number}.log"),
+                        str(root / "1.json"),
+                        child,
+                        state,
+                        str(path),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    check=True,
                 )
                 self.assertIn("capture-result: None", result.stdout)
                 self.assertLessEqual(path.stat().st_size, 3 * 1024 * 1024 + 2)
-                outcomes.append({(suite, name): status for suite, name, status in json.loads(path.read_text())})
-            for key in (("Running unittests src/lib.rs (target/debug/deps/example)", "last"),
-                        ("doctest:example", "src/lib.rs - last")):
+                outcomes.append(
+                    {(suite, name): status for suite, name, status in json.loads(path.read_text())}
+                )
+            for key in (
+                ("Running unittests src/lib.rs (target/debug/deps/example)", "last"),
+                ("doctest:example", "src/lib.rs - last"),
+            ):
                 self.assertEqual([record[key] for record in outcomes], ["failure", "passed"])
             duplicate = ("Running unittests src/lib.rs (target/debug/deps/example)", "case_20001")
             self.assertTrue(all(duplicate not in record for record in outcomes))
@@ -551,10 +631,17 @@ raise SystemExit(0)
             self.assertFalse(summary["incomplete"])
             self.assertEqual(summary["mixed"], [["pkg::suite", "write"]])
             comparison = subprocess.run(
-                [sys.executable, "-I", str(Path(__file__).with_name("compare_partial_flakes.py")),
-                 str(root / "evidence")],
+                [
+                    sys.executable,
+                    "-I",
+                    str(Path(__file__).with_name("compare_partial_flakes.py")),
+                    str(root / "evidence"),
+                ],
                 env={**env, "PRODUCER_OUTCOME": "failure"},
-                capture_output=True, text=True, timeout=10, check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
             )
             self.assertNotEqual(comparison.returncode, 0)
             self.assertEqual(json.loads((root / "evidence/summary.json").read_text()), summary)
@@ -692,7 +779,7 @@ if "--doc" not in sys.argv:
             fake_rustc(root)
             cargo = root / "cargo"
             cargo.write_text(
-                '''#!/usr/bin/env python3
+                """#!/usr/bin/env python3
 import sys, tomllib
 from pathlib import Path
 if sys.argv[1:3] == ["nextest", "list"]:
@@ -715,14 +802,22 @@ if sys.argv[1] == "test" and "--doc" not in sys.argv:
     print("test tests::b ... " + ("ok" if first else "FAILED"))
     print("test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out")
     raise SystemExit(101)
-''', encoding="utf-8",
+""",
+                encoding="utf-8",
             )
             fake_doctests(cargo)
             cargo.chmod(0o755)
             env = {**os.environ, "PATH": str(root) + os.pathsep + os.environ.get("PATH", "")}
             result = subprocess.run(
-                [sys.executable, str(Path(__file__).with_name("flake_check.py")), str(root / "evidence")],
-                cwd=root, env=env, capture_output=True, check=False,
+                [
+                    sys.executable,
+                    str(Path(__file__).with_name("flake_check.py")),
+                    str(root / "evidence"),
+                ],
+                cwd=root,
+                env=env,
+                capture_output=True,
+                check=False,
             )
             summary = json.loads((root / "evidence/summary.json").read_text())
             self.assertNotEqual(result.returncode, 0)

@@ -23,10 +23,24 @@ class SecretServiceTests(unittest.TestCase):
             wrapper = project / "scripts/with-secret-service"
             shutil.copy2(ROOT / "scripts/with-secret-service", wrapper)
             result = subprocess.run(
-                [str(wrapper), "gdbus", "call", "--session", "--timeout", "10",
-                 "--dest", "org.freedesktop.DBus", "--object-path", "/org/freedesktop/DBus",
-                 "--method", "org.freedesktop.DBus.ListNames"],
-                text=True, capture_output=True, timeout=20, check=False,
+                [
+                    str(wrapper),
+                    "gdbus",
+                    "call",
+                    "--session",
+                    "--timeout",
+                    "10",
+                    "--dest",
+                    "org.freedesktop.DBus",
+                    "--object-path",
+                    "/org/freedesktop/DBus",
+                    "--method",
+                    "org.freedesktop.DBus.ListNames",
+                ],
+                text=True,
+                capture_output=True,
+                timeout=20,
+                check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("org.freedesktop.secrets", result.stdout)
@@ -77,7 +91,8 @@ class SecretServiceTests(unittest.TestCase):
                         sys.executable,
                         "-c",
                         "import json, os, sys; print(json.dumps([os.environ['XDG_DATA_HOME'], "
-                        "os.path.realpath(os.environ['XDG_RUNTIME_DIR']), os.environ['DBUS_SESSION_BUS_ADDRESS']])); "
+                        "os.path.realpath(os.environ['XDG_RUNTIME_DIR']), "
+                        "os.environ['DBUS_SESSION_BUS_ADDRESS']])); "
                         f"sys.exit({code})",
                     ],
                     cwd=ROOT,
@@ -128,8 +143,14 @@ class SecretServiceTests(unittest.TestCase):
                 env = {**os.environ, "DBUS_SESSION_BUS_ADDRESS": f"unix:path={address}"}
                 env.pop("EJM_AUTH_SECRET_SERVICE_TEST_CHILD", None)
                 command = [
-                    "cargo", "test", "--message-format=json", "--locked", "-p", "ejm-harness-auth",
-                    "--lib", "native_os_key_service_round_trip",
+                    "cargo",
+                    "test",
+                    "--message-format=json",
+                    "--locked",
+                    "-p",
+                    "ejm-harness-auth",
+                    "--lib",
+                    "native_os_key_service_round_trip",
                 ]
                 result = subprocess.run(
                     command,
@@ -141,13 +162,17 @@ class SecretServiceTests(unittest.TestCase):
                     check=False,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr + result.stdout[-8192:])
-                artifacts = [json.loads(line) for line in result.stdout.splitlines()
-                             if line.startswith("{")]
-                executables = [artifact["executable"] for artifact in artifacts
-                               if artifact.get("reason") == "compiler-artifact"
-                               and artifact.get("profile", {}).get("test")
-                               and artifact.get("target", {}).get("name") == "ejm_harness_auth"
-                               and artifact.get("executable")]
+                artifacts = [
+                    json.loads(line) for line in result.stdout.splitlines() if line.startswith("{")
+                ]
+                executables = [
+                    artifact["executable"]
+                    for artifact in artifacts
+                    if artifact.get("reason") == "compiler-artifact"
+                    and artifact.get("profile", {}).get("test")
+                    and artifact.get("target", {}).get("name") == "ejm_harness_auth"
+                    and artifact.get("executable")
+                ]
                 self.assertEqual(len(executables), 1, result.stdout + result.stderr)
                 with contextlib.ExitStack() as cleanup:
                     fake_dir = ROOT / f".s.{uuid.uuid4().hex[:8]}"
@@ -182,26 +207,35 @@ class SecretServiceTests(unittest.TestCase):
                         encoding="utf-8",
                     )
                     forged = subprocess.run(
-                        ["sh", "-c", 'exec 3< "$FAKE_RUNTIME"; '
-                         'export XDG_RUNTIME_DIR="/proc/$$/fd/3"; '
-                         'export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/b"; '
-                         '"$FAKE_DAEMON" "$FAKE_FORWARDER" & bus=$!; '
-                         "trap 'kill \"$bus\" 2>/dev/null || :; wait \"$bus\" 2>/dev/null || :' EXIT; "
-                         'export EJM_TEST_SECRET_BUS_PID="$bus" EJM_TEST_SECRET_SERVICE_PID="$bus"; '
-                         'for i in 1 2 3 4 5 6 7 8 9 10; do '
-                         'test -S "$XDG_RUNTIME_DIR/b" && break; sleep .1; done; '
-                         'test -S "$XDG_RUNTIME_DIR/b" || exit 1; '
-                         '"$TEST_EXECUTABLE" --exact '
-                         'store::vault::tests::native_os_key_service_round_trip'],
+                        [
+                            "sh",
+                            "-c",
+                            'exec 3< "$FAKE_RUNTIME"; '
+                            'export XDG_RUNTIME_DIR="/proc/$$/fd/3"; '
+                            'export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/b"; '
+                            '"$FAKE_DAEMON" "$FAKE_FORWARDER" & bus=$!; '
+                            'trap \'kill "$bus" 2>/dev/null || :; '
+                            'wait "$bus" 2>/dev/null || :\' EXIT; '
+                            'export EJM_TEST_SECRET_BUS_PID="$bus" '
+                            'EJM_TEST_SECRET_SERVICE_PID="$bus"; '
+                            "for i in 1 2 3 4 5 6 7 8 9 10; do "
+                            'test -S "$XDG_RUNTIME_DIR/b" && break; sleep .1; done; '
+                            'test -S "$XDG_RUNTIME_DIR/b" || exit 1; '
+                            '"$TEST_EXECUTABLE" --exact '
+                            "store::vault::tests::native_os_key_service_round_trip",
+                        ],
                         cwd=ROOT,
-                        env={**env, "EJM_AUTH_SECRET_SERVICE_TEST_CHILD": "1",
-                             "PATH": str(fake_bin) + os.pathsep + os.environ["PATH"],
-                             "XDG_DATA_HOME": str(fake_dir / "data"),
-                             "FAKE_RUNTIME": str(fake_dir / "r"),
-                             "FAKE_AMBIENT": address,
-                             "FAKE_DAEMON": str(fake_bin / "dbus-daemon"),
-                             "FAKE_FORWARDER": str(forwarder),
-                             "TEST_EXECUTABLE": executables[0]},
+                        env={
+                            **env,
+                            "EJM_AUTH_SECRET_SERVICE_TEST_CHILD": "1",
+                            "PATH": str(fake_bin) + os.pathsep + os.environ["PATH"],
+                            "XDG_DATA_HOME": str(fake_dir / "data"),
+                            "FAKE_RUNTIME": str(fake_dir / "r"),
+                            "FAKE_AMBIENT": address,
+                            "FAKE_DAEMON": str(fake_bin / "dbus-daemon"),
+                            "FAKE_FORWARDER": str(forwarder),
+                            "TEST_EXECUTABLE": executables[0],
+                        },
                         text=True,
                         capture_output=True,
                         timeout=600,

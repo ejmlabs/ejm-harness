@@ -21,16 +21,32 @@ class RegistryVitestCompareTests(unittest.TestCase):
             listing.write_text(json.dumps([{"file": file, "name": name} for name in names]))
             first, second = root / "first.json", root / "second.json"
             for path, status in ((first, "failed"), (second, "passed")):
-                records = [{"kind": "start"}] + [
-                    {"kind": "case", "file": file, "name": name, "status": status}
-                    for name in names
-                ] + [{"kind": "end", "incomplete": False}]
-                path.write_text("".join(json.dumps(item, separators=(",", ":")) + "\n" for item in records))
+                records = (
+                    [{"kind": "start"}]
+                    + [
+                        {"kind": "case", "file": file, "name": name, "status": status}
+                        for name in names
+                    ]
+                    + [{"kind": "end", "incomplete": False}]
+                )
+                path.write_text(
+                    "".join(json.dumps(item, separators=(",", ":")) + "\n" for item in records)
+                )
             summary = root / "summary.json"
-            result = subprocess.run([
-                sys.executable, "-I", str(Path(__file__).with_name("registry_vitest_compare.py")),
-                str(listing), str(first), str(second), str(root), str(summary),
-            ], capture_output=True, check=False)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-I",
+                    str(Path(__file__).with_name("registry_vitest_compare.py")),
+                    str(listing),
+                    str(first),
+                    str(second),
+                    str(root),
+                    str(summary),
+                ],
+                capture_output=True,
+                check=False,
+            )
             data = json.loads(summary.read_text())
             self.assertEqual(result.returncode, 1)
             self.assertLessEqual(summary.stat().st_size, 4 * 1024 * 1024)
@@ -47,12 +63,20 @@ class RegistryVitestCompareTests(unittest.TestCase):
             for path, state in ((first, "failed"), (second, "passed")):
                 lines = [
                     {"kind": "start"},
-                    {"kind": "case", "file": file, "name": "flip", "status": state,
-                     "message": "first failure"},
+                    {
+                        "kind": "case",
+                        "file": file,
+                        "name": "flip",
+                        "status": state,
+                        "message": "first failure",
+                    },
                 ]
-                path.write_bytes(b"".join(
-                    json.dumps(line, separators=(",", ":")).encode() + b"\n" for line in lines
-                ) + b'{"kind":"case","name":"\xc3')
+                path.write_bytes(
+                    b"".join(
+                        json.dumps(line, separators=(",", ":")).encode() + b"\n" for line in lines
+                    )
+                    + b'{"kind":"case","name":"\xc3'
+                )
             result = compare(listing, first, second, root)
             self.assertTrue(result["incomplete"])
             self.assertEqual(result["mixed"], ['["worker.test.ts","flip"]'])
@@ -66,15 +90,35 @@ class RegistryVitestCompareTests(unittest.TestCase):
             listing.write_text(json.dumps([{"file": file, "name": "case"}]))
             reports = [root / "first.json", root / "second.json"]
             for path in reports:
-                path.write_text(json.dumps({
-                    "testResults": [{"name": file, "assertionResults": [{
-                        "fullName": "case", "status": "failed",
-                        "failureMessages": ["failure start\n" + "x" * 100000 + "\nassertion detail"],
-                    }]}],
-                    "numTotalTests": 1, "numPassedTests": 0, "numFailedTests": 1,
-                    "numPendingTests": 0, "numTodoTests": 0, "success": False,
-                }))
-            result = compare(listing, *reports, root)
+                path.write_text(
+                    json.dumps(
+                        {
+                            "testResults": [
+                                {
+                                    "name": file,
+                                    "assertionResults": [
+                                        {
+                                            "fullName": "case",
+                                            "status": "failed",
+                                            "failureMessages": [
+                                                "failure start\n"
+                                                + "x" * 100000
+                                                + "\nassertion detail"
+                                            ],
+                                        }
+                                    ],
+                                }
+                            ],
+                            "numTotalTests": 1,
+                            "numPassedTests": 0,
+                            "numFailedTests": 1,
+                            "numPendingTests": 0,
+                            "numTodoTests": 0,
+                            "success": False,
+                        }
+                    )
+                )
+            result = compare(listing, reports[0], reports[1], root)
             for field in ("first_diagnostic", "second_diagnostic"):
                 message = result[field]["message"]
                 self.assertTrue(message.startswith("failure start"))
@@ -172,12 +216,21 @@ class RegistryVitestCompareTests(unittest.TestCase):
             listing.write_text(json.dumps([{"file": file, "name": "flip"}]))
             reports = [root / "first.json", root / "second.json"]
             for path, state in zip(reports, ("failed", "passed"), strict=True):
-                path.write_text(json.dumps({
-                    "testResults": [{"name": file, "assertionResults": [
-                        {"fullName": "flip", "status": state},
-                        {"fullName": "bad", "status": "unknown"},
-                    ]}],
-                }))
+                path.write_text(
+                    json.dumps(
+                        {
+                            "testResults": [
+                                {
+                                    "name": file,
+                                    "assertionResults": [
+                                        {"fullName": "flip", "status": state},
+                                        {"fullName": "bad", "status": "unknown"},
+                                    ],
+                                }
+                            ],
+                        }
+                    )
+                )
             result = compare(listing, reports[0], reports[1], root)
             self.assertTrue(result["incomplete"])
             self.assertEqual(result["mixed"], ['["worker.test.ts","flip"]'])

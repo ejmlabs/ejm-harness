@@ -144,30 +144,7 @@ async fn start_helper(
     ownership: File,
 ) -> Result<Option<Advertisement>> {
     let generation = uuid::Uuid::new_v4();
-    let admission = owner.admission.clone();
-    let request = NativeOwnerRequest::new(
-        owner.inner.root.clone(),
-        owner.inner.domain.clone(),
-        generation,
-        directory.path().join("owner.lock"),
-    );
-    let (ownership, accounted) = tokio::task::spawn_blocking(move || -> Result<_> {
-        let accounted = if let Some(admission) = admission {
-            let permit = admission.admit(&request)?;
-            ensure!(
-                permit.generation == generation,
-                "native helper admission generation mismatch"
-            );
-            true
-        } else {
-            false
-        };
-        // Cancellation may discard this result. Closing the locked description
-        // then supplies recovery proof; the permit itself never refunds a row.
-        Ok((ownership, accounted))
-    })
-    .await
-    .context("admit native execution helper")??;
+    let (ownership, accounted) = admit_helper(owner, directory, ownership, generation).await?;
     // Shared admission has its own bounded wait. Give process startup a fresh
     // transport window after that commitment, within the caller's deadline.
     let deadline = Instant::now() + wire::TIMEOUT;
@@ -255,6 +232,38 @@ async fn start_helper(
         let _ = helper.wait().await;
     });
     Ok(Some(ad))
+}
+
+async fn admit_helper(
+    owner: &NativeOwner,
+    directory: &rightkit_fs::StateDir,
+    ownership: File,
+    generation: uuid::Uuid,
+) -> Result<(File, bool)> {
+    let admission = owner.admission.clone();
+    let request = NativeOwnerRequest::new(
+        owner.inner.root.clone(),
+        owner.inner.domain.clone(),
+        generation,
+        directory.path().join("owner.lock"),
+    );
+    tokio::task::spawn_blocking(move || -> Result<_> {
+        let accounted = if let Some(admission) = admission {
+            let permit = admission.admit(&request)?;
+            ensure!(
+                permit.generation == generation,
+                "native helper admission generation mismatch"
+            );
+            true
+        } else {
+            false
+        };
+        // Cancellation may discard this result. Closing the locked description
+        // then supplies recovery proof; the permit itself never refunds a row.
+        Ok((ownership, accounted))
+    })
+    .await
+    .context("admit native execution helper")?
 }
 
 fn require_accounted(owner: &NativeOwner, ad: &Advertisement) -> Result<()> {

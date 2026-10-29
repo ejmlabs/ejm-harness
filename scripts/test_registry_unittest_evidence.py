@@ -14,7 +14,8 @@ class RegistryUnittestEvidenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "tests").mkdir()
-            (root / "tests/test_fixture_error.py").write_text('''
+            (root / "tests/test_fixture_error.py").write_text(
+                """
 import os
 import time
 import unittest
@@ -33,12 +34,16 @@ class Later(unittest.TestCase):
         Path(os.environ["HANG_STARTED"]).write_text("started")
         while True:
             time.sleep(1)
-''', encoding="utf-8")
+""",
+                encoding="utf-8",
+            )
             report, started = root / "fixture.json", root / "fixture.started"
             child = subprocess.Popen(
                 [sys.executable, "-I", str(script), "run", str(report), "test_*.py"],
-                cwd=root, env={**os.environ, "HANG_STARTED": str(started)},
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                cwd=root,
+                env={**os.environ, "HANG_STARTED": str(started)},
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             try:
                 deadline = time.monotonic() + 10
@@ -66,7 +71,8 @@ class Later(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "tests").mkdir()
-            (root / "tests/test_diagnostic.py").write_text('''
+            (root / "tests/test_diagnostic.py").write_text(
+                """
 import os
 import time
 import unittest
@@ -92,14 +98,17 @@ class Case(unittest.TestCase):
         Path(os.environ["HANG_STARTED"]).write_text("started")
         while True:
             time.sleep(1)
-''', encoding="utf-8")
+""",
+                encoding="utf-8",
+            )
             for mode in ("failure", "error", "subtest"):
                 report, started = root / f"{mode}.json", root / f"{mode}.started"
                 child = subprocess.Popen(
                     [sys.executable, "-I", str(script), "run", str(report), "test_*.py"],
                     cwd=root,
                     env={**os.environ, "FAILURE_MODE": mode, "HANG_STARTED": str(started)},
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
                 try:
                     deadline = time.monotonic() + 10
@@ -111,15 +120,21 @@ class Case(unittest.TestCase):
                     evidence = json.loads(report.read_text(encoding="utf-8"))
                     self.assertTrue(evidence["incomplete"])
                     diagnostic = evidence["first_diagnostic"]
-                    self.assertTrue(diagnostic["test"].startswith("test_diagnostic.Case.test_a_failure"))
+                    self.assertTrue(
+                        diagnostic["test"].startswith("test_diagnostic.Case.test_a_failure")
+                    )
                     self.assertIn("FIRST_SENTINEL", diagnostic["message"])
                     self.assertNotIn("SECOND_SENTINEL", diagnostic["message"])
                     self.assertTrue(diagnostic["truncated"])
                     self.assertLessEqual(report.stat().st_size, 4 * 1024 * 1024)
                     if mode == "subtest":
-                        self.assertNotIn("test_diagnostic.Case.test_a_failure", evidence["outcomes"])
+                        self.assertNotIn(
+                            "test_diagnostic.Case.test_a_failure", evidence["outcomes"]
+                        )
                     else:
-                        self.assertEqual(evidence["outcomes"]["test_diagnostic.Case.test_a_failure"], "failed")
+                        self.assertEqual(
+                            evidence["outcomes"]["test_diagnostic.Case.test_a_failure"], "failed"
+                        )
                 finally:
                     child.terminate()
                     try:
@@ -133,7 +148,8 @@ class Case(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "tests").mkdir()
-            (root / "tests/test_subtest.py").write_text('''
+            (root / "tests/test_subtest.py").write_text(
+                """
 import os
 import time
 import unittest
@@ -147,13 +163,18 @@ class Case(unittest.TestCase):
             Path(os.environ["HANG_STARTED"]).write_text("started")
             while True:
                 time.sleep(1)
-''', encoding="utf-8")
+""",
+                encoding="utf-8",
+            )
             first, second = root / "first.json", root / "second.json"
             started = root / "started"
             env = {**os.environ, "FAIL_SUBTEST": "1", "HANG_STARTED": str(started)}
             child = subprocess.Popen(
                 [sys.executable, "-I", str(script), "run", str(first), "test_*.py"],
-                cwd=root, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                cwd=root,
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             try:
                 deadline = time.monotonic() + 10
@@ -173,13 +194,19 @@ class Case(unittest.TestCase):
                     child.wait(timeout=5)
             completed = subprocess.run(
                 [sys.executable, "-I", str(script), "run", str(second), "test_*.py"],
-                cwd=root, env={**env, "FAIL_SUBTEST": "0"},
-                capture_output=True, timeout=10, check=False,
+                cwd=root,
+                env={**env, "FAIL_SUBTEST": "0"},
+                capture_output=True,
+                timeout=10,
+                check=False,
             )
             self.assertEqual(completed.returncode, 0)
             compared = subprocess.run(
                 [sys.executable, "-I", str(script), "compare", str(first), str(second)],
-                capture_output=True, text=True, timeout=10, check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
             )
             self.assertNotEqual(compared.returncode, 0)
             self.assertNotIn("flaky-test:", compared.stdout)
@@ -189,7 +216,8 @@ class Case(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "tests").mkdir()
-            (root / "tests/test_fixture.py").write_text('''
+            (root / "tests/test_fixture.py").write_text(
+                """
 import os
 import time
 import unittest
@@ -210,13 +238,18 @@ class Later(unittest.TestCase):
             Path(os.environ["HANG_STARTED"]).write_text("started")
             while True:
                 time.sleep(1)
-''', encoding="utf-8")
+""",
+                encoding="utf-8",
+            )
             first, second = root / "first.json", root / "second.json"
             started = root / "started"
             env = {**os.environ, "FAIL_FLIP": "1", "HANG": "1", "HANG_STARTED": str(started)}
             child = subprocess.Popen(
                 [sys.executable, "-I", str(script), "run", str(first), "test_*.py"],
-                cwd=root, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                cwd=root,
+                env=env,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
             )
             try:
                 deadline = time.monotonic() + 10
@@ -237,13 +270,19 @@ class Later(unittest.TestCase):
                     child.wait(timeout=5)
             completed = subprocess.run(
                 [sys.executable, "-I", str(script), "run", str(second), "test_*.py"],
-                cwd=root, env={**env, "FAIL_FLIP": "0", "HANG": "0"},
-                capture_output=True, timeout=10, check=False,
+                cwd=root,
+                env={**env, "FAIL_FLIP": "0", "HANG": "0"},
+                capture_output=True,
+                timeout=10,
+                check=False,
             )
             self.assertNotEqual(completed.returncode, 0)
             compared = subprocess.run(
                 [sys.executable, "-I", str(script), "compare", str(first), str(second)],
-                capture_output=True, text=True, timeout=10, check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
             )
             self.assertNotEqual(compared.returncode, 0)
             self.assertNotIn("flaky-test:", compared.stdout)
@@ -253,7 +292,8 @@ class Later(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "tests").mkdir()
-            (root / "tests/test_partial.py").write_text('''
+            (root / "tests/test_partial.py").write_text(
+                """
 import os
 import time
 import unittest
@@ -268,7 +308,9 @@ class Case(unittest.TestCase):
         Path(os.environ["HANG_STARTED"]).write_text("started")
         while True:
             time.sleep(1)
-''', encoding="utf-8")
+""",
+                encoding="utf-8",
+            )
             reports = [root / "first.json", root / "second.json"]
             for number, report in enumerate(reports):
                 started = root / f"started-{number}"
@@ -280,7 +322,10 @@ class Case(unittest.TestCase):
                 }
                 child = subprocess.Popen(
                     [sys.executable, "-I", str(script), "run", str(report), "test_*.py"],
-                    cwd=root, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    cwd=root,
+                    env=env,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                 )
                 try:
                     deadline = time.monotonic() + 10
@@ -291,12 +336,16 @@ class Case(unittest.TestCase):
                                 candidate = json.loads(report.read_text(encoding="utf-8"))
                             except (OSError, ValueError):
                                 candidate = None
-                            if candidate and "test_partial.Case.test_a_flip" in candidate["outcomes"]:
+                            if (
+                                candidate
+                                and "test_partial.Case.test_a_flip" in candidate["outcomes"]
+                            ):
                                 evidence = candidate
                                 break
                         self.assertIsNone(child.poll(), "schema runner exited before hanging")
                         time.sleep(0.01)
-                    self.assertIsNotNone(evidence, "completed test evidence was not persisted")
+                    if evidence is None:
+                        self.fail("completed test evidence was not persisted")
                     self.assertIsNone(child.poll())
                     self.assertTrue(evidence["incomplete"])
                     self.assertEqual(
@@ -313,7 +362,10 @@ class Case(unittest.TestCase):
                         child.wait(timeout=5)
             compared = subprocess.run(
                 [sys.executable, "-I", str(script), "compare", *(str(path) for path in reports)],
-                capture_output=True, text=True, timeout=10, check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
             )
             self.assertNotEqual(compared.returncode, 0)
             self.assertIn("flaky-test: test_partial.Case.test_a_flip", compared.stdout)
@@ -323,7 +375,7 @@ class Case(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "tests").mkdir()
-            (root / "tests/test_many.py").write_text('''
+            (root / "tests/test_many.py").write_text("""
 import os
 import unittest
 
@@ -334,7 +386,8 @@ class Case(unittest.TestCase):
     def id(self):
         return self.identity
     def runTest(self):
-        if (self.identity.startswith("0000") or self.identity == "zzzz-small") and os.environ.get("FAIL_FLIP") == "1":
+        if ((self.identity.startswith("0000") or self.identity == "zzzz-small")
+                and os.environ.get("FAIL_FLIP") == "1"):
             self.fail("first failure")
 
 def load_tests(loader, tests, pattern):
@@ -343,14 +396,20 @@ def load_tests(loader, tests, pattern):
         [Case(f"{index:04d}" + "x" * 2000) for index in range(2400)] +
         [Case("zzzz-small")]
     )
-''')
+""")
             reports = [root / "first.json", root / "second.json"]
             for report, fail in zip(reports, ("1", "0"), strict=True):
                 result = subprocess.run(
                     [sys.executable, "-I", str(script), "run", str(report), "test_*.py"],
-                    cwd=root, env={**os.environ, "FAIL_FLIP": fail,
-                                   "EJM_REGISTRY_SCHEMA_REFERENCE": str(reports[0]) if fail == "0" else ""},
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+                    cwd=root,
+                    env={
+                        **os.environ,
+                        "FAIL_FLIP": fail,
+                        "EJM_REGISTRY_SCHEMA_REFERENCE": str(reports[0]) if fail == "0" else "",
+                    },
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    check=False,
                 )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertLessEqual(report.stat().st_size, 4 * 1024 * 1024)
@@ -360,7 +419,9 @@ def load_tests(loader, tests, pattern):
                 self.assertIn("zzzz-small", data["outcomes"])
             compared = subprocess.run(
                 [sys.executable, "-I", str(script), "compare", *(str(path) for path in reports)],
-                capture_output=True, text=True, check=False,
+                capture_output=True,
+                text=True,
+                check=False,
             )
             self.assertNotEqual(compared.returncode, 0)
             self.assertIn("flaky-test: 0000", compared.stdout)

@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from junit_stream import IdentityFilter
 from registry_vitest_compare import compare
@@ -29,7 +30,7 @@ class EvidenceIdentityTests(unittest.TestCase):
             inventory.write_text("[]")
             first, second = root / "first.json", root / "second.json"
             for number, output in enumerate((first, second)):
-                code = '''import json, sys
+                code = """import json, sys
 from pathlib import Path
 path, status = sys.argv[1:]
 file = str(Path.cwd() / "suite.test.ts")
@@ -40,23 +41,39 @@ with open(path, "w") as stream:
     write({"kind": "case", "file": file, "name": "duplicate", "status": "passed"})
     for index in range(20000):
         write({"kind": "case", "file": file, "name": f"case-{index}", "status": "passed"})
-    write({"kind": "case", "file": file, "name": "late", "status": status, "message": "late diagnostic"})
+    write({"kind": "case", "file": file, "name": "late", "status": status,
+           "message": "late diagnostic"})
     write({"kind": "end", "incomplete": False})
-'''
+"""
                 env = dict(os.environ)
                 env["EJM_REGISTRY_VITEST_REFERENCE"] = str(first) if number else ""
                 result = subprocess.run(
-                    [sys.executable, str(script), "fifo-jsonl", str(output), "4194304", "--",
-                     sys.executable, "-c", code, str(output) + ".fifo", "failed" if not number else "passed"],
-                    cwd=root, env=env, capture_output=True, timeout=30, check=False,
+                    [
+                        sys.executable,
+                        str(script),
+                        "fifo-jsonl",
+                        str(output),
+                        "4194304",
+                        "--",
+                        sys.executable,
+                        "-c",
+                        code,
+                        str(output) + ".fifo",
+                        "failed" if not number else "passed",
+                    ],
+                    cwd=root,
+                    env=env,
+                    capture_output=True,
+                    timeout=30,
+                    check=False,
                 )
                 self.assertEqual(result.returncode, 1, result.stderr.decode(errors="replace"))
                 self.assertLessEqual(output.stat().st_size, 4 * 1024 * 1024)
-            result = compare(inventory, first, second, root)
-            self.assertTrue(result["incomplete"])
-            self.assertEqual(result["mixed"], ['["suite.test.ts","late"]'])
-            self.assertNotIn('["suite.test.ts","duplicate"]', result["mixed"])
-            self.assertIn("late diagnostic", result["first_diagnostic"]["message"])
+            evidence = compare(inventory, first, second, root)
+            self.assertTrue(evidence["incomplete"])
+            self.assertEqual(evidence["mixed"], ['["suite.test.ts","late"]'])
+            self.assertNotIn('["suite.test.ts","duplicate"]', evidence["mixed"])
+            self.assertIn("late diagnostic", evidence["first_diagnostic"]["message"])
 
     def test_junit_stream_and_raw_reports_keep_late_failure(self) -> None:
         script = Path(__file__).with_name("bounded_report.py")
@@ -69,7 +86,7 @@ with open(path, "w") as stream:
                 first = root / f"first-{streaming}.xml"
                 second = root / f"second-{streaming}.xml"
                 for number, output in enumerate((first, second)):
-                    code = '''import sys
+                    code = """import sys
 path, status = sys.argv[1:]
 with open(path, "w") as stream:
     stream.write('<testsuites><testsuite name="suite">')
@@ -77,21 +94,50 @@ with open(path, "w") as stream:
         stream.write(f'<testcase classname="suite" name="case-{index}"/>')
     stream.write('<testcase classname="suite" name="duplicate"/>')
     stream.write('<testcase classname="suite" name="duplicate"><failure/></testcase>')
-    stream.write('<testcase classname="suite" name="late">' + ('<failure/>' if status == 'failed' else '') + '</testcase>')
+    stream.write('<testcase classname="suite" name="late">'
+                 + ('<failure/>' if status == 'failed' else '') + '</testcase>')
     stream.write('</testsuite></testsuites>')
-'''
+"""
                     env = dict(os.environ)
                     env["EJM_HARNESS_JUNIT_REFERENCE"] = str(first) if number else ""
-                    command = [sys.executable, "-c", code, str(output) + (".fifo" if streaming else ""),
-                               "failed" if not number else "passed"]
+                    command = [
+                        sys.executable,
+                        "-c",
+                        code,
+                        str(output) + (".fifo" if streaming else ""),
+                        "failed" if not number else "passed",
+                    ]
                     if streaming:
-                        command = [sys.executable, str(script), "fifo-xml", str(output), "250000", "--", *command]
-                    result = subprocess.run(command, cwd=root, env=env, capture_output=True, timeout=30, check=False)
-                    self.assertEqual(result.returncode, int(streaming), result.stderr.decode(errors="replace"))
+                        command = [
+                            sys.executable,
+                            str(script),
+                            "fifo-xml",
+                            str(output),
+                            "250000",
+                            "--",
+                            *command,
+                        ]
+                    result = subprocess.run(
+                        command, cwd=root, env=env, capture_output=True, timeout=30, check=False
+                    )
+                    self.assertEqual(
+                        result.returncode, int(streaming), result.stderr.decode(errors="replace")
+                    )
                 summary = root / f"summary-{streaming}.json"
                 result = subprocess.run(
-                    [sys.executable, "-I", str(compare_script), str(inventory), str(first), str(second), str(summary)],
-                    cwd=root, capture_output=True, timeout=30, check=False,
+                    [
+                        sys.executable,
+                        "-I",
+                        str(compare_script),
+                        str(inventory),
+                        str(first),
+                        str(second),
+                        str(summary),
+                    ],
+                    cwd=root,
+                    capture_output=True,
+                    timeout=30,
+                    check=False,
                 )
                 evidence = json.loads(summary.read_text())
                 self.assertEqual(result.returncode, 1)
@@ -106,10 +152,26 @@ with open(path, "w") as stream:
             inventory.write_text("[]")
             reports = [root / "first.json", root / "second.json"]
             for number, report in enumerate(reports):
-                cases = [{"fullName": f"case-{index}", "status": "passed"} for index in range(20_000)]
-                cases.append({"fullName": "late", "status": "failed" if not number else "passed", "failureMessages": ["late diagnostic"]})
-                report.write_text(json.dumps({"testResults": [{"name": str(root / "suite.test.ts"), "assertionResults": cases}]}))
-            result = compare(inventory, *reports, root)
+                cases: list[dict[str, Any]] = [
+                    {"fullName": f"case-{index}", "status": "passed"} for index in range(20_000)
+                ]
+                cases.append(
+                    {
+                        "fullName": "late",
+                        "status": "failed" if not number else "passed",
+                        "failureMessages": ["late diagnostic"],
+                    }
+                )
+                report.write_text(
+                    json.dumps(
+                        {
+                            "testResults": [
+                                {"name": str(root / "suite.test.ts"), "assertionResults": cases}
+                            ]
+                        }
+                    )
+                )
+            result = compare(inventory, reports[0], reports[1], root)
             self.assertTrue(result["incomplete"])
             self.assertEqual(result["mixed"], ['["suite.test.ts","late"]'])
             self.assertIn("late diagnostic", result["first_diagnostic"]["message"])

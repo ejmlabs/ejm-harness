@@ -17,15 +17,28 @@ class RegistryRustCompareTests(unittest.TestCase):
             first, second = root / "first.xml", root / "second.xml"
             names = [f"{index:05}" + "x" * 900 for index in range(2500)]
             for path, state in ((first, "<failure/>"), (second, "")):
-                path.write_text('<testsuites><testsuite name="suite">' + "".join(
-                    f'<testcase classname="suite" name="{name}">{state}</testcase>'
-                    for name in names
-                ) + '</testsuite></testsuites>')
+                path.write_text(
+                    '<testsuites><testsuite name="suite">'
+                    + "".join(
+                        f'<testcase classname="suite" name="{name}">{state}</testcase>'
+                        for name in names
+                    )
+                    + "</testsuite></testsuites>"
+                )
             summary = root / "summary.json"
-            result = subprocess.run([
-                sys.executable, "-I", str(Path(__file__).with_name("registry_rust_compare.py")),
-                str(listing), str(first), str(second), str(summary),
-            ], capture_output=True, check=False)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-I",
+                    str(Path(__file__).with_name("registry_rust_compare.py")),
+                    str(listing),
+                    str(first),
+                    str(second),
+                    str(summary),
+                ],
+                capture_output=True,
+                check=False,
+            )
             data = json.loads(summary.read_text())
             self.assertEqual(result.returncode, 1)
             self.assertLessEqual(summary.stat().st_size, 4 * 1024 * 1024)
@@ -43,14 +56,25 @@ class RegistryRustCompareTests(unittest.TestCase):
                 b'<testcase classname="suite" name="flip"><failure/></testcase>'
                 b'<testcase classname="suite" name="\xc3'
             )
-            second.write_text('<testsuites><testsuite name="suite">'
-                              '<testcase classname="suite" name="flip"/>'
-                              '</testsuite></testsuites>')
+            second.write_text(
+                '<testsuites><testsuite name="suite">'
+                '<testcase classname="suite" name="flip"/>'
+                "</testsuite></testsuites>"
+            )
             summary = root / "summary.json"
-            result = subprocess.run([
-                sys.executable, "-I", str(Path(__file__).with_name("registry_rust_compare.py")),
-                str(listing), str(first), str(second), str(summary),
-            ], capture_output=True, check=False)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-I",
+                    str(Path(__file__).with_name("registry_rust_compare.py")),
+                    str(listing),
+                    str(first),
+                    str(second),
+                    str(summary),
+                ],
+                capture_output=True,
+                check=False,
+            )
             data = json.loads(summary.read_text())
             self.assertEqual(result.returncode, 1)
             self.assertTrue(data["incomplete"])
@@ -62,17 +86,30 @@ class RegistryRustCompareTests(unittest.TestCase):
             listing = root / "inventory.json"
             listing.write_text("{}")
             first, second = root / "first.xml", root / "second.xml"
-            first.write_text('<testsuites><testsuite name="suite">'
-                             '<testcase classname="suite" name="flip"><failure/></testcase>'
-                             '<testcase classname="suite" name="truncated"')
-            second.write_text('<testsuites><testsuite name="suite">'
-                              '<testcase classname="suite" name="flip"/>'
-                              '</testsuite></testsuites>')
+            first.write_text(
+                '<testsuites><testsuite name="suite">'
+                '<testcase classname="suite" name="flip"><failure/></testcase>'
+                '<testcase classname="suite" name="truncated"'
+            )
+            second.write_text(
+                '<testsuites><testsuite name="suite">'
+                '<testcase classname="suite" name="flip"/>'
+                "</testsuite></testsuites>"
+            )
             summary = root / "summary.json"
-            result = subprocess.run([
-                sys.executable, "-I", str(Path(__file__).with_name("registry_rust_compare.py")),
-                str(listing), str(first), str(second), str(summary),
-            ], capture_output=True, check=False)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-I",
+                    str(Path(__file__).with_name("registry_rust_compare.py")),
+                    str(listing),
+                    str(first),
+                    str(second),
+                    str(summary),
+                ],
+                capture_output=True,
+                check=False,
+            )
             data = json.loads(summary.read_text())
             self.assertEqual(result.returncode, 1)
             self.assertTrue(data["incomplete"])
@@ -125,18 +162,32 @@ class RegistryRustCompareTests(unittest.TestCase):
             listing = root / "inventory.json"
             listing.write_text("{}")
             first, second = root / "first.xml", root / "second.xml"
-            cases = ''.join(f'<testcase classname="suite" name="case{i}"/>' for i in range(20_000))
-            first.write_text('<testsuites><testsuite name="suite">'
-                             '<testcase classname="suite" name="flip"><failure/></testcase>'
-                             + cases + '</testsuite></testsuites>')
-            second.write_text('<testsuites><testsuite name="suite">'
-                              '<testcase classname="suite" name="flip"/>'
-                              '</testsuite></testsuites>')
+            cases = "".join(f'<testcase classname="suite" name="case{i}"/>' for i in range(20_000))
+            first.write_text(
+                '<testsuites><testsuite name="suite">'
+                '<testcase classname="suite" name="flip"><failure/></testcase>'
+                + cases
+                + "</testsuite></testsuites>"
+            )
+            second.write_text(
+                '<testsuites><testsuite name="suite">'
+                '<testcase classname="suite" name="flip"/>'
+                "</testsuite></testsuites>"
+            )
             summary = root / "summary.json"
-            result = subprocess.run([
-                sys.executable, "-I", str(Path(__file__).with_name("registry_rust_compare.py")),
-                str(listing), str(first), str(second), str(summary),
-            ], capture_output=True, check=False)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-I",
+                    str(Path(__file__).with_name("registry_rust_compare.py")),
+                    str(listing),
+                    str(first),
+                    str(second),
+                    str(summary),
+                ],
+                capture_output=True,
+                check=False,
+            )
             data = json.loads(summary.read_text())
             self.assertEqual(result.returncode, 1)
             self.assertTrue(data["incomplete"])

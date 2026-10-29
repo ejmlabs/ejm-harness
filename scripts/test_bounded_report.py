@@ -16,8 +16,12 @@ class BoundedReportTests(unittest.TestCase):
     def test_junit_diagnostic_fits_small_bounds_and_retains_tail(self) -> None:
         from junit_stream import JunitRecords
 
-        report = (b'<testsuites><testsuite name="suite"><testcase classname="suite" name="case">'
-                  + b'<failure>' + b'x' * 20000 + b'TAIL</failure></testcase></testsuite></testsuites>')
+        report = (
+            b'<testsuites><testsuite name="suite"><testcase classname="suite" name="case">'
+            + b"<failure>"
+            + b"x" * 20000
+            + b"TAIL</failure></testcase></testsuite></testsuites>"
+        )
         for limit in (64, 128, 512):
             collector = JunitRecords(limit, None)
             collector.add(report)
@@ -36,32 +40,63 @@ class BoundedReportTests(unittest.TestCase):
                 for failure_first in (False, True):
                     for overflow in (False, True):
                         first, second = root / "first.xml", root / "second.xml"
-                        failed = (f'<testcase classname="suite" name="duplicate">'
-                                  f'<{kind} message="duplicate sentinel">first detail</{kind}></testcase>')
+                        failed = (
+                            f'<testcase classname="suite" name="duplicate">'
+                            f'<{kind} message="duplicate sentinel">first detail</{kind}></testcase>'
+                        )
                         passed = '<testcase classname="suite" name="duplicate"/>'
                         duplicate = failed + passed if failure_first else passed + failed
                         padding = " " * 8192 if overflow else ""
-                        first_xml = (f'<testsuites><testsuite name="suite">{padding}{duplicate}'
-                                     '<testcase classname="suite" name="stable"><failure/></testcase>'
-                                     '</testsuite></testsuites>')
-                        second_xml = ('<testsuites><testsuite name="suite">'
-                                      '<testcase classname="suite" name="duplicate"/>'
-                                      '<testcase classname="suite" name="stable"/>'
-                                      '</testsuite></testsuites>')
+                        first_xml = (
+                            f'<testsuites><testsuite name="suite">{padding}{duplicate}'
+                            '<testcase classname="suite" name="stable"><failure/></testcase>'
+                            "</testsuite></testsuites>"
+                        )
+                        second_xml = (
+                            '<testsuites><testsuite name="suite">'
+                            '<testcase classname="suite" name="duplicate"/>'
+                            '<testcase classname="suite" name="stable"/>'
+                            "</testsuite></testsuites>"
+                        )
                         for output, report in ((first, first_xml), (second, second_xml)):
-                            code = "from pathlib import Path; import sys; Path(sys.argv[1]).write_text(sys.argv[2])"
+                            code = (
+                                "from pathlib import Path; import sys; "
+                                "Path(sys.argv[1]).write_text(sys.argv[2])"
+                            )
                             subprocess.run(
-                                [sys.executable, str(script), "fifo-xml", str(output), "4096", "--",
-                                 sys.executable, "-c", code, str(output) + ".fifo", report],
-                                capture_output=True, timeout=10, check=False,
+                                [
+                                    sys.executable,
+                                    str(script),
+                                    "fifo-xml",
+                                    str(output),
+                                    "4096",
+                                    "--",
+                                    sys.executable,
+                                    "-c",
+                                    code,
+                                    str(output) + ".fifo",
+                                    report,
+                                ],
+                                capture_output=True,
+                                timeout=10,
+                                check=False,
                             )
                             self.assertLessEqual(output.stat().st_size, 4096)
                         inventory, summary = root / "inventory.json", root / "summary.json"
                         inventory.write_text("{}")
                         result = subprocess.run(
-                            [sys.executable, "-I", str(script.with_name("registry_rust_compare.py")),
-                             str(inventory), str(first), str(second), str(summary)],
-                            capture_output=True, timeout=10, check=False,
+                            [
+                                sys.executable,
+                                "-I",
+                                str(script.with_name("registry_rust_compare.py")),
+                                str(inventory),
+                                str(first),
+                                str(second),
+                                str(summary),
+                            ],
+                            capture_output=True,
+                            timeout=10,
+                            check=False,
                         )
                         evidence = json.loads(summary.read_text())
                         self.assertNotEqual(result.returncode, 0)
@@ -77,13 +112,19 @@ class BoundedReportTests(unittest.TestCase):
             for mode in ("fifo-jsonl", "fifo-xml"):
                 output = root / mode
                 if mode == "fifo-jsonl":
-                    first = b'{"kind":"start"}\n{"kind":"case","file":"case.rs","name":"early","status":"failed"}\n'
+                    first = (
+                        b'{"kind":"start"}\n{"kind":"case","file":"case.rs",'
+                        b'"name":"early","status":"failed"}\n'
+                    )
                     second = b'{"kind":"case","file":"case.rs","name":"later","status":"passed"}\n'
                     expected = b'"name":"early"'
                     unexpected = b'"name":"later"'
                 else:
-                    first = (b'<testsuites><testsuite name="suite">' + b" " * 300
-                             + b'<testcase classname="suite" name="early"><failure/></testcase>')
+                    first = (
+                        b'<testsuites><testsuite name="suite">'
+                        + b" " * 300
+                        + b'<testcase classname="suite" name="early"><failure/></testcase>'
+                    )
                     second = b'<testcase classname="suite" name="later"/>'
                     expected, unexpected = b'name="early"', b'name="later"'
                 producer = (
@@ -91,7 +132,7 @@ class BoundedReportTests(unittest.TestCase):
                     "out.write(bytes.fromhex(sys.argv[2])); time.sleep(0.6); "
                     "out.write(bytes.fromhex(sys.argv[3])); time.sleep(1)"
                 )
-                driver = '''import subprocess, sys
+                driver = """import subprocess, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 import bounded_report
@@ -114,11 +155,26 @@ def replace(path, target):
     return original(path, target)
 Path.replace = replace
 bounded_report.capture(sys.argv[2], Path(sys.argv[3]), 256, sys.argv[4:])
-'''
+"""
                 result = subprocess.run(
-                    [sys.executable, "-c", driver, str(script.parent), mode, str(output),
-                     sys.executable, "-c", producer, str(output) + ".fifo", first.hex(), second.hex()],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10, check=False,
+                    [
+                        sys.executable,
+                        "-c",
+                        driver,
+                        str(script.parent),
+                        mode,
+                        str(output),
+                        sys.executable,
+                        "-c",
+                        producer,
+                        str(output) + ".fifo",
+                        first.hex(),
+                        second.hex(),
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=10,
+                    check=False,
                 )
                 self.assertEqual(result.returncode, 77)
                 evidence = output.read_bytes()
@@ -136,28 +192,48 @@ bounded_report.capture(sys.argv[2], Path(sys.argv[3]), 256, sys.argv[4:])
             for mode in ("stdout", "fifo", "fifo-jsonl", "fifo-xml"):
                 output = root / mode
                 if mode == "fifo-jsonl":
-                    initial = (b'{"kind":"start"}\n{"kind":"case","file":"case.rs","name":"early",'
-                               b'"status":"failed"}\n{"kind":"end","incomplete":false}\n')
+                    initial = (
+                        b'{"kind":"start"}\n{"kind":"case","file":"case.rs","name":"early",'
+                        b'"status":"failed"}\n{"kind":"end","incomplete":false}\n'
+                    )
                     final = b""
                     expected = b'"name":"early"'
                 elif mode == "fifo-xml":
-                    initial = (b'<testsuites><testsuite name="suite">' + b" " * 300
-                               + b'<testcase classname="suite" name="early"><failure/></testcase>')
-                    final = b'</testsuite></testsuites>'
+                    initial = (
+                        b'<testsuites><testsuite name="suite">'
+                        + b" " * 300
+                        + b'<testcase classname="suite" name="early"><failure/></testcase>'
+                    )
+                    final = b"</testsuite></testsuites>"
                     expected = b'name="early"'
                 else:
                     initial, final, expected = b"early evidence\n", b"finished\n", b"early evidence"
                 child = (
                     "import sys; from pathlib import Path; "
-                    "out = sys.stdout.buffer if sys.argv[1] == '-' else open(sys.argv[1], 'wb', buffering=0); "
+                    "out = sys.stdout.buffer if sys.argv[1] == '-' "
+                    "else open(sys.argv[1], 'wb', buffering=0); "
                     "out.write(bytes.fromhex(sys.argv[2])); out.flush(); "
                     "sys.stdin.buffer.read(1); out.write(bytes.fromhex(sys.argv[3])); out.flush()"
                 )
                 destination = "-" if mode == "stdout" else str(output) + ".fifo"
                 process = subprocess.Popen(
-                    [sys.executable, str(script), mode, str(output), "256", "--", sys.executable,
-                     "-c", child, destination, initial.hex(), final.hex()],
-                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    [
+                        sys.executable,
+                        str(script),
+                        mode,
+                        str(output),
+                        "256",
+                        "--",
+                        sys.executable,
+                        "-c",
+                        child,
+                        destination,
+                        initial.hex(),
+                        final.hex(),
+                    ],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
                 )
                 try:
                     deadline = time.monotonic() + 5
@@ -170,7 +246,9 @@ bounded_report.capture(sys.argv[2], Path(sys.argv[3]), 256, sys.argv[4:])
                         self.fail(f"{mode} evidence not persisted before producer exit")
                     self.assertIsNone(process.poll())
                     if mode == "fifo-jsonl":
-                        self.assertTrue(json.loads(output.read_text().splitlines()[-1])["incomplete"])
+                        self.assertTrue(
+                            json.loads(output.read_text().splitlines()[-1])["incomplete"]
+                        )
                     if mode == "fifo-xml":
                         self.assertIn(b'incomplete="true"', output.read_bytes())
                 finally:
@@ -180,9 +258,10 @@ bounded_report.capture(sys.argv[2], Path(sys.argv[3]), 256, sys.argv[4:])
         import bounded_report
 
         output = Path("unused")
-        with patch.object(bounded_report.os, "name", "nt"), patch.object(
-            bounded_report.subprocess, "Popen"
-        ) as spawn:
+        with (
+            patch.object(os, "name", "nt"),
+            patch.object(subprocess, "Popen") as spawn,
+        ):
             with self.assertRaisesRegex(OSError, "unsupported on Windows"):
                 bounded_report.capture("stdout", output, 256, ["producer"])
             spawn.assert_not_called()
@@ -193,30 +272,59 @@ bounded_report.capture(sys.argv[2], Path(sys.argv[3]), 256, sys.argv[4:])
             root = Path(directory)
             first, second = root / "first.xml", root / "second.xml"
             for index, (output, failed) in enumerate(((first, True), (second, False))):
-                cases = ''.join(f'<testcase classname="suite" name="case{i}"/>' for i in range(30))
-                state = '<failure/>' if failed else ''
-                report = ('<testsuites><testsuite name="suite">' + cases
-                          + f'<testcase classname="suite" name="late">{state}</testcase>'
-                          + '</testsuite></testsuites>')
-                code = "from pathlib import Path; import sys; Path(sys.argv[1]).write_text(sys.argv[2])"
+                cases = "".join(f'<testcase classname="suite" name="case{i}"/>' for i in range(30))
+                state = "<failure/>" if failed else ""
+                report = (
+                    '<testsuites><testsuite name="suite">'
+                    + cases
+                    + f'<testcase classname="suite" name="late">{state}</testcase>'
+                    + "</testsuite></testsuites>"
+                )
+                code = (
+                    "from pathlib import Path; import sys; "
+                    "Path(sys.argv[1]).write_text(sys.argv[2])"
+                )
                 env = dict(os.environ)
                 if index:
                     env["EJM_HARNESS_JUNIT_REFERENCE"] = str(first)
                 else:
                     env.pop("EJM_HARNESS_JUNIT_REFERENCE", None)
                 result = subprocess.run(
-                    [sys.executable, str(script), "fifo-xml", str(output), "400", "--",
-                     sys.executable, "-c", code, str(output) + ".fifo", report],
-                    env=env, capture_output=True, timeout=10, check=False,
+                    [
+                        sys.executable,
+                        str(script),
+                        "fifo-xml",
+                        str(output),
+                        "400",
+                        "--",
+                        sys.executable,
+                        "-c",
+                        code,
+                        str(output) + ".fifo",
+                        report,
+                    ],
+                    env=env,
+                    capture_output=True,
+                    timeout=10,
+                    check=False,
                 )
                 self.assertEqual(result.returncode, 1)
                 self.assertLessEqual(output.stat().st_size, 400)
             inventory, summary = root / "inventory.json", root / "summary.json"
             inventory.write_text("{}")
             result = subprocess.run(
-                [sys.executable, "-I", str(script.with_name("registry_rust_compare.py")),
-                 str(inventory), str(first), str(second), str(summary)],
-                capture_output=True, timeout=10, check=False,
+                [
+                    sys.executable,
+                    "-I",
+                    str(script.with_name("registry_rust_compare.py")),
+                    str(inventory),
+                    str(first),
+                    str(second),
+                    str(summary),
+                ],
+                capture_output=True,
+                timeout=10,
+                check=False,
             )
             evidence = json.loads(summary.read_text())
             self.assertEqual(result.returncode, 1)
@@ -238,9 +346,22 @@ bounded_report.capture(sys.argv[2], Path(sys.argv[3]), 256, sys.argv[4:])
                     )
                     destination = str(output) + ".fifo" if mode == "fifo" else "-"
                     result = subprocess.run(
-                        [sys.executable, str(script), mode, str(output), "32", "--",
-                         sys.executable, "-c", producer, destination, str(size)],
-                        capture_output=True, timeout=10, check=False,
+                        [
+                            sys.executable,
+                            str(script),
+                            mode,
+                            str(output),
+                            "32",
+                            "--",
+                            sys.executable,
+                            "-c",
+                            producer,
+                            destination,
+                            str(size),
+                        ],
+                        capture_output=True,
+                        timeout=10,
+                        check=False,
                     )
                     self.assertEqual(result.returncode, int(size > 32))
                     self.assertEqual(output.read_bytes(), b"x" * min(size, 32))
@@ -253,14 +374,26 @@ bounded_report.capture(sys.argv[2], Path(sys.argv[3]), 256, sys.argv[4:])
                 output = root / str(replacement)
                 fifo = str(output) + ".fifo"
                 code = (
-                    "import os,sys; os.unlink(sys.argv[1]); "
-                    "open(sys.argv[1], 'wb').write(b'x')"
-                    if replacement else "pass"
+                    "import os,sys; os.unlink(sys.argv[1]); open(sys.argv[1], 'wb').write(b'x')"
+                    if replacement
+                    else "pass"
                 )
                 result = subprocess.run(
-                    [sys.executable, str(script), "fifo", str(output), "32", "--",
-                     sys.executable, "-c", code, fifo],
-                    capture_output=True, timeout=10, check=False,
+                    [
+                        sys.executable,
+                        str(script),
+                        "fifo",
+                        str(output),
+                        "32",
+                        "--",
+                        sys.executable,
+                        "-c",
+                        code,
+                        fifo,
+                    ],
+                    capture_output=True,
+                    timeout=10,
+                    check=False,
                 )
                 self.assertNotEqual(result.returncode, 0)
 
