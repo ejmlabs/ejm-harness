@@ -397,11 +397,14 @@ fn a_parent_swapped_after_the_checks_cannot_redirect_the_unlink() -> Result<()> 
     write_legacy_mode(&outside.join(LEGACY), b"{}", 0o600)?;
     write_legacy_mode(&fixture.root.join(LEGACY), b"{}", 0o600)?;
     let directory = PackageRoot::open(&fixture.root)?;
+    let Some(entry) = directory.entry()? else {
+        bail!("legacy fixture missing");
+    };
     // Swap the package root for a symlink to a directory outside it, after the checks.
     let moved = base.join("moved");
     fs::rename(&fixture.root, &moved)?;
     std::os::unix::fs::symlink(&outside, &fixture.root)?;
-    ensure!(directory.unlink_legacy()?);
+    ensure!(directory.unlink_legacy(entry)?);
     ensure!(
         fs::symlink_metadata(outside.join(LEGACY)).is_ok(),
         "the outside file stays"
@@ -410,6 +413,26 @@ fn a_parent_swapped_after_the_checks_cannot_redirect_the_unlink() -> Result<()> 
     // A package root that is now a symlink is refused before any check runs.
     ensure!(PackageRoot::open(&fixture.root).is_err());
     ensure!(fs::symlink_metadata(outside.join(LEGACY)).is_ok());
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_session_replaced_after_the_checks_is_not_deleted() -> Result<()> {
+    let fixture = Fixture::new()?;
+    write_legacy_mode(&fixture.root.join(LEGACY), b"{}", 0o644)?;
+    let directory = PackageRoot::open(&fixture.root)?;
+    let LegacyRead::Unusable(checked) = classify_legacy(&directory)? else {
+        bail!("a loose legacy file must be unusable");
+    };
+    // A well-formed session takes the checked file's place before the delete.
+    fs::remove_file(fixture.root.join(LEGACY))?;
+    fixture.legacy(ORIGIN)?;
+    ensure!(directory.unlink_legacy(checked).is_err());
+    ensure!(
+        fs::symlink_metadata(fixture.root.join(LEGACY)).is_ok(),
+        "the replacement stays"
+    );
     Ok(())
 }
 
