@@ -10,6 +10,7 @@ import selectors
 import stat
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import BinaryIO
 
@@ -28,7 +29,9 @@ class VitestRecords:
         self.header = False
         self.finished = False
         self.incomplete = False
-        self.seen: set[str] = set()
+        self.seen = junit_stream.IdentityFilter()
+        self.exact: set[str] = set()
+        self.retained: set[str] = set()
         self.ambiguous: set[str] = set()
         self.records: list[tuple[tuple[int, int], str, bytes]] = []
         self.size = 0
@@ -81,14 +84,17 @@ class VitestRecords:
             if not isinstance(file, str) or not isinstance(name, str) or status not in ("passed", "failed", "skipped"):
                 raise ValueError("invalid case")
             key = json.dumps([file, name])
-            if key in self.seen:
-                self.ambiguous.add(key)
+            maybe_duplicate = self.seen.add(key)
+            if len(self.exact) < 20_000:
+                duplicate = key in self.exact
+                self.exact.add(key)
+            else:
+                duplicate = maybe_duplicate
+            if duplicate:
+                if key in self.retained:
+                    self.ambiguous.add(key)
                 self.incomplete = True
                 return
-            if len(self.seen) >= 20_000:
-                self.incomplete = True
-                return
-            self.seen.add(key)
             first = status == "failed" and not self.first_failure
             self.first_failure |= status == "failed"
             self.incomplete |= record.get("truncated") is True
@@ -106,7 +112,7 @@ class VitestRecords:
                 self.incomplete = True
                 return
             evicted = []
-            while self.size + len(raw) > self.limit:
+            while self.size + len(raw) > self.limit or len(self.records) >= 20_000:
                 if not self.records or self.records[0][0] >= rank:
                     for item in evicted:
                         heapq.heappush(self.records, item)
@@ -117,13 +123,17 @@ class VitestRecords:
                 evicted.append(item)
                 self.size -= len(item[2])
             self.incomplete |= bool(evicted)
+            for _, victim, _ in evicted:
+                self.retained.remove(victim)
+                self.ambiguous.discard(victim)
             heapq.heappush(self.records, (rank, key, raw))
+            self.retained.add(key)
             self.size += len(raw)
         except (ValueError, KeyError, TypeError, RecursionError):
             self.incomplete = True
 
-    def write(self, stream: BinaryIO) -> bool:
-        incomplete = self.incomplete or not self.header or not self.finished or bool(self.buffer)
+    def write(self, stream: BinaryIO, *, partial: bool = False) -> bool:
+        incomplete = partial or self.incomplete or not self.header or not self.finished or bool(self.buffer)
         if self.header:
             stream.write(b'{"kind":"start"}\n')
             for _, key, line in sorted(self.records, key=lambda item: (-item[0][0], item[1])):
@@ -134,6 +144,8 @@ class VitestRecords:
 
 
 def capture(mode: str, output: Path, limit: int, command: list[str]) -> int:
+    if os.name == "nt":
+        raise OSError("bounded report capture is unsupported on Windows")
     fifo = Path(str(output) + ".fifo")
     reader = None
     keeper = None
@@ -157,6 +169,22 @@ def capture(mode: str, output: Path, limit: int, command: list[str]) -> int:
         records = VitestRecords(limit) if mode == "fifo-jsonl" else None
         junit = junit_stream.JunitRecords(limit, os.environ.get("EJM_HARNESS_JUNIT_REFERENCE")) if mode == "fifo-xml" else None
         with output.open("wb") as stream, selectors.DefaultSelector() as selector:
+            dirty = False
+            last_snapshot = time.monotonic()
+
+            def snapshot(*, final: bool = False) -> None:
+                nonlocal dirty, last_snapshot
+                if dirty:
+                    stream.seek(0)
+                    stream.truncate()
+                    if records is not None:
+                        records.write(stream, partial=not final)
+                    elif junit is not None:
+                        stream.write(junit.snapshot())
+                    stream.flush()
+                    dirty = False
+                    last_snapshot = time.monotonic()
+
             selector.register(reader, selectors.EVENT_READ)
             while True:
                 ready = selector.select(timeout=0.1)
@@ -171,23 +199,34 @@ def capture(mode: str, output: Path, limit: int, command: list[str]) -> int:
                         if records is not None:
                             records.add(chunk)
                             written += len(chunk)
+                            dirty = True
                         else:
-                            retained = chunk[: max(0, limit - written)]
-                            stream.write(retained)
-                            written += len(retained)
-                            overflow |= len(retained) != len(chunk)
+                            if not overflow:
+                                retained = chunk[: max(0, limit - written)]
+                                stream.write(retained)
+                                stream.flush()
+                                written += len(retained)
+                                overflow |= len(retained) != len(chunk)
+                            if overflow and junit is not None:
+                                dirty = True
+                        if dirty and time.monotonic() - last_snapshot >= 0.1:
+                            snapshot()
                         continue
+                snapshot()
                 if process.poll() is not None:
                     break
             code = process.wait()
             if records is not None:
-                overflow |= records.write(stream)
+                overflow |= records.incomplete or not records.header or not records.finished or bool(records.buffer)
+                dirty = True
+                snapshot(final=True)
             if junit is not None:
                 projection = junit.finish()
                 if overflow:
                     stream.seek(0)
                     stream.truncate()
                     stream.write(projection)
+                    stream.flush()
         valid_fifo = mode == "stdout" or (
             fifo.exists() and stat.S_ISFIFO(fifo.stat().st_mode) and fifo.stat().st_ino == identity
         )

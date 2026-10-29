@@ -34,7 +34,7 @@ jobs:
           tar -xzf "$archive" -C "$bindir" cargo-nextest
           "$bindir/cargo-nextest" --version
           echo "$bindir" >> "$GITHUB_PATH"
-      - run: PYTHONPATH=scripts python3 -B -m unittest test_bounded_report test_flake_check test_nextest_evidence test_registry_rust_compare test_registry_unittest_evidence test_registry_vitest_compare
+      - run: PYTHONPATH=scripts python3 -B -m unittest test_bounded_report test_evidence_identity test_flake_check test_nextest_evidence test_registry_rust_compare test_registry_unittest_evidence test_registry_vitest_compare
       - name: Compare two independent Rust test runs
         timeout-minutes: 50
         run: scripts/with-secret-service python3 scripts/flake_check.py "$RUNNER_TEMP/harness-flakes"
@@ -48,10 +48,10 @@ jobs:
           mkdir -p "$destination"
           shopt -s nullglob
           result=0
-          for file in "$source"/summary.json "$source"/inventory.json "$source"/attempt-*.xml "$source"/cargo-test-*.json "$source"/doctest-*.json "$source"/*.log; do
+          for file in "$source"/summary.json "$source"/inventory.json "$source"/attempt-*.xml "$source"/cargo-test-*.json "$source"/doctest-*.json "$source"/cargo-test-*.json.partial "$source"/doctest-*.json.partial "$source"/*.log; do
             [[ -e "$file" ]] || continue
             limit=52428800
-            [[ "$file" == *.log || "$file" == */summary.json || "$file" == */cargo-test-*.json || "$file" == */doctest-*.json ]] && limit=4194304
+            [[ "$file" == *.log || "$file" == */summary.json || "$file" == */cargo-test-*.json* || "$file" == */doctest-*.json* ]] && limit=4194304
             if [[ -L "$file" || ! -f "$file" ]] || (( $(wc -c < "$file") > limit )); then
               echo "Evidence exceeds its bound or is not a regular file: $file" >&2
               result=1

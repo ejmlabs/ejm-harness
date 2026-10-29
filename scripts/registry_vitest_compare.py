@@ -48,12 +48,33 @@ def bounded_message(message: str) -> str:
     return message[:4096] + "\n...\n" + message[-4096:]
 
 
+def retain_outcome(
+    outcomes: dict[str, str], evictable: dict[str, None], key: str, state: str,
+    priority: set[str],
+) -> bool:
+    preferred = state == "failed" or key in priority
+    if len(outcomes) >= MAX_TESTS:
+        if not preferred or not evictable:
+            return False
+        victim = next(iter(evictable))
+        evictable.pop(victim)
+        outcomes.pop(victim)
+    outcomes[key] = state
+    if not preferred:
+        evictable[key] = None
+    return True
+
+
 def stream_report(
-    path: Path, root: Path
+    path: Path, root: Path, priority: set[str] | None = None
 ) -> tuple[dict[str, str], set[str], set[str], bool, dict[str, str] | None]:
     outcomes: dict[str, str] = {}
     ambiguous: set[str] = set()
     failures: set[str] = set()
+    identities = reporter.IdentityFilter()
+    exact: set[str] = set()
+    evictable: dict[str, None] = {}
+    priority = priority or set()
     diagnostic = None
     incomplete = False
     finished = False
@@ -82,24 +103,35 @@ def stream_report(
                 key = identity(file, name, root)
                 if number > MAX_TESTS:
                     incomplete = True
-                    if key not in outcomes and key not in ambiguous:
-                        continue
-                if status not in ("passed", "failed", "skipped"):
+                maybe_duplicate = identities.add(key)
+                if len(exact) < MAX_TESTS:
+                    duplicate = key in exact
+                    exact.add(key)
+                else:
+                    duplicate = maybe_duplicate
+                if duplicate:
+                    if key in outcomes and len(ambiguous) < MAX_TESTS:
+                        ambiguous.add(key)
                     outcomes.pop(key, None)
-                    ambiguous.add(key)
+                    evictable.pop(key, None)
+                    if status == "failed" and len(failures) < MAX_TESTS:
+                        failures.add(key)
+                        if diagnostic is None:
+                            message = record.get("message", "")
+                            diagnostic = {"test": key, "message": bounded_message(message if isinstance(message, str) else "")}
+                    incomplete = True
+                    continue
+                if status not in ("passed", "failed", "skipped"):
                     incomplete = True
                     continue
                 if status == "failed":
-                    failures.add(key)
+                    if len(failures) < MAX_TESTS:
+                        failures.add(key)
                     if diagnostic is None:
                         message = record.get("message", "")
                         diagnostic = {"test": key, "message": bounded_message(message if isinstance(message, str) else "")}
-                if key in outcomes or key in ambiguous:
-                    outcomes.pop(key, None)
-                    ambiguous.add(key)
+                if not retain_outcome(outcomes, evictable, key, status, priority):
                     incomplete = True
-                else:
-                    outcomes[key] = status
                 incomplete |= status == "skipped"
             except (ValueError, KeyError, TypeError, OSError, RecursionError):
                 incomplete = True
@@ -107,19 +139,23 @@ def stream_report(
 
 
 def report(
-    path: Path, root: Path
+    path: Path, root: Path, priority: set[str] | None = None
 ) -> tuple[dict[str, str], set[str], set[str], bool, dict[str, str] | None]:
     if path.is_symlink() or not path.is_file() or path.stat().st_size > MAX_BYTES:
         raise ValueError("missing or oversized report")
     with path.open("rb") as stream:
         if stream.readline(32) == b'{"kind":"start"}\n':
-            return stream_report(path, root)
+            return stream_report(path, root, priority)
     data = read(path)
     if not isinstance(data, dict) or not isinstance(data.get("testResults"), list):
         raise ValueError("invalid Vitest report")
     outcomes: dict[str, str] = {}
     ambiguous: set[str] = set()
     failures: set[str] = set()
+    identities = reporter.IdentityFilter()
+    exact: set[str] = set()
+    evictable: dict[str, None] = {}
+    priority = priority or set()
     counts = {"passed": 0, "failed": 0, "pending": 0, "skipped": 0, "todo": 0}
     incomplete = False
     total = 0
@@ -145,17 +181,33 @@ def report(
                 continue
             if total > MAX_TESTS:
                 incomplete = True
-                if key not in outcomes and key not in ambiguous:
-                    continue
+            maybe_duplicate = identities.add(key)
+            if len(exact) < MAX_TESTS:
+                duplicate = key in exact
+                exact.add(key)
+            else:
+                duplicate = maybe_duplicate
+            if duplicate:
+                if key in outcomes and len(ambiguous) < MAX_TESTS:
+                    ambiguous.add(key)
+                outcomes.pop(key, None)
+                evictable.pop(key, None)
+                if case.get("status") == "failed" and len(failures) < MAX_TESTS:
+                    failures.add(key)
+                    if diagnostic is None:
+                        messages = case.get("failureMessages")
+                        message = next((item for item in messages if isinstance(item, str)), "") if isinstance(messages, list) else ""
+                        diagnostic = {"test": key, "message": bounded_message(message)}
+                incomplete = True
+                continue
             if not isinstance(case.get("status"), str) or case["status"] not in counts:
                 incomplete = True
-                outcomes.pop(key, None)
-                ambiguous.add(key)
                 continue
             state = case["status"]
             counts[state] += 1
             if state == "failed":
-                failures.add(key)
+                if len(failures) < MAX_TESTS:
+                    failures.add(key)
                 suite_failed = True
                 if diagnostic is None:
                     messages = case.get("failureMessages")
@@ -165,12 +217,8 @@ def report(
                         else ""
                     )
                     diagnostic = {"test": key, "message": bounded_message(message)}
-            if key in outcomes or key in ambiguous:
-                outcomes.pop(key, None)
-                ambiguous.add(key)
+            if not retain_outcome(outcomes, evictable, key, state, priority):
                 incomplete = True
-            else:
-                outcomes[key] = state
             if state not in ("passed", "failed"):
                 incomplete = True
         if suite.get("status") == "failed" and not suite_failed:
@@ -222,7 +270,7 @@ def compare(listing: Path, first: Path, second: Path, root: Path) -> dict[str, A
     parsed = []
     for path in (first, second):
         try:
-            parsed.append(report(path, root))
+            parsed.append(report(path, root, parsed[0][2] if parsed else None))
         except (OSError, ValueError, TypeError, RecursionError):
             parsed.append(({}, set(), set(), True, None))
     a, b = parsed

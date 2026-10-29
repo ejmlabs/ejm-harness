@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Compare independent nextest reports without turning a failure green."""
 
+import importlib.util
 import json
 import os
 import re
@@ -12,6 +13,15 @@ from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, BinaryIO
+
+_identity_spec = importlib.util.spec_from_file_location(
+    "junit_stream", Path(__file__).with_name("junit_stream.py")
+)
+if _identity_spec is None or _identity_spec.loader is None:
+    raise RuntimeError("Cannot load bounded identity filter")
+_identity_module = importlib.util.module_from_spec(_identity_spec)
+_identity_spec.loader.exec_module(_identity_module)
+IdentityFilter = _identity_module.IdentityFilter
 
 
 def bounded_summary(data: dict[str, Any], keys: tuple[str, ...]) -> tuple[str, bool]:
@@ -80,7 +90,9 @@ def outcomes(path: Path) -> dict[tuple[str, str], str]:
     return results
 
 
-def partial_outcomes(path: Path) -> tuple[dict[tuple[str, str], str], set[tuple[str, str]]]:
+def partial_outcomes(
+    path: Path, priority: set[tuple[str, str]] | None = None
+) -> tuple[dict[tuple[str, str], str], set[tuple[str, str]]]:
     if path.is_symlink() or not path.is_file() or path.stat().st_size > 50 * 1024 * 1024:
         raise ValueError("invalid report")
     text = path.read_bytes()
@@ -117,38 +129,49 @@ def partial_outcomes(path: Path) -> tuple[dict[tuple[str, str], str], set[tuple[
     if root.tag != "testsuites":
         raise ValueError("invalid report root")
     outcomes: dict[tuple[str, str], str] = {}
-    ambiguous: set[tuple[str, str]] = set()
+    identities = IdentityFilter()
+    exact_identities: set[tuple[str, str]] = set()
+    evictable: dict[tuple[str, str], None] = {}
     failures: set[tuple[str, str]] = set()
-    count = 0
     for suite in root.findall("testsuite"):
         suite_name = suite.get("name")
         if not suite_name or len(suite_name) > 1024:
             continue
         for case in suite.findall("testcase"):
-            count += 1
             name = case.get("name")
             if not name or len(name) > 1024:
                 continue
             key = (suite_name, name)
-            if count > 20_000 and key not in outcomes and key not in ambiguous:
-                continue
-            if case.get("classname") != suite_name:
-                outcomes.pop(key, None)
-                ambiguous.add(key)
-                continue
             states = [child.tag for child in case if child.tag in ("failure", "error", "skipped")]
-            if "failure" in states:
+            if case.get("classname") == suite_name and "failure" in states and len(failures) < 20_000:
                 failures.add(key)
+            maybe_duplicate = identities.add(repr(key))
+            if len(exact_identities) < 20_000:
+                duplicate = key in exact_identities
+                exact_identities.add(key)
+            else:
+                duplicate = maybe_duplicate
+            if duplicate:
+                outcomes.pop(key, None)
+                evictable.pop(key, None)
+                continue
             if (
-                key in outcomes
-                or key in ambiguous
+                case.get("classname") != suite_name
                 or len(states) > 1
                 or any(child.tag.startswith(("flaky", "rerun")) for child in case)
             ):
-                outcomes.pop(key, None)
-                ambiguous.add(key)
-            else:
-                outcomes[key] = states[0] if states else "passed"
+                continue
+            status = states[0] if states else "passed"
+            preferred = status == "failure" or (priority is not None and key in priority)
+            if len(outcomes) >= 20_000:
+                if not preferred or not evictable:
+                    continue
+                victim = next(iter(evictable))
+                evictable.pop(victim)
+                outcomes.pop(victim)
+            outcomes[key] = status
+            if not preferred:
+                evictable[key] = None
     return outcomes, failures
 
 
@@ -207,6 +230,11 @@ def run(
     cargo_results: Path | None = None,
     priority: set[tuple[str, str]] | None = None,
 ) -> int | None:
+    partial = (
+        None if cargo_results is None else cargo_results.with_name(cargo_results.name + ".partial")
+    )
+    if partial is not None:
+        partial.write_text("incomplete\n", encoding="utf-8")
     try:
         process = subprocess.Popen(
             command,
@@ -230,12 +258,42 @@ def run(
         suite = None
         remaining = 0
         seen: dict[tuple[str, str], str] = {}
-        ambiguous: set[tuple[str, str]] = set()
+        identities = IdentityFilter()
+        exact_identities: set[tuple[str, str]] = set()
         evictable: dict[tuple[str, str], None] = {}
         result_bytes = 0
         results_incomplete = False
+        results_dirty = False
+
+        def persist(target: Path, data: bytes) -> None:
+            temporary = target.with_name(target.name + ".tmp")
+            temporary.write_bytes(data)
+            temporary.replace(target)
+
+        def persist_partial(diagnostics_changed: bool = False) -> None:
+            nonlocal results_dirty
+            if diagnostics_changed and (failure is not None or diagnostic is not None):
+                details = (failure, diagnostic)
+                if failure is not None and diagnostic is not None and diagnostic in failure:
+                    details = (failure, None)
+                persist(
+                    path.with_name(path.name + ".failure.log"),
+                    b"\n".join(part for part in details if part is not None),
+                )
+            if echo and path in truncated:
+                persist(path.with_name(path.name + ".tail.log"), tail)
+            if cargo_results is not None and echo and results_dirty:
+                persist(
+                    cargo_results,
+                    json.dumps(
+                        [[*key, state] for key, state in seen.items()], ensure_ascii=False
+                    ).encode("utf-8"),
+                )
+                results_dirty = False
+
         with path.open("wb") as stream:
-            while chunk := pipe.read(65536):
+            while chunk := os.read(pipe.fileno(), 65536):
+                previous_details = (failure, diagnostic)
                 if echo:
                     tail = (tail + chunk)[-65536:]
                 if echo and failure is None:
@@ -292,6 +350,7 @@ def run(
                             remaining = int(count[1])
                         elif case and suite is not None and remaining:
                             remaining -= 1
+                            results_dirty = True
                             name = case[1].decode("utf-8", "replace")
                             key = (suite, name)
                             state = {
@@ -299,18 +358,24 @@ def run(
                                 b"FAILED": "failure",
                                 b"ignored": "skipped",
                             }[case[2]]
-                            if key in seen or key in ambiguous:
+                            if len(name) > 1024 or len(suite) > 2048:
+                                results_incomplete = True
+                                continue
+                            filtered = identities.add(repr(key))
+                            if len(exact_identities) < 20_000:
+                                duplicate = key in exact_identities
+                                exact_identities.add(key)
+                            else:
+                                duplicate = filtered
+                            if duplicate:
                                 previous = seen.pop(key, None)
                                 if previous is not None:
                                     result_bytes -= len(
                                         json.dumps([suite, name, previous], ensure_ascii=False).encode()
                                     ) + 2
                                     evictable.pop(key, None)
-                                ambiguous.add(key)
                                 results_incomplete = True
-                            elif len(ambiguous) >= 20_000:
-                                results_incomplete = True
-                            elif len(name) <= 1024 and len(suite) <= 2048:
+                            else:
                                 size = len(
                                     json.dumps([suite, name, state], ensure_ascii=False).encode()
                                 ) + 2
@@ -330,7 +395,6 @@ def run(
                                         result_bytes -= len(
                                             json.dumps([*victim, old], ensure_ascii=False).encode()
                                         ) + 2
-                                        ambiguous.add(victim)
                                         results_incomplete = True
                                 if len(seen) < 20_000 and result_bytes + size + 2 <= 3 * 1024 * 1024:
                                     seen[key] = state
@@ -338,11 +402,7 @@ def run(
                                     if not preferred:
                                         evictable[key] = None
                                 else:
-                                    ambiguous.add(key)
                                     results_incomplete = True
-                            else:
-                                ambiguous.add(key)
-                                results_incomplete = True
                         elif line.startswith(b"test result:"):
                             suite = None
                             remaining = 0
@@ -353,25 +413,17 @@ def run(
                         dropping_line = True
                 kept = chunk[: max(0, limit - written)]
                 stream.write(kept)
+                stream.flush()
                 if echo and kept:
                     sys.stdout.buffer.write(kept)
                     sys.stdout.buffer.flush()
                 written += len(kept)
                 if len(kept) != len(chunk) and path not in truncated:
                     truncated.append(path)
-        if failure is not None and diagnostic is not None and diagnostic in failure:
-            diagnostic = None
-        if failure is not None or diagnostic is not None:
-            path.with_name(path.name + ".failure.log").write_bytes(
-                b"\n".join(part for part in (failure, diagnostic) if part is not None)
-            )
-        if echo and path in truncated:
-            path.with_name(path.name + ".tail.log").write_bytes(tail)
+                persist_partial(previous_details != (failure, diagnostic))
         if cargo_results is not None and echo:
-            cargo_results.write_text(
-                json.dumps([[*key, state] for key, state in seen.items()], ensure_ascii=False),
-                encoding="utf-8",
-            )
+            results_dirty = True
+            persist_partial()
             if results_incomplete:
                 truncated.append(cargo_results)
 
@@ -391,6 +443,8 @@ def run(
     if truncated:
         print(f"Output exceeded its limit: {truncated[0]}", file=sys.stderr)
         return None
+    if partial is not None and code in (0, 101):
+        partial.unlink()
     return code
 
 
@@ -649,8 +703,8 @@ def main() -> int:
     )
     mixed = []
     try:
-        first, _ = partial_outcomes(output / "attempt-1.xml")
-        second, _ = partial_outcomes(output / "attempt-2.xml")
+        first, failures = partial_outcomes(output / "attempt-1.xml")
+        second, _ = partial_outcomes(output / "attempt-2.xml", failures)
         mixed = sorted(
             key
             for key in first.keys() & second.keys()

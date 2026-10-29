@@ -19,7 +19,7 @@ class NextestEvidenceTests(unittest.TestCase):
             (fixture / "src").mkdir()
             (fixture / "Cargo.toml").write_text(
                 '[package]\nname = "nextest-evidence-fixture"\nversion = "0.1.0"\n'
-                'edition = "2021"\n', encoding="utf-8"
+                'edition = "2021"\n\n[workspace]\n', encoding="utf-8"
             )
             (fixture / "Cargo.lock").write_text(
                 'version = 4\n\n[[package]]\nname = "nextest-evidence-fixture"\n'
@@ -37,8 +37,9 @@ class NextestEvidenceTests(unittest.TestCase):
             listing = subprocess.run(
                 ["cargo", "nextest", "list", "--locked", "--ignore-default-filter",
                  "--message-format", "json", "--user-config-file", "none"],
-                cwd=fixture, env=env, capture_output=True, timeout=120, check=True,
+                cwd=fixture, env=env, capture_output=True, timeout=120, check=False,
             )
+            self.assertEqual(listing.returncode, 0, listing.stderr.decode(errors="replace"))
             inventory.write_bytes(listing.stdout)
             reports = [fixture / "first.xml", fixture / "second.xml"]
             for report, fail in zip(reports, ("1", "0"), strict=True):
@@ -79,7 +80,7 @@ class NextestEvidenceTests(unittest.TestCase):
             (fixture / "src").mkdir()
             (fixture / "Cargo.toml").write_text(
                 '[package]\nname = "nextest-overflow-fixture"\nversion = "0.1.0"\n'
-                'edition = "2021"\n', encoding="utf-8"
+                'edition = "2021"\n\n[workspace]\n', encoding="utf-8"
             )
             (fixture / "Cargo.lock").write_text(
                 'version = 4\n\n[[package]]\nname = "nextest-overflow-fixture"\n'
@@ -96,8 +97,9 @@ class NextestEvidenceTests(unittest.TestCase):
             listing = subprocess.run(
                 ["cargo", "nextest", "list", "--locked", "--ignore-default-filter",
                  "--message-format", "json", "--user-config-file", "none"],
-                cwd=fixture, env=env, capture_output=True, timeout=120, check=True,
+                cwd=fixture, env=env, capture_output=True, timeout=120, check=False,
             )
+            self.assertEqual(listing.returncode, 0, listing.stderr.decode(errors="replace"))
             inventory = fixture / "inventory.json"
             inventory.write_bytes(listing.stdout)
             reports = [fixture / "first.xml", fixture / "second.xml"]

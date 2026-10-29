@@ -8,6 +8,19 @@ from typing import Any
 from xml.parsers import expat
 
 
+class IdentityFilter:
+    def __init__(self) -> None:
+        self.bits = bytearray(256 * 1024)
+
+    def add(self, identity: str) -> bool:
+        digest = hashlib.sha256(identity.encode("utf-8")).digest()
+        positions = [int.from_bytes(digest[i : i + 4], "big") % (len(self.bits) * 8) for i in (0, 4, 8, 12)]
+        present = all(self.bits[position // 8] & (1 << (position % 8)) for position in positions)
+        for position in positions:
+            self.bits[position // 8] |= 1 << (position % 8)
+        return present
+
+
 class JunitRecords:
     def __init__(self, limit: int, reference: str | None) -> None:
         self.limit = max(0, limit - 64)
@@ -17,7 +30,9 @@ class JunitRecords:
         self.states: list[str] = []
         self.invalid = False
         self.pending = 0
-        self.seen: set[tuple[str, str]] = set()
+        self.seen = IdentityFilter()
+        self.exact: set[tuple[str, str]] = set()
+        self.retained: set[tuple[str, str]] = set()
         self.ambiguous: set[tuple[str, str]] = set()
         self.records: list[tuple[tuple[int, int], tuple[str, str], bytes]] = []
         self.size = 0
@@ -79,18 +94,20 @@ class JunitRecords:
         if not self.suite or not name or len(self.suite) > 1024 or len(name) > 1024:
             self.invalid = True
             return
-        if key in self.seen:
-            self.ambiguous.add(key)
+        maybe_duplicate = self.seen.add(repr(key))
+        if len(self.exact) < 20_000:
+            duplicate = key in self.exact
+            self.exact.add(key)
+        else:
+            duplicate = maybe_duplicate
+        if duplicate:
+            if key in self.retained:
+                self.ambiguous.add(key)
             self.invalid = True
             return
-        if len(self.seen) >= 20_000:
-            self.invalid = True
-            return
-        self.seen.add(key)
         if self.case.get("classname") != self.suite or len(self.states) > 1 or any(
             state.startswith(("flaky", "rerun")) for state in self.states
         ):
-            self.ambiguous.add(key)
             self.invalid = True
             return
         state = self.states[0] if self.states else "passed"
@@ -107,14 +124,23 @@ class JunitRecords:
         if len(raw) > self.limit:
             self.invalid = True
             return
-        while self.size + len(raw) > self.limit:
+        evicted = []
+        while self.size + len(raw) > self.limit or len(self.records) >= 20_000:
             if not self.records or self.records[0][0] >= rank:
+                for item in evicted:
+                    heapq.heappush(self.records, item)
+                    self.size += len(item[2])
                 self.invalid = True
                 return
-            _, _, removed = heapq.heappop(self.records)
-            self.size -= len(removed)
+            item = heapq.heappop(self.records)
+            evicted.append(item)
+            self.size -= len(item[2])
             self.invalid = True
+        for _, victim, _ in evicted:
+            self.retained.remove(victim)
+            self.ambiguous.discard(victim)
         heapq.heappush(self.records, (rank, key, raw))
+        self.retained.add(key)
         self.size += len(raw)
 
     def add(self, chunk: bytes) -> None:
@@ -134,6 +160,9 @@ class JunitRecords:
                 self.parser.Parse(b"", True)
             except expat.ExpatError:
                 self.invalid = True
+        return self.snapshot()
+
+    def snapshot(self) -> bytes:
         return b'<testsuites incomplete="true">' + b"".join(
             raw for _, key, raw in sorted(self.records, key=lambda item: (-item[0][0], item[1]))
             if key not in self.ambiguous

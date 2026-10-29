@@ -9,6 +9,8 @@ is unchanged; this workflow does not run unadmitted pull requests.
 To reproduce locally, install the pinned tool with
 `cargo install --locked --version 0.9.124 cargo-nextest`, then run
 `python3 scripts/flake_check.py /tmp/harness-flakes` with a new output directory.
+The bounded report transport requires POSIX and fails closed on Windows before
+starting the report producer. Windows behavior has not been validated.
 The detector retains JUnit reports and bounded logs locally. The workflow uploads
 bounded inventory, JUnit reports, logs and summary for 14 days. Nextest runs individual
 tests in separate processes, so it does not replace the existing Cargo gate or
@@ -41,4 +43,7 @@ failed identities and their counterparts from earlier attempts, then retain
 other identities in deterministic order. A mixed outcome can be unavailable
 if its earlier passing result did not fit. Any omitted identity or truncated
 diagnostic marks the attempt incomplete.
+Duplicate tracking uses exact identities up to its bound and then a fixed-size
+probabilistic filter. A collision can exclude an unrelated identity; it marks
+evidence incomplete and does not report that identity as a comparable result.
 Hosted timing, service cleanup and artifact upload need verification after push.

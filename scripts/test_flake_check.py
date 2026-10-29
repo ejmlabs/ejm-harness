@@ -1,8 +1,10 @@
 import json
 import os
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import xml.etree.ElementTree as ET
 from collections import Counter
@@ -247,6 +249,88 @@ class FlakeCheckTests(unittest.TestCase):
             self.assertIn(b"Output exceeded its limit", result.stderr)
             self.assertTrue(result.stdout.endswith(b"None\n"))
 
+    def test_running_child_exposes_partial_logs_and_results(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = Path(__file__).with_name("flake_check.py")
+            for overflow in (False, True):
+                log = root / f"{overflow}.log"
+                results = root / f"{overflow}.json"
+                pid_file = root / f"{overflow}.pid"
+                child = (
+                    "import os,sys,time; from pathlib import Path; "
+                    "Path(sys.argv[1]).write_text(str(os.getpid())); "
+                    "sys.stdout.write('Running unittests src/lib.rs (target/test)\\n'"
+                    " + 'running 1 test\\ntest broken ... FAILED\\nError: live detail\\n'); "
+                    "sys.stdout.flush(); "
+                    + (
+                        "sys.stdout.write('x' * 4200000 + '\\nTAIL_SENTINEL\\n'); "
+                        "sys.stdout.flush(); " if overflow else ""
+                    )
+                    + "time.sleep(60)"
+                )
+                driver = (
+                    "import sys; sys.path.insert(0, sys.argv[1]); from flake_check import run; "
+                    "from pathlib import Path; "
+                    "run([sys.executable, '-c', sys.argv[4], sys.argv[5]], "
+                    "Path(sys.argv[2]), cargo_results=Path(sys.argv[3]))"
+                )
+                runner = subprocess.Popen(
+                    [
+                        sys.executable, "-c", driver, str(script.parent), str(log), str(results),
+                        child, str(pid_file),
+                    ],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                )
+                try:
+                    deadline = time.monotonic() + 10
+                    while time.monotonic() < deadline:
+                        failure = log.with_name(log.name + ".failure.log")
+                        tail = log.with_name(log.name + ".tail.log")
+                        partial = results.with_name(results.name + ".partial")
+                        if (
+                            pid_file.exists() and log.exists() and results.exists()
+                            and failure.exists() and partial.exists()
+                            and b"live detail" in failure.read_bytes()
+                            and (not overflow or (
+                                tail.exists() and b"TAIL_SENTINEL" in tail.read_bytes()
+                            ))
+                        ):
+                            break
+                        self.assertIsNone(runner.poll(), "capture exited before the child")
+                        time.sleep(0.01)
+                    else:
+                        self.fail("live evidence was not persisted while the child was running")
+                    self.assertIsNone(runner.poll())
+                    self.assertIn(b"test broken ... FAILED", log.read_bytes())
+                    records = json.loads(results.read_text(encoding="utf-8"))
+                    self.assertEqual(records[0][1:], ["broken", "failure"])
+                finally:
+                    if pid_file.exists():
+                        try:
+                            os.kill(int(pid_file.read_text()), signal.SIGTERM)
+                        except ProcessLookupError:
+                            pass
+                    try:
+                        runner.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        runner.kill()
+                        runner.wait(timeout=10)
+                self.assertTrue(partial.exists())
+            for code in (0, 101):
+                results = root / f"completed-{code}.json"
+                completed = subprocess.run(
+                    [
+                        sys.executable, "-c", driver, str(script.parent),
+                        str(root / f"completed-{code}.log"), str(results),
+                        f"print('running 0 tests'); raise SystemExit({code})",
+                        str(root / "unused.pid"),
+                    ],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10, check=False,
+                )
+                self.assertEqual(completed.returncode, 0)
+                self.assertFalse(results.with_name(results.name + ".partial").exists())
+
     def test_log_preserves_first_panic_after_excess_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -293,6 +377,30 @@ class FlakeCheckTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0)
             self.assertIn(b"Error: first failure detail", (root / "log.failure.log").read_bytes())
             self.assertEqual((root / "log.tail.log").stat().st_size, 65536)
+
+    def test_small_cargo_run_uses_exact_identities_despite_filter_collisions(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            child = (
+                "print('Running unittests src/lib.rs (target/test)'); "
+                "print('running 2 tests'); print('test first ... ok'); print('test second ... ok')"
+            )
+            driver = (
+                "import sys; sys.path.insert(0, sys.argv[1]); import flake_check; "
+                "from pathlib import Path; "
+                "flake_check.IdentityFilter = type('Collisions', (), {'add': lambda self, value: True}); "
+                "print(flake_check.run([sys.executable, '-c', sys.argv[4]], "
+                "Path(sys.argv[2]), cargo_results=Path(sys.argv[3])))"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", driver, str(Path(__file__).parent),
+                 str(root / "log"), str(root / "results.json"), child],
+                capture_output=True, text=True, timeout=10, check=False,
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertTrue(result.stdout.endswith("0\n"))
+            outcomes = json.loads((root / "results.json").read_text(encoding="utf-8"))
+            self.assertEqual([record[1] for record in outcomes], ["first", "second"])
 
     def test_real_cargo_shared_process_outcomes_are_captured(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -345,10 +453,11 @@ class FlakeCheckTests(unittest.TestCase):
                 "import sys; status = sys.argv[1]; "
                 "print('x' * 5000000); "
                 "print('     Running unittests src/lib.rs (target/debug/deps/example)'); "
-                "print('running 20002 tests'); "
-                "[print('test case_%05d ... ok' % n) for n in range(20001)]; "
+                "print('running 40004 tests'); "
+                "[print('test case_%05d ... ok' % n) for n in range(40002)]; "
+                "print('test case_20001 ... FAILED'); "
                 "print('test last ... ' + status); "
-                "print('test result: FAILED. 20001 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out;'); "
+                "print('test result: FAILED. 40002 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out;'); "
                 "print('   Doc-tests example'); print('running 1 test'); "
                 "print('test src/lib.rs - last ... ' + status); "
                 "print('test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out;')"
@@ -367,6 +476,8 @@ class FlakeCheckTests(unittest.TestCase):
             for key in (("Running unittests src/lib.rs (target/debug/deps/example)", "last"),
                         ("doctest:example", "src/lib.rs - last")):
                 self.assertEqual([record[key] for record in outcomes], ["failure", "passed"])
+            duplicate = ("Running unittests src/lib.rs (target/debug/deps/example)", "case_20001")
+            self.assertTrue(all(duplicate not in record for record in outcomes))
 
     def test_captured_output_cannot_spoof_a_test_result(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

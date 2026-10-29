@@ -37,7 +37,9 @@ def main() -> int:
         except (OSError, ValueError, ET.ParseError):
             incomplete = True
             try:
-                record, failures = reporter.partial_outcomes(path)
+                record, failures = reporter.partial_outcomes(
+                    path, known_failures[0] if known_failures else None
+                )
                 results.append(record)
                 known_failures.append(failures)
             except (OSError, ValueError, ET.ParseError):
