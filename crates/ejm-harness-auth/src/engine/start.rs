@@ -8,7 +8,7 @@ use super::{
     attempt::{AttemptSecrets, RetryHint},
     callback::callback_redirect,
     discovery::Discovery,
-    locked, timestamp,
+    lock, timestamp,
 };
 use crate::{LoginAttempt, SecretString};
 
@@ -38,14 +38,14 @@ impl AuthEngine {
         cancel: CancellationToken,
     ) -> Result<LoginAttempt> {
         callback_redirect(redirect_uri)?;
-        let previous = locked(&self.inner.attempts)
+        let previous = lock(&self.inner.attempts)
             .remove(attempt_id)
             .context("unknown or consumed sign-in retry")?;
         ensure!(
             previous.is_live_at(timestamp()),
             "sign-in retry expired or cancelled"
         );
-        let hint = locked(&previous.retry)
+        let hint = lock(&previous.retry)
             .take()
             .context("sign-in attempt does not require retry")?;
         previous.cancel.cancel();

@@ -70,7 +70,7 @@ impl AuthEngine {
 }
 
 /// Lock a mutex, recovering its data if a panicking holder poisoned it.
-fn locked<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 

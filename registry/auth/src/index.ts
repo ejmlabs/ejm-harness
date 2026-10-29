@@ -82,26 +82,45 @@ async function boundedBody(request: Request): Promise<Uint8Array | null> {
   return bytes;
 }
 
+async function internalSession(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "GET") return failure(405, "method_not_allowed");
+  const headers = credentialHeaders(request.headers);
+  if (!headers) return failure(401, "sign_in_required");
+  const session = await createAuth(env).api.getSession({ headers });
+  if (!session) return failure(401, "sign_in_required");
+  const operators = new Set(
+    (env.OPERATOR_SUBJECT_IDS ?? "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean),
+  );
+  return Response.json({
+    id: session.user.id,
+    display_name: Array.from(session.user.name).slice(0, 128).join(""),
+    is_operator: operators.has(session.user.id),
+  });
+}
+
+function validDeviceCodeRequest(body: Uint8Array): boolean {
+  let data: unknown;
+  try {
+    data = JSON.parse(new TextDecoder().decode(body));
+  } catch {
+    return false;
+  }
+  return (
+    !!data &&
+    typeof data === "object" &&
+    "client_id" in data &&
+    data.client_id === "ejm-cli" &&
+    (!("scope" in data) || data.scope === "registry") &&
+    Object.keys(data).every((key) => key === "client_id" || key === "scope")
+  );
+}
+
 async function handle(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
-  if (url.pathname === "/internal/session") {
-    if (request.method !== "GET") return failure(405, "method_not_allowed");
-    const headers = credentialHeaders(request.headers);
-    if (!headers) return failure(401, "sign_in_required");
-    const session = await createAuth(env).api.getSession({ headers });
-    if (!session) return failure(401, "sign_in_required");
-    const operators = new Set(
-      (env.OPERATOR_SUBJECT_IDS ?? "")
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean),
-    );
-    return Response.json({
-      id: session.user.id,
-      display_name: Array.from(session.user.name).slice(0, 128).join(""),
-      is_operator: operators.has(session.user.id),
-    });
-  }
+  if (url.pathname === "/internal/session") return internalSession(request, env);
   if (!requestAllowed(request, env.REGISTRY_ORIGIN)) return failure(403, "request_not_allowed");
   const headers = new Headers(request.headers);
   if (headers.has("authorization")) {
@@ -112,23 +131,8 @@ async function handle(request: Request, env: Env): Promise<Response> {
   if (request.method === "POST") {
     const body = await boundedBody(request);
     if (!body) return failure(413, "body_too_large");
-    if (url.pathname === "/api/auth/device/code") {
-      let data: unknown;
-      try {
-        data = JSON.parse(new TextDecoder().decode(body));
-      } catch {
-        return failure(400, "invalid_device_request");
-      }
-      if (
-        !data ||
-        typeof data !== "object" ||
-        !("client_id" in data) ||
-        data.client_id !== "ejm-cli" ||
-        ("scope" in data && data.scope !== "registry") ||
-        Object.keys(data).some((key) => key !== "client_id" && key !== "scope")
-      ) {
-        return failure(400, "invalid_device_request");
-      }
+    if (url.pathname === "/api/auth/device/code" && !validDeviceCodeRequest(body)) {
+      return failure(400, "invalid_device_request");
     }
     forwarded = new Request(request.url, { method: request.method, headers, body });
   } else {
