@@ -15,8 +15,10 @@ in a real browser. A repository's own skill may add a stricter rule, never a wea
   after a reviewed host decision recorded in the repository.
 - Each site or service has its own Worker, named in its wrangler config. Deploy and change only
   that Worker. Never touch other Workers, zones, DNS or account settings.
-- CI holds no deploy credential. Deploys use the owner's wrangler login. If auth fails, ask the
-  user to run `wrangler login`. Never retry in a loop or create a token.
+- With a `.github/workflows/deploy.yml` caller, CI deploys: each push to main builds without
+  secrets, deploys staging, then production after the `production` environment's required
+  reviewer approves. Agents never approve it; ask the user. Without the caller, deploy by hand
+  with the owner's wrangler login; never create a token.
 
 ## Config
 
@@ -55,10 +57,8 @@ in a real browser. A repository's own skill may add a stricter rule, never a wea
 
 ## Build and deploy
 
-- Deploy only after the PR merges to main, from the merge commit. Never deploy a working tree,
-  a feature branch, or a build you did not just make. Deploy is part of finish through ship
-  unless the repository marks production deploys approval-gated; then wait for the user's
-  explicit request each time.
+- Deploy only the merge commit on main, never a working tree, branch or old build. With CI
+  deploys, check staging live, then ask the user to approve production.
 - Build in a fresh scratch directory from clean clones, side by side: the site repository at
   the merge commit and ejm-ui at the revision pinned in the repository (`.github/ui-source.json`).
   The `file:` dependencies then resolve to the clean ejm-ui clone. Never build from the sibling
