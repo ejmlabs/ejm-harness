@@ -1,16 +1,15 @@
 use std::{
     collections::VecDeque,
     path::{Path, PathBuf},
-    process::{ExitStatus, Stdio},
+    process::ExitStatus,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, ensure};
 use tokio::{
     fs::{File, OpenOptions},
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
-    process::Command,
     sync::Mutex as AsyncMutex,
     task::JoinSet,
     time::{Instant as TokioInstant, sleep_until, timeout},
@@ -22,7 +21,7 @@ use crate::{
     CommandOutput, CommandRequest, ExecutorCapabilities, Governor, Lease, RequiredCapabilities,
     RestrictionState,
     governor::{ARTIFACT_OVERHEAD, lock},
-    process::{OwnedChild, spawn_owned},
+    native::{self, NativeChild, NativeCleanupState, NativeCommand, NativeOwner, NativeOwnerReady},
     processes,
 };
 
@@ -37,10 +36,16 @@ struct ProcessInput {
     env_remove: Vec<String>,
 }
 
+struct CommandAdmission {
+    _lease: Lease,
+    ready: Option<NativeOwnerReady>,
+}
+
 #[derive(Clone)]
 pub struct Executor {
     governor: Arc<Governor>,
     artifact_root: Arc<PathBuf>,
+    native_owner: Option<NativeOwner>,
 }
 
 impl Executor {
@@ -62,7 +67,15 @@ impl Executor {
         Ok(Self {
             governor,
             artifact_root: Arc::new(artifact_root),
+            native_owner: None,
         })
+    }
+
+    /// Route future commands through a lazy shared native owner.
+    #[must_use]
+    pub fn with_native_owner(mut self, owner: NativeOwner) -> Self {
+        self.native_owner = Some(owner);
+        self
     }
 
     #[must_use]
@@ -177,11 +190,11 @@ impl Executor {
             request.timeout_ms.min(max_ms)
         };
         let deadline = TokioInstant::now() + Duration::from_millis(timeout_ms);
-        let lease = tokio::select! {
+        let admission = tokio::select! {
             biased;
             () = cancel.cancelled() => return Ok(unlaunched_output(start, true, false)),
             () = sleep_until(deadline) => return Ok(unlaunched_output(start, false, true)),
-            lease = self.governor.acquire(&request.session_id, request.reservation.clone(), &cancel) => lease?,
+            admission = self.admit_command(&request, &cancel) => admission?,
         };
 
         // Own the process and the lease in a separate task. Dropping the caller's
@@ -191,13 +204,45 @@ impl Executor {
         let executor = self.clone();
         tokio::spawn(async move {
             let result = executor
-                .supervise(request, input, local_cancel, deadline, start, lease)
+                .supervise(request, input, local_cancel, deadline, start, admission)
                 .await;
             drop(retained);
             result
         })
         .await
         .context("command supervisor failed")?
+    }
+
+    async fn admit_command(
+        &self,
+        request: &CommandRequest,
+        cancel: &CancellationToken,
+    ) -> Result<CommandAdmission> {
+        let Some(owner) = &self.native_owner else {
+            return Ok(CommandAdmission {
+                _lease: self
+                    .governor
+                    .acquire(&request.session_id, request.reservation.clone(), cancel)
+                    .await?,
+                ready: None,
+            });
+        };
+        // Publish useful demand before helper preparation. A rejected activation
+        // retains this ticket, and releases the helper pin before waiting again.
+        let mut queued = self
+            .governor
+            .stage(&request.session_id, request.reservation.clone())?;
+        loop {
+            let eligibility = queued.wait_eligible(cancel).await?;
+            let ready = owner.ready().await?;
+            if let Some(lease) = queued.try_activate(eligibility)? {
+                return Ok(CommandAdmission {
+                    _lease: lease,
+                    ready: Some(ready),
+                });
+            }
+            drop(ready);
+        }
     }
 
     async fn supervise(
@@ -207,8 +252,9 @@ impl Executor {
         cancel: CancellationToken,
         deadline: TokioInstant,
         start: Instant,
-        _lease: Lease,
+        admission: CommandAdmission,
     ) -> Result<CommandOutput> {
+        let CommandAdmission { _lease, ready } = admission;
         if cancel.is_cancelled() {
             return Ok(unlaunched_output(start, true, false));
         }
@@ -216,12 +262,16 @@ impl Executor {
             return Ok(unlaunched_output(start, false, true));
         }
 
-        let mut child = spawn_command(&request, &input)?;
+        let mut child = self
+            .spawn_command(&request, &input, deadline, ready.as_ref())
+            .await?;
+        drop(ready);
         let pid = child.id().context("spawned command has no process ID")?;
-        let observed =
+        let observed = (!child.is_remote()).then(|| {
             self.governor
                 .monitor
-                .register(pid, request.reservation.clone(), cancel.clone());
+                .register(pid, request.reservation.clone(), cancel.clone())
+        });
         let capture = Arc::new(Mutex::new(Capture::new(request.reservation.output_bytes)));
         let spool = Arc::new(AsyncMutex::new(Spool {
             governor: self.governor.clone(),
@@ -256,7 +306,14 @@ impl Executor {
         };
 
         let status = reap(&mut child, status).await;
-        observed.kill_known_descendants().await;
+        if child.cleanup_state() == NativeCleanupState::OwnerDied {
+            // Park before the retained lease is dropped. Fresh host sampling
+            // must retire the old authority before admitting replacement work.
+            self.governor.park_admission();
+        }
+        if let Some(observed) = &observed {
+            observed.kill_known_descendants().await;
+        }
         let drained = timeout(DRAIN_GRACE, async {
             while let Some(result) = drainers.join_next().await {
                 if let Some(error) = drain_error(Some(result)) {
@@ -270,12 +327,12 @@ impl Executor {
             drainers.abort_all();
             while drainers.join_next().await.is_some() {}
         }
-        let usage = observed.usage();
+        let usage = observed
+            .as_ref()
+            .map_or_else(|| child.usage(), crate::monitor::MonitorLease::usage);
         drop(observed);
         let status = status?;
-        if let Some(message) = usage.violation {
-            bail!(message);
-        }
+        usage.check_violation()?;
         if let Some(error) = failure {
             return Err(error);
         }
@@ -297,29 +354,48 @@ impl Executor {
             peak_processes: usage.peak_processes,
         })
     }
-}
 
-fn spawn_command(request: &CommandRequest, input: &ProcessInput) -> Result<OwnedChild> {
-    let mut command = Command::new(&request.program);
-    for key in &input.env_remove {
-        command.env_remove(key);
+    async fn spawn_command(
+        &self,
+        request: &CommandRequest,
+        input: &ProcessInput,
+        deadline: TokioInstant,
+        ready: Option<&NativeOwnerReady>,
+    ) -> Result<NativeChild> {
+        let mut command = NativeCommand::new(&request.program)?
+            .args(&request.args)
+            .current_dir(&request.cwd)
+            .lifetime(deadline.saturating_duration_since(TokioInstant::now()))
+            .reservation(request.reservation.clone())
+            .piped_stdin(input.bytes.is_some());
+        for key in &input.env_remove {
+            command = command.env_remove(key);
+        }
+        for (key, value) in &request.env {
+            command = command.env(key, value);
+        }
+        let deaths = self
+            .native_owner
+            .as_ref()
+            .map(|owner| owner.snapshot().owner_deaths);
+        let result = match ready {
+            Some(ready) => ready.spawn(command).await,
+            None => native::spawn(command, None).await,
+        };
+        if result.is_err()
+            && self
+                .native_owner
+                .as_ref()
+                .is_some_and(|owner| Some(owner.snapshot().owner_deaths) != deaths)
+        {
+            self.governor.park_admission();
+        }
+        result.with_context(|| format!("launch command {}", request.program))
     }
-    command
-        .args(&request.args)
-        .current_dir(&request.cwd)
-        .envs(&request.env)
-        .stdin(if input.bytes.is_some() {
-            Stdio::piped()
-        } else {
-            Stdio::null()
-        })
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    spawn_owned(command).with_context(|| format!("launch command {}", request.program))
 }
 
 fn start_pipes(
-    child: &mut OwnedChild,
+    child: &mut NativeChild,
     capture: &Arc<Mutex<Capture>>,
     spool: &Arc<AsyncMutex<Spool>>,
     input: Option<Vec<u8>>,
@@ -354,7 +430,7 @@ fn start_pipes(
     Ok(drainers)
 }
 
-async fn reap(child: &mut OwnedChild, status: Option<ExitStatus>) -> Result<ExitStatus> {
+async fn reap(child: &mut NativeChild, status: Option<ExitStatus>) -> Result<ExitStatus> {
     let status = if let Some(status) = status {
         Ok(status)
     } else {
