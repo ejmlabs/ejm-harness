@@ -14,6 +14,8 @@ SDKs. ejm-cli lives in its own sibling repository.
 - Never replay an uncertain effect after recovery.
 - Report native restrictions as enforced, monitored, or unsupported. Native execution is not a sandbox.
 - Public traits are dependency injection ports. Add a trait where an external boundary or real variation needs one.
+- Follow an existing code pattern or define one, so the code stays uniform. [The code layout](docs/contributing.md#code-layout)
+  lists the patterns and shared helpers; add a new pattern there before you use it.
 - Inherit workspace lints. Do not relax groups or add production panic shortcuts.
 - Use trusted, maintained packages for standard behavior. Write custom code
   for ejm-harness's distinct behavior, such as admission, recovery, and context

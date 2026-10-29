@@ -4,6 +4,7 @@
 //! registration in ejm-harness, not operating system containment.
 
 mod adapters;
+mod http;
 mod manager;
 mod registry;
 mod runtime;

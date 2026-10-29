@@ -1,4 +1,5 @@
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result, bail, ensure};
+use serde::Serialize;
 
 use crate::{Message, ModelResponse, Role, ToolCall};
 
@@ -16,11 +17,12 @@ pub trait ContextPolicy: Send + Sync {
 /// Complete older exchanges may still be omitted when their retained evidence cannot fit.
 pub struct RecentContext;
 
+const OUTPUT_OMITTED: &str = "[ejm-harness context note: older tool output omitted to fit the context budget. Call details and any artifact reference are retained.]";
+const EXCHANGES_OMITTED: &str = "[ejm-harness context note: older exchanges were omitted to fit the context budget. Complete events remain in the session journal. Verify current files before relying on omitted observations.]";
+
 impl ContextPolicy for RecentContext {
     fn prepare(&self, messages: Vec<Message>, max_bytes: usize) -> Result<Vec<Message>> {
-        let bytes =
-            |messages: &[Message]| -> Result<usize> { Ok(serde_json::to_vec(messages)?.len()) };
-        if bytes(&messages)? <= max_bytes {
+        if json_len(&messages)? <= max_bytes {
             return Ok(messages);
         }
         // Prefer whole turns, then retain the latest intent and complete recent tool exchanges.
@@ -31,7 +33,7 @@ impl ContextPolicy for RecentContext {
             .map(|(i, _)| i)
             .collect();
         for start in starts.iter().copied().skip(1) {
-            if bytes(&messages[start..])? <= max_bytes {
+            if json_len(&messages[start..])? <= max_bytes {
                 return Ok(messages[start..].to_vec());
             }
         }
@@ -39,44 +41,60 @@ impl ContextPolicy for RecentContext {
         let mut turn = messages[start..].to_vec();
         let anchor = turn.first().context("context has no user intent")?.clone();
         ensure!(anchor.role == Role::User, "context has no user intent");
-        let latest_exchange = turn
-            .iter()
-            .rposition(|message| message.role == Role::Assistant)
-            .unwrap_or(0);
-        let omitted = "[ejm-harness context note: older tool output omitted to fit the context budget. Call details and any artifact reference are retained.]";
-        let omitted_bytes = serde_json::to_vec(omitted)?.len();
-        let mut used = bytes(&turn)?;
-        for message in turn.iter_mut().take(latest_exchange) {
-            if message.role != Role::Tool || message.is_error {
-                continue;
-            }
-            let content_bytes = serde_json::to_vec(&message.content)?.len();
-            if content_bytes > omitted_bytes {
-                message.content = omitted.into();
-                used -= content_bytes - omitted_bytes;
-                if used <= max_bytes {
-                    break;
-                }
-            }
-        }
-        if used <= max_bytes {
+        if mask_old_outputs(&mut turn, max_bytes)? {
             return Ok(turn);
         }
-        let marker = Message::user(
-            "[ejm-harness context note: older exchanges were omitted to fit the context budget. Complete events remain in the session journal. Verify current files before relying on omitted observations.]",
-        );
-        for index in 1..turn.len() {
-            if turn[index].role != Role::Assistant {
-                continue;
-            }
-            let mut recent = vec![anchor.clone(), marker.clone()];
-            recent.extend_from_slice(&turn[index..]);
-            if bytes(&recent)? <= max_bytes {
-                return Ok(recent);
+        keep_recent_exchanges(&anchor, &turn, max_bytes)
+    }
+}
+
+fn json_len(value: &(impl Serialize + ?Sized)) -> Result<usize> {
+    Ok(serde_json::to_vec(value)?.len())
+}
+
+/// Replace large successful tool outputs older than the latest exchange, oldest first,
+/// until the turn fits. Errors are evidence and stay. Returns whether the turn now fits.
+fn mask_old_outputs(turn: &mut [Message], max_bytes: usize) -> Result<bool> {
+    let latest_exchange = turn
+        .iter()
+        .rposition(|message| message.role == Role::Assistant)
+        .unwrap_or(0);
+    let omitted_bytes = json_len(OUTPUT_OMITTED)?;
+    let mut used = json_len(&*turn)?;
+    for message in turn.iter_mut().take(latest_exchange) {
+        if message.role != Role::Tool || message.is_error {
+            continue;
+        }
+        let content_bytes = json_len(&message.content)?;
+        if content_bytes > omitted_bytes {
+            message.content = OUTPUT_OMITTED.into();
+            used -= content_bytes - omitted_bytes;
+            if used <= max_bytes {
+                break;
             }
         }
-        anyhow::bail!("latest intent or tool exchange exceeds context budget ({max_bytes} bytes)")
     }
+    Ok(used <= max_bytes)
+}
+
+/// Keep the intent, a note, and the newest run of complete exchanges that fits.
+fn keep_recent_exchanges(
+    anchor: &Message,
+    turn: &[Message],
+    max_bytes: usize,
+) -> Result<Vec<Message>> {
+    let marker = Message::user(EXCHANGES_OMITTED);
+    for index in 1..turn.len() {
+        if turn[index].role != Role::Assistant {
+            continue;
+        }
+        let mut recent = vec![anchor.clone(), marker.clone()];
+        recent.extend_from_slice(&turn[index..]);
+        if json_len(&recent)? <= max_bytes {
+            return Ok(recent);
+        }
+    }
+    bail!("latest intent or tool exchange exceeds context budget ({max_bytes} bytes)")
 }
 
 #[derive(Clone, Debug)]

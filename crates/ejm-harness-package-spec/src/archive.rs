@@ -44,6 +44,19 @@ pub fn read_archive(bytes: &[u8]) -> Result<PackageArchive> {
         bytes.len() <= MAX_ARCHIVE_BYTES,
         "package archive exceeds 8 MiB"
     );
+    let files = read_files(bytes)?;
+    reject_file_directory_conflicts(&files)?;
+    let manifest_bytes = &files
+        .iter()
+        .find(|file| file.path == MANIFEST_FILE)
+        .context("archive has no root ejm.package.json")?
+        .bytes;
+    let manifest = Manifest::from_bytes(manifest_bytes)?;
+    require_declared_assets(&manifest, &files)?;
+    Ok(PackageArchive { manifest, files })
+}
+
+fn read_files(bytes: &[u8]) -> Result<Vec<ArchiveFile>> {
     let decoded = MultiGzDecoder::new(bytes).take(u64::try_from(MAX_EXPANDED_BYTES)? + 1);
     let mut archive = tar::Archive::new(decoded);
     let mut paths = HashSet::new();
@@ -90,11 +103,15 @@ pub fn read_archive(bytes: &[u8]) -> Result<PackageArchive> {
     let mut decoded = archive.into_inner();
     std::io::copy(&mut decoded, &mut std::io::sink())?;
     ensure!(decoded.limit() > 0, "expanded package exceeds 32 MiB");
+    Ok(files)
+}
+
+fn reject_file_directory_conflicts(files: &[ArchiveFile]) -> Result<()> {
     let regular_paths: HashSet<_> = files
         .iter()
         .map(|file| file.path.to_ascii_lowercase())
         .collect();
-    for file in &files {
+    for file in files {
         let lowered = file.path.to_ascii_lowercase();
         for (index, _) in lowered.match_indices('/') {
             ensure!(
@@ -103,12 +120,10 @@ pub fn read_archive(bytes: &[u8]) -> Result<PackageArchive> {
             );
         }
     }
-    let manifest_bytes = &files
-        .iter()
-        .find(|file| file.path == MANIFEST_FILE)
-        .context("archive has no root ejm.package.json")?
-        .bytes;
-    let manifest = Manifest::from_bytes(manifest_bytes)?;
+    Ok(())
+}
+
+fn require_declared_assets(manifest: &Manifest, files: &[ArchiveFile]) -> Result<()> {
     let mut assets: Vec<&str> = manifest
         .exports
         .themes
@@ -126,5 +141,5 @@ pub fn read_archive(bytes: &[u8]) -> Result<PackageArchive> {
             "declared asset is absent: {asset}"
         );
     }
-    Ok(PackageArchive { manifest, files })
+    Ok(())
 }

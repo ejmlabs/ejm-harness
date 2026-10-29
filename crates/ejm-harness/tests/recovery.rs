@@ -3,7 +3,7 @@ use std::{
     fs::OpenOptions,
     path::Path,
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, MutexGuard,
         atomic::{AtomicUsize, Ordering},
     },
     time::Duration,
@@ -22,6 +22,14 @@ struct RecordingProvider {
     replay: ReplayProvider,
 }
 
+impl RecordingProvider {
+    fn captured(&self) -> Result<MutexGuard<'_, Vec<ModelRequest>>> {
+        self.requests
+            .lock()
+            .map_err(|_| anyhow::anyhow!("request capture lock poisoned"))
+    }
+}
+
 #[async_trait]
 impl Provider for RecordingProvider {
     async fn stream(
@@ -30,10 +38,7 @@ impl Provider for RecordingProvider {
         cancel: CancellationToken,
         deltas: mpsc::Sender<ModelDelta>,
     ) -> Result<ModelResponse> {
-        self.requests
-            .lock()
-            .map_err(|_| anyhow::anyhow!("request capture lock poisoned"))?
-            .push(request.clone());
+        self.captured()?.push(request.clone());
         self.replay.stream(request, cancel, deltas).await
     }
 }
@@ -229,13 +234,7 @@ async fn recovery_is_idempotent_and_preserves_confirmed_and_unknown_results() ->
         serde_json::to_value(second.events(&session.id, 0, 100).await?)?
     );
     assert_eq!(effects.load(Ordering::SeqCst), 0);
-    assert!(
-        provider
-            .requests
-            .lock()
-            .map_err(|_| anyhow::anyhow!("request capture lock poisoned"))?
-            .is_empty()
-    );
+    assert!(provider.captured()?.is_empty());
     let summary = second
         .start(
             &session.id,
@@ -247,10 +246,7 @@ async fn recovery_is_idempotent_and_preserves_confirmed_and_unknown_results() ->
     assert_eq!(summary.status, RunStatus::Completed);
     assert_eq!(effects.load(Ordering::SeqCst), 0);
     {
-        let requests = provider
-            .requests
-            .lock()
-            .map_err(|_| anyhow::anyhow!("request capture lock poisoned"))?;
+        let requests = provider.captured()?;
         assert_eq!(requests.len(), 1);
         assert_recovered_context(&requests[0].messages, &confirmed)?;
     }

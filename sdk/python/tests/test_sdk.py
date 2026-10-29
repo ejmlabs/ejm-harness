@@ -240,7 +240,7 @@ class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
         if harness._tasks:
             await asyncio.gather(*harness._tasks, return_exceptions=True)
         self.assertEqual(calls, [])
-        harness._pool.shutdown(wait=False)
+        harness._callbacks.shutdown()
 
     async def test_one_hundred_concurrent_starts_and_waits(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ejm-harness-sdk-py-") as state:

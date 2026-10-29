@@ -11,11 +11,19 @@ use ejm_harness_package_spec::{
     archive_sha256, read_archive, validate_name, validate_relative_path,
 };
 use flate2::{Compression, write::GzEncoder};
+use scopeguard::ScopeGuard;
 use serde::{Deserialize, Serialize};
-use tempfile::{NamedTempFile, TempDir};
+#[cfg(not(windows))]
+use tempfile::NamedTempFile;
+use tempfile::TempDir;
 use walkdir::WalkDir;
 
 use crate::{InstalledPackage, PackageGrants};
+
+#[cfg(test)]
+mod tests;
+#[cfg(windows)]
+mod windows;
 
 const MAX_RECORDS: usize = 64;
 const MAX_LOCK_BYTES: usize = 256 * 1024;
@@ -36,6 +44,8 @@ pub struct PackageRecord {
 #[derive(Clone, Debug)]
 pub struct PackageManager {
     root: PathBuf,
+    #[cfg(windows)]
+    native: std::sync::Arc<windows::NativeStore>,
 }
 
 impl PackageManager {
@@ -44,10 +54,21 @@ impl PackageManager {
     /// # Errors
     /// Rejects inaccessible or symbolic-link storage roots.
     pub fn new(root: impl AsRef<Path>) -> Result<Self> {
-        private_directory(root.as_ref())?;
-        let root = root.as_ref().canonicalize()?;
-        private_directory(&root.join("objects"))?;
-        Ok(Self { root })
+        #[cfg(windows)]
+        {
+            let native = std::sync::Arc::new(windows::NativeStore::open(root.as_ref())?);
+            Ok(Self {
+                root: native.path().to_owned(),
+                native,
+            })
+        }
+        #[cfg(not(windows))]
+        {
+            private_directory(root.as_ref())?;
+            let root = root.as_ref().canonicalize()?;
+            private_directory(&root.join("objects"))?;
+            Ok(Self { root })
+        }
     }
 
     #[must_use]
@@ -60,11 +81,18 @@ impl PackageManager {
     /// # Errors
     /// Rejects invalid, oversized, duplicate, or tampered records.
     pub fn list(&self) -> Result<Vec<PackageRecord>> {
-        let path = self.root.join("packages.lock.json");
-        if !path.exists() {
+        #[cfg(windows)]
+        let Some(bytes) = self.native.read_records(MAX_LOCK_BYTES)? else {
             return Ok(Vec::new());
-        }
-        let bytes = read_bounded(&path, MAX_LOCK_BYTES)?;
+        };
+        #[cfg(not(windows))]
+        let bytes = {
+            let path = self.root.join("packages.lock.json");
+            if !path.exists() {
+                return Ok(Vec::new());
+            }
+            read_bounded(&path, MAX_LOCK_BYTES)?
+        };
         let records: Vec<PackageRecord> = serde_json::from_slice(&bytes)?;
         ensure!(
             records.len() <= MAX_RECORDS,
@@ -235,6 +263,8 @@ impl PackageManager {
             "invalid package digest"
         );
         let snapshot = self.root.join("objects").join(&record.sha256);
+        #[cfg(windows)]
+        let _native_snapshot = self.native.pin_snapshot(&record.sha256)?;
         let metadata = fs::symlink_metadata(&snapshot)?;
         ensure!(
             metadata.is_dir() && !metadata.file_type().is_symlink(),
@@ -267,6 +297,7 @@ impl PackageManager {
             .collect();
         for entry in WalkDir::new(&root).min_depth(1) {
             let entry = entry?;
+            reject_reparse(&entry.metadata()?)?;
             ensure!(
                 entry.file_type().is_file() || entry.file_type().is_dir(),
                 "installed package contains a link or special file"
@@ -297,17 +328,25 @@ impl PackageManager {
         })
     }
 
-    fn lock(&self) -> Result<File> {
-        let path = self.root.join("mutation.lock");
-        let file = OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .read(true)
-            .write(true)
-            .open(path)?;
-        file.try_lock()
-            .context("another package operation is running")?;
-        Ok(file)
+    fn lock(&self) -> Result<ScopeGuard<File, fn(File)>> {
+        #[cfg(windows)]
+        let file = self.native.lock()?;
+        #[cfg(not(windows))]
+        let file = {
+            let path = self.root.join("mutation.lock");
+            let file = OpenOptions::new()
+                .create(true)
+                .truncate(false)
+                .read(true)
+                .write(true)
+                .open(path)?;
+            file.try_lock()
+                .context("another package operation is running")?;
+            file
+        };
+        Ok(scopeguard::guard(file, |file| {
+            let _ = file.unlock();
+        }))
     }
 
     fn write_records(&self, records: &[PackageRecord]) -> Result<()> {
@@ -316,11 +355,18 @@ impl PackageManager {
             bytes.len() <= MAX_LOCK_BYTES,
             "package lockfile exceeds 256 KiB"
         );
-        let mut temporary = NamedTempFile::new_in(&self.root)?;
-        temporary.write_all(&bytes)?;
-        temporary.as_file().sync_all()?;
-        temporary.persist(self.root.join("packages.lock.json"))?;
-        Ok(())
+        #[cfg(windows)]
+        {
+            self.native.write_records(&bytes)
+        }
+        #[cfg(not(windows))]
+        {
+            let mut temporary = NamedTempFile::new_in(&self.root)?;
+            temporary.write_all(&bytes)?;
+            temporary.as_file().sync_all()?;
+            temporary.persist(self.root.join("packages.lock.json"))?;
+            Ok(())
+        }
     }
 }
 
@@ -370,6 +416,7 @@ pub(crate) fn pack_directory_checked(
             entry.depth() <= MAX_DIRECTORY_DEPTH,
             "package directory depth exceeds 32 levels"
         );
+        reject_reparse(&entry.metadata()?)?;
         ensure!(
             !entry.file_type().is_symlink(),
             "package contains symbolic link"
@@ -405,7 +452,12 @@ pub(crate) fn pack_directory_checked(
         header.set_mode(0o644);
         header.set_mtime(0);
         header.set_cksum();
-        builder.append_data(&mut header, path, File::open(source)?)?;
+        let file = open_regular(&source)?;
+        ensure!(
+            file.metadata()?.len() == size,
+            "package file changed while packing"
+        );
+        builder.append_data(&mut header, path, file.take(size))?;
     }
     let bytes = builder.into_inner()?.finish()?;
     read_archive(&bytes)?;
@@ -427,17 +479,14 @@ pub(crate) fn read_bounded_checked(
     check: &dyn Fn() -> Result<()>,
 ) -> Result<Vec<u8>> {
     check()?;
-    let metadata = fs::symlink_metadata(path)?;
-    ensure!(
-        metadata.is_file() && !metadata.file_type().is_symlink(),
-        "expected a regular package file"
-    );
+    let file = open_regular(path)?;
+    let metadata = file.metadata()?;
     ensure!(
         metadata.len() <= u64::try_from(max)?,
         "package file exceeds limit"
     );
     let mut bytes = Vec::new();
-    let mut reader = File::open(path)?.take(u64::try_from(max)? + 1);
+    let mut reader = file.take(u64::try_from(max)? + 1);
     loop {
         check()?;
         if reader.by_ref().take(64 * 1024).read_to_end(&mut bytes)? == 0 {
@@ -448,18 +497,50 @@ pub(crate) fn read_bounded_checked(
     Ok(bytes)
 }
 
+fn open_regular(path: &Path) -> Result<File> {
+    #[cfg(unix)]
+    let file = {
+        use rustix::fs::{Mode, OFlags};
+        File::from(rustix::fs::open(
+            path,
+            OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::CLOEXEC | OFlags::NONBLOCK,
+            Mode::empty(),
+        )?)
+    };
+    #[cfg(windows)]
+    let file = rightkit_fs::handle::open_read_nofollow(
+        path,
+        &rightkit_fs::handle::ReadOptions::new()
+            .require_single_link(true)
+            .share_read_only(true),
+    )?;
+    #[cfg(not(any(unix, windows)))]
+    let file = File::open(path)?;
+    let metadata = file.metadata()?;
+    ensure!(metadata.is_file(), "expected a regular package file");
+    reject_reparse(&metadata)?;
+    Ok(file)
+}
+
+fn reject_reparse(metadata: &fs::Metadata) -> Result<()> {
+    ensure!(
+        !metadata.file_type().is_symlink(),
+        "package contains a symbolic link"
+    );
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        ensure!(
+            metadata.file_attributes() & 0x400 == 0,
+            "package contains a Windows reparse point"
+        );
+    }
+    Ok(())
+}
+
 #[cfg(windows)]
 pub(crate) fn private_directory(path: &Path) -> Result<()> {
-    let directory = rightkit_fs::StateDir::create(&std::path::absolute(path)?)
-        .context("open protected package directory")?;
-    rightkit_fs::private::verify_owner_only(directory.path())
-        .context("package directory must have an owner-only Windows ACL")?;
-    rightkit_fs::private::restrict_owner_only(directory.path())?;
-    ensure!(
-        rightkit_fs::private::is_owner_only_strict(directory.path())?,
-        "package directory requires an inheritable owner-only Windows ACL"
-    );
-    Ok(())
+    windows::private_directory(path).map(drop)
 }
 
 #[cfg(target_os = "macos")]

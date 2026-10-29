@@ -72,6 +72,22 @@ pub(super) fn tar(
 }
 
 pub(super) fn wheel(bytes: &[u8]) -> Result<Vec<u8>> {
+    let files = wheel_files(bytes)?;
+    let root = wheel_root(&files)?;
+    let files = files
+        .into_iter()
+        .filter_map(|file| {
+            let path = file.path.strip_prefix(&root)?.to_owned();
+            Some(ArchiveFile {
+                path,
+                bytes: file.bytes,
+            })
+        })
+        .collect();
+    encode(files)
+}
+
+fn wheel_files(bytes: &[u8]) -> Result<Vec<ArchiveFile>> {
     let mut archive = zip::ZipArchive::new(Cursor::new(bytes))?;
     ensure!(
         archive.len() <= MAX_ARCHIVE_FILES,
@@ -91,12 +107,7 @@ pub(super) fn wheel(bytes: &[u8]) -> Result<Vec<u8>> {
             "wheel contains links or special files"
         );
         ensure!(
-            !Path::new(&path)
-                .extension()
-                .is_some_and(|ext| ext.eq_ignore_ascii_case("pth"))
-                && !path.split('/').any(|part| Path::new(part)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("data"))),
+            !is_startup_or_relocation_path(&path),
             "wheel startup hooks and relocation layouts are unsupported; bundle locally"
         );
         if entry.is_dir() {
@@ -123,18 +134,17 @@ pub(super) fn wheel(bytes: &[u8]) -> Result<Vec<u8>> {
             bytes: content,
         });
     }
-    let root = wheel_root(&files)?;
-    let files = files
-        .into_iter()
-        .filter_map(|file| {
-            let path = file.path.strip_prefix(&root)?.to_owned();
-            Some(ArchiveFile {
-                path,
-                bytes: file.bytes,
-            })
-        })
-        .collect();
-    encode(files)
+    Ok(files)
+}
+
+/// `.pth` files run at interpreter startup and `.data` folders relocate files outside the package.
+fn is_startup_or_relocation_path(path: &str) -> bool {
+    let has_extension = |name: &str, wanted: &str| {
+        Path::new(name)
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case(wanted))
+    };
+    has_extension(path, "pth") || path.split('/').any(|part| has_extension(part, "data"))
 }
 
 fn wheel_root(files: &[ArchiveFile]) -> Result<String> {

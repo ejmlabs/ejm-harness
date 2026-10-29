@@ -1,6 +1,7 @@
 {
     "$schema": "./node_modules/wrangler/config-schema.json",
     "name": "ejm-registry",
+    "account_id": "478a0db3a110d8503c16abbc1db27af4",
     "main": "build/worker/shim.mjs",
     "compatibility_date": "2026-10-18",
     "workers_dev": false,

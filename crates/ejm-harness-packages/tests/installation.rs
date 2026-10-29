@@ -20,10 +20,24 @@ fn fixture(root: &std::path::Path, version: &str) -> Result<()> {
 
 #[test]
 fn install_never_executes_and_update_clears_trust() -> Result<()> {
-    let source = tempfile::tempdir()?;
+    let source = tempfile::Builder::new()
+        .prefix("package source 雪 ")
+        .tempdir()?;
     let store = tempfile::tempdir()?;
     fixture(source.path(), "1.0.0")?;
-    let manager = PackageManager::new(store.path().join("packages"))?;
+    let manager = PackageManager::new(store.path().join("packages with space 雪"))?;
+    #[cfg(windows)]
+    {
+        assert!(std::fs::rename(manager.root(), store.path().join("moved")).is_err());
+        assert!(std::fs::remove_file(manager.root().join("mutation.lock")).is_err());
+        for path in [
+            manager.root().to_owned(),
+            manager.root().join("objects"),
+            manager.root().join("mutation.lock"),
+        ] {
+            rightkit_fs::private::verify_owner_only(&path)?;
+        }
+    }
     let first = manager.install(&pack_directory(source.path())?, "local:fixture")?;
     assert!(!first.enabled);
     assert!(manager.enabled()?.is_empty());
@@ -37,6 +51,8 @@ fn install_never_executes_and_update_clears_trust() -> Result<()> {
     let next = manager.install(&pack_directory(source.path())?, "local:fixture")?;
     assert!(!next.enabled && next.grants.commands.is_empty());
     assert_eq!(manager.list()?.len(), 1);
+    #[cfg(windows)]
+    rightkit_fs::private::verify_owner_only(&manager.root().join("packages.lock.json"))?;
     assert!(manager.enabled()?.is_empty());
     Ok(())
 }

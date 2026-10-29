@@ -1,12 +1,15 @@
+mod files;
+mod vault;
+mod wire;
+
 use crate::StoredAuth;
 use anyhow::Result;
 use async_trait::async_trait;
 use std::{path::Path, sync::Arc};
 use tokio_util::sync::CancellationToken;
-mod files;
-mod vault;
-mod wire;
+
 pub use vault::{SecretId, SecretVault, VaultKeyStore, VaultTransaction};
+
 /// Serializes credential reads and updates across host processes.
 #[async_trait]
 pub trait CredentialStore: Send + Sync {
