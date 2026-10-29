@@ -20,11 +20,11 @@ When several agents share one task:
 
 The ejmlabs repositories depend on each other by path and by pinned revision:
 
-| Owner | Consumers |
-| --- | --- |
-| `ejm-harness` (engine, auth, coding tools, SDKs) | `ejm-cli`, `ejm-ide` |
-| `ejm-ui` (tokens, components, site tooling, `ejm-tui`) | every site, `ejm-cli`, `ejm-ide` |
-| `.github` (gates, community files, lint layer, shared skills) | every repository |
+| Owner                                                         | Consumers                        |
+| ------------------------------------------------------------- | -------------------------------- |
+| `ejm-harness` (engine, auth, coding tools, SDKs)              | `ejm-cli`, `ejm-ide`             |
+| `ejm-ui` (tokens, components, site tooling, `ejm-tui`)        | every site, `ejm-cli`, `ejm-ide` |
+| `.github` (gates, community files, lint layer, shared skills) | every repository                 |
 
 - Never edit a sibling repository from another repository's task without its owner's agreement.
   When a sibling breaks your build, tell its session and wait, or work against its pinned

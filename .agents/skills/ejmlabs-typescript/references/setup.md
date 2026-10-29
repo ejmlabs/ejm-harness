@@ -15,9 +15,9 @@ it when you touch it.
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "noEmit": true,
-    "types": ["node", "vite/client"]
+    "types": ["node", "vite/client"],
   },
-  "include": ["src", "vite.config.ts"]
+  "include": ["src", "vite.config.ts"],
 }
 ```
 
@@ -44,16 +44,19 @@ the ban on `@ts-` directives, required reasons on disable comments, `consistent-
 `switch-exhaustiveness-check`.
 
 ```js
-import jsxA11y from 'eslint-plugin-jsx-a11y';
-import reactHooks from 'eslint-plugin-react-hooks';
-import strict from './eslint.strict.mjs';
+import jsxA11y from "eslint-plugin-jsx-a11y";
+import reactHooks from "eslint-plugin-react-hooks";
+import strict from "./eslint.strict.mjs";
 
 export default [
   ...strict,
   {
-    files: ['src/**/*.tsx'],
-    plugins: { 'react-hooks': reactHooks, 'jsx-a11y': jsxA11y },
-    rules: { ...reactHooks.configs.recommended.rules, ...jsxA11y.configs.strict.rules },
+    files: ["src/**/*.tsx"],
+    plugins: { "react-hooks": reactHooks, "jsx-a11y": jsxA11y },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      ...jsxA11y.configs.strict.rules,
+    },
   },
 ];
 ```
@@ -99,16 +102,16 @@ save-exact=true
 ## vite.config.ts for a site
 
 ```ts
-import tailwindcss from '@tailwindcss/vite';
-import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
-import { ejmSite } from '@ejm/site/vite';
-import { ejmSsg } from '@ejm/ssg/vite';
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+import { ejmSite } from "@ejm/site/vite";
+import { ejmSsg } from "@ejm/ssg/vite";
 
 export default defineConfig({
-  resolve: { dedupe: ['react', 'react-dom'] },
-  plugins: [tailwindcss(), react(), ejmSite({ project: 'cli' }), ejmSsg({ site: 'src/site.tsx' })],
-  build: { target: 'es2022', cssMinify: 'lightningcss' },
+  resolve: { dedupe: ["react", "react-dom"] },
+  plugins: [tailwindcss(), react(), ejmSite({ project: "cli" }), ejmSsg({ site: "src/site.tsx" })],
+  build: { target: "es2022", cssMinify: "lightningcss" },
 });
 ```
 

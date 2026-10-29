@@ -86,15 +86,15 @@ behavior. Remove the scratch directory when the live check is done.
 
 Record, for each deploy:
 
-| Field | Example form |
-| --- | --- |
-| Site commit | full merge SHA |
-| ejm-ui revision | full SHA from the pin, when the site uses ejm-ui |
-| Wrangler version | from `npx wrangler --version` |
-| Previous version id | from `wrangler deployments list` before the deploy |
-| New version id | the `Current Version ID` line wrangler prints |
-| Checks | each command that ran, and its result |
-| Live check | what you looked at, and how (see [verify.md](verify.md)) |
+| Field               | Example form                                             |
+| ------------------- | -------------------------------------------------------- |
+| Site commit         | full merge SHA                                           |
+| ejm-ui revision     | full SHA from the pin, when the site uses ejm-ui         |
+| Wrangler version    | from `npx wrangler --version`                            |
+| Previous version id | from `wrangler deployments list` before the deploy       |
+| New version id      | the `Current Version ID` line wrangler prints            |
+| Checks              | each command that ran, and its result                    |
+| Live check          | what you looked at, and how (see [verify.md](verify.md)) |
 
 ## Rollback
 

@@ -80,7 +80,7 @@ for the path with the live response. In the headed page, after the challenge has
 same-origin fetch reads the real response headers:
 
 ```js
-const r = await fetch(location.pathname, { cache: 'no-store' });
+const r = await fetch(location.pathname, { cache: "no-store" });
 Object.fromEntries(r.headers);
 ```
 

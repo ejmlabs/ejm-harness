@@ -2,13 +2,13 @@
 
 ## Who owns which state
 
-| State | Owner |
-| --- | --- |
-| Unsaved form input, open menus, hover, local toggles | `useState` or `useReducer` in the component |
-| Server records | TanStack Query, through the feature's `queries.ts` |
-| A view someone can share or reload (filters, sort, page, tab) | URL search params, through the router |
-| Theme | `useTheme` from `@ejm/ui/hooks/useTheme`; never a second theme store |
-| App state several features read | A hook in the app shell, passed down as its state object |
+| State                                                         | Owner                                                                |
+| ------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Unsaved form input, open menus, hover, local toggles          | `useState` or `useReducer` in the component                          |
+| Server records                                                | TanStack Query, through the feature's `queries.ts`                   |
+| A view someone can share or reload (filters, sort, page, tab) | URL search params, through the router                                |
+| Theme                                                         | `useTheme` from `@ejm/ui/hooks/useTheme`; never a second theme store |
+| App state several features read                               | A hook in the app shell, passed down as its state object             |
 
 - One owner per piece of state. Never mirror it into a second store or a context copy.
 - Never add a global state library for data the query cache already owns.

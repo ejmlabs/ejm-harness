@@ -128,7 +128,7 @@ without a deadline. Check at startup that the drain and cancel budgets fit the t
 
 - Under pytest, turn "coroutine was never awaited" and unraisable exceptions into failures:
   `filterwarnings = ["error:coroutine .* was never awaited:RuntimeWarning",
-  "error::pytest.PytestUnraisableExceptionWarning"]`. Under `unittest`, run the suite with
+"error::pytest.PytestUnraisableExceptionWarning"]`. Under `unittest`, run the suite with
   `python -X dev` and treat each such warning as a failure.
 - A cancel test cancels at the exact await (an `asyncio.Event` the fake waits on), then asserts
   the cancel propagates and the cleanup ran.

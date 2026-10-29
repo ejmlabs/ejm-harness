@@ -1,6 +1,6 @@
 ---
 name: ejmlabs-cloudflare
-description: Use when you build, preview, deploy, verify or roll back a Cloudflare Worker or static site: wrangler.jsonc, _headers and CSP, bundle or load budgets, builds against pinned ejm-ui, wrangler deploy, live checks behind bot protection, release metadata Workers, R2 downloads.
+description: Use when you build, preview, deploy, verify or roll back a Cloudflare Worker or static site, including wrangler.jsonc, _headers and CSP, bundle or load budgets, builds against pinned ejm-ui, wrangler deploy, live checks behind bot protection, release metadata Workers, R2 downloads.
 ---
 
 # Cloudflare Workers and static sites

@@ -28,11 +28,11 @@ profile = "minimal"
 
 The org strict tables, pasted into `[workspace.lints]` (or `[lints]` for a single crate):
 
-| Table | Denied |
-| --- | --- |
-| `rust` | `unsafe_code`, `unused_must_use` |
-| `clippy` groups | `all` and `pedantic`, both at `priority = -1` |
-| `clippy` lints | `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented`, `unreachable`, `dbg_macro`, `exit`, `mem_forget`, `undocumented_unsafe_blocks`, `allow_attributes_without_reason` |
+| Table           | Denied                                                                                                                                                                            |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rust`          | `unsafe_code`, `unused_must_use`                                                                                                                                                  |
+| `clippy` groups | `all` and `pedantic`, both at `priority = -1`                                                                                                                                     |
+| `clippy` lints  | `unwrap_used`, `expect_used`, `panic`, `todo`, `unimplemented`, `unreachable`, `dbg_macro`, `exit`, `mem_forget`, `undocumented_unsafe_blocks`, `allow_attributes_without_reason` |
 
 - The org lint sync check compares these tables with each manifest and reports drift.
 - A repo may be stricter (`unsafe_code = "forbid"`, `warnings = "deny"`, `missing_docs`), never

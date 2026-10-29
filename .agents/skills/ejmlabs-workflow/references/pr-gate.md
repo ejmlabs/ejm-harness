@@ -8,11 +8,11 @@ All three are standalone PR comments by a current human maintainer (GitHub maint
 naming the full 40-character head SHA. Agents never post them, and never write permission rules
 or scripts that post them for an agent.
 
-| Comment | Effect |
-| --- | --- |
-| `/ready FULL_SHA` | Admits that commit. Quality, Repository standards and AI review start. |
-| `/approve FULL_SHA` | Records the maintainer's approval of that commit after review. |
-| `/revoke FULL_SHA` | Cancels the admitted run and blocks merge. |
+| Comment             | Effect                                                                 |
+| ------------------- | ---------------------------------------------------------------------- |
+| `/ready FULL_SHA`   | Admits that commit. Quality, Repository standards and AI review start. |
+| `/approve FULL_SHA` | Records the maintainer's approval of that commit after review.         |
+| `/revoke FULL_SHA`  | Cancels the admitted run and blocks merge.                             |
 
 Hand the user the commands ready to paste, for example:
 
@@ -53,12 +53,12 @@ GitHub review alone does not replace the comments.
 
 ## Limits
 
-| Limit | Bound |
-| --- | --- |
-| Changed files | 200 |
-| Added and deleted lines | 12,000 |
-| Quality job | 45 minutes |
-| AI review job | 12 minutes |
+| Limit                   | Bound      |
+| ----------------------- | ---------- |
+| Changed files           | 200        |
+| Added and deleted lines | 12,000     |
+| Quality job             | 45 minutes |
+| AI review job           | 12 minutes |
 
 Split larger work into a sequence of PRs that each pass alone.
 

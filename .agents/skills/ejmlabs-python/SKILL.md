@@ -1,6 +1,6 @@
 ---
 name: ejmlabs-python
-description: Use before you write, edit, or review Python: .py files, pyproject.toml, uv.lock, ruff or mypy config, a new dependency, asyncio code, SQL sent from Python, Python tests, or a script that reads untrusted input. Holds the ejmlabs rules for tooling, types, errors, async, and tests.
+description: Use before you write, edit, or review Python, including .py files, pyproject.toml, uv.lock, ruff or mypy config, a new dependency, asyncio code, SQL sent from Python, Python tests, or a script that reads untrusted input. Holds the ejmlabs rules for tooling, types, errors, async, and tests.
 ---
 
 # Python at ejmlabs

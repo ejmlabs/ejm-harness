@@ -5,12 +5,12 @@ Read this before writing Rust tests or fixtures, or before measuring or claiming
 
 ## Where tests live
 
-| Kind | Place |
-| --- | --- |
-| Unit tests | `#[cfg(test)] mod tests` at the bottom of the file under test |
-| Large tests of a folder module | `<module>/tests.rs`, declared from the module root |
-| Shared fixtures | `<module>/test_support.rs`, declared `#[cfg(test)] mod test_support;` |
-| Public API and binary tests | `crates/<crate>/tests/*.rs` |
+| Kind                           | Place                                                                 |
+| ------------------------------ | --------------------------------------------------------------------- |
+| Unit tests                     | `#[cfg(test)] mod tests` at the bottom of the file under test         |
+| Large tests of a folder module | `<module>/tests.rs`, declared from the module root                    |
+| Shared fixtures                | `<module>/test_support.rs`, declared `#[cfg(test)] mod test_support;` |
+| Public API and binary tests    | `crates/<crate>/tests/*.rs`                                           |
 
 - No catch-all test files. A fixture used by one file stays in that file's `tests` module.
 - Existing test files keep their paths; docs and decision records cite them.

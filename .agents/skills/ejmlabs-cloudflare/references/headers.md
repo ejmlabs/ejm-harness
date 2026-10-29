@@ -40,10 +40,10 @@ permissions.
 
 Add a source only for a feature the site really uses, and name the reason in the change.
 
-| Need | Addition |
-| --- | --- |
-| Cloudflare Web Analytics | `script-src https://static.cloudflareinsights.com` and `connect-src https://cloudflareinsights.com` |
-| Web workers (for example a WebGL scene) | `worker-src 'self'` |
+| Need                                                                  | Addition                                                                                                                                                 |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cloudflare Web Analytics                                              | `script-src https://static.cloudflareinsights.com` and `connect-src https://cloudflareinsights.com`                                                      |
+| Web workers (for example a WebGL scene)                               | `worker-src 'self'`                                                                                                                                      |
 | Shared components that set inline style attributes or data URI images | `style-src-attr 'unsafe-inline'` and `img-src 'self' data:`, owned by the shared generator; a hand-written file does not copy them without the same need |
 
 Never add `'unsafe-inline'` or `'unsafe-eval'` to `script-src`, a wildcard, a bare scheme

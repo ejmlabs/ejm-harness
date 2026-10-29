@@ -16,12 +16,12 @@ when you test a failure, cancellation, recovery, retry, race, or duplicate event
 
 ## Pick the double by what the claim needs
 
-| Double | Use when |
-| --- | --- |
-| The real thing | It is cheap and deterministic. |
+| Double                    | Use when                                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------------- |
+| The real thing            | It is cheap and deterministic.                                                           |
 | Fake (a working shortcut) | The collaborator is slow or remote, and the claim is about branching, not its semantics. |
-| Stub (canned answers) | The test needs one fixed reply. |
-| Spy or mock | The call itself is the claim. |
+| Stub (canned answers)     | The test needs one fixed reply.                                                          |
+| Spy or mock               | The call itself is the claim.                                                            |
 
 - Fake at the library's own seam, such as an HTTP mock transport or an in-process app transport.
   Never patch the client class, and never write a wrapper just to mock it.

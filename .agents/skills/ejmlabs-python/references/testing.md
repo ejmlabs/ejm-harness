@@ -28,7 +28,7 @@ new one, and match it.
 - No real network, no paid model calls, no real secrets. Use placeholders like
   `"test-key-not-used"`. Never read `.env`.
 - Test a script as its user runs it: `subprocess.run([sys.executable, str(SCRIPT), ...],
-  capture_output=True, text=True, check=False)` inside a `tempfile.TemporaryDirectory()`, then
+capture_output=True, text=True, check=False)` inside a `tempfile.TemporaryDirectory()`, then
   assert on the exit status and the output.
 
 ## Database-backed tests

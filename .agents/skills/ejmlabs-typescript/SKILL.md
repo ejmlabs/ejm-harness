@@ -53,13 +53,13 @@ only, and a measured performance gate that never moves to fit a change.
 
 ## Modules and files
 
-| Kind | Name |
-| --- | --- |
+| Kind                         | Name                                                       |
+| ---------------------------- | ---------------------------------------------------------- |
 | Components, pages, providers | `PascalCase.tsx`, exporting the component of the same name |
-| Hooks | `useThing.ts`, exporting `useThing` |
-| Other modules | kebab-case `.ts`, such as `theme-store.ts` |
-| Tests | Beside the source, same stem plus `.test`: `Hero.test.tsx` |
-| Folders | Lowercase, one per feature or capability |
+| Hooks                        | `useThing.ts`, exporting `useThing`                        |
+| Other modules                | kebab-case `.ts`, such as `theme-store.ts`                 |
+| Tests                        | Beside the source, same stem plus `.test`: `Hero.test.tsx` |
+| Folders                      | Lowercase, one per feature or capability                   |
 
 - Imports point one way. Feature and shared code never import the app shell or routes. No cycles.
 - Route and page files stay thin and compose feature hooks and components.

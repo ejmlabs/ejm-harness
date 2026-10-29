@@ -54,11 +54,11 @@ a package host, file access for a model, or a claim about native restrictions.
 
 Use these three words in code, docs, and reports:
 
-| Word | Meaning |
-| --- | --- |
-| enforced | The OS blocks it, and the check runs before launch. |
-| monitored | The program observes it (sampling, process groups) and may stop the work after the fact. It is not containment. |
-| unsupported | This platform cannot provide it. Say so. |
+| Word        | Meaning                                                                                                         |
+| ----------- | --------------------------------------------------------------------------------------------------------------- |
+| enforced    | The OS blocks it, and the check runs before launch.                                                             |
+| monitored   | The program observes it (sampling, process groups) and may stop the work after the fact. It is not containment. |
+| unsupported | This platform cannot provide it. Say so.                                                                        |
 
 - A required restriction that cannot be enforced rejects the launch.
 - A claim names the platform it was checked on. Evidence from one OS says nothing about another.

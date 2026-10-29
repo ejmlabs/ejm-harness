@@ -9,10 +9,10 @@ is released; this file covers how a Cloudflare site offers it.
 House default: a static release list. Use a download Worker with private R2 only when Cloudflare
 must serve the files themselves.
 
-| Form | Used by | Runtime |
-| --- | --- | --- |
+| Form                                                                                     | Used by                                                   | Runtime                            |
+| ---------------------------------------------------------------------------------------- | --------------------------------------------------------- | ---------------------------------- |
 | Static list: a reviewed JSON file built into the site, pointing at GitHub release assets | ejmlabs.com `/download/`, `/install.sh`, `/releases.json` | none; the site stores no installer |
-| Download Worker: release metadata and installers served from a private R2 bucket | ide.ejmlabs.com `/api/releases`, `/downloads/*` | Worker plus R2 |
+| Download Worker: release metadata and installers served from a private R2 bucket         | ide.ejmlabs.com `/api/releases`, `/downloads/*`           | Worker plus R2                     |
 
 ## Static release list
 
@@ -41,14 +41,14 @@ must serve the files themselves.
 - The download route reads the current manifest and requires the exact digest, so cached
   metadata can never select bytes from another release.
 
-| Contract | Required behavior |
-| --- | --- |
-| Routes | Metadata at `/api/releases`; installers at `/downloads/{target}?sha256={sha256}` |
-| Methods | `GET` and `HEAD` |
-| Digest | The URL carries the exact artifact digest, which is part of the cache key. Missing, stale or mismatched: non-cacheable `409`. Unreleased target: `404`. Listed but missing or wrong-size object: `503` with a retry hint |
-| Cache | Metadata 30 seconds, digest-bound downloads 60 seconds, errors `no-store` |
-| Ranges and validators | R2 handles them; keep `206`, `304`, `412` and `416`. Ignored ranges and `If-Range` fall back to a full `200` |
-| Streaming | The Worker streams from R2 and never buffers an installer |
+| Contract              | Required behavior                                                                                                                                                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Routes                | Metadata at `/api/releases`; installers at `/downloads/{target}?sha256={sha256}`                                                                                                                                         |
+| Methods               | `GET` and `HEAD`                                                                                                                                                                                                         |
+| Digest                | The URL carries the exact artifact digest, which is part of the cache key. Missing, stale or mismatched: non-cacheable `409`. Unreleased target: `404`. Listed but missing or wrong-size object: `503` with a retry hint |
+| Cache                 | Metadata 30 seconds, digest-bound downloads 60 seconds, errors `no-store`                                                                                                                                                |
+| Ranges and validators | R2 handles them; keep `206`, `304`, `412` and `416`. Ignored ranges and `If-Range` fall back to a full `200`                                                                                                             |
+| Streaming             | The Worker streams from R2 and never buffers an installer                                                                                                                                                                |
 
 - Route only those paths to the Worker (`run_worker_first`); static assets serve the rest.
 - Browser challenges never cover these routes. Check them with `curl -sSI` after a deploy.

@@ -1,6 +1,6 @@
 ---
 name: ejmlabs-shell
-description: Use before you write, edit, or review a shell script: .sh files, bash in bin/ or scripts/, git hooks, CI run steps, install, restore, or backup scripts, .shellcheckrc, or a pkill or pgrep line. Holds the ejmlabs bash rules and when to switch to Python.
+description: Use before you write, edit, or review a shell script, including .sh files, bash in bin/ or scripts/, git hooks, CI run steps, install, restore, or backup scripts, .shellcheckrc, or a pkill or pgrep line. Holds the ejmlabs bash rules and when to switch to Python.
 ---
 
 # Shell scripts at ejmlabs
