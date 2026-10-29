@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Result, bail, ensure};
 use ejm_harness_auth::VaultKeyStore;
 use tokio_util::sync::CancellationToken;
 
@@ -389,7 +389,9 @@ fn world_readable_retired_legacy_file_is_force_discarded() -> Result<()> {
 #[test]
 fn a_parent_swapped_after_the_checks_cannot_redirect_the_unlink() -> Result<()> {
     let fixture = Fixture::new()?;
-    let base = fixture.root.parent().context("fixture base")?.to_path_buf();
+    let Some(base) = fixture.root.parent().map(std::path::Path::to_path_buf) else {
+        bail!("fixture root has no parent");
+    };
     let outside = base.join("outside");
     fs::create_dir(&outside)?;
     write_legacy_mode(&outside.join(LEGACY), b"{}", 0o600)?;
