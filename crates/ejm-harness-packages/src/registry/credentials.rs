@@ -148,19 +148,22 @@ pub fn discard_retired_registry_sessions(root: &Path) -> Result<Vec<RetiredRegis
 ///
 /// Returns whether a directory entry was removed. A missing path returns `false`.
 /// A private, well-formed legacy file is left in place and returns `false`.
-/// Nothing is sent on the network. A symlink or other unsafe entry is removed
-/// with `symlink_metadata` and `remove_file`, without reading it. A private
-/// file is read only to tell a well-formed session from one that does not parse.
+/// Nothing is sent on the network. A symlink or other unsafe entry is unlinked
+/// without being followed or read. On Unix the unlink is relative to a handle on
+/// the package root opened before the checks, so a parent directory swapped
+/// afterwards cannot redirect it. A private file is read only to tell a
+/// well-formed session from one that does not parse.
 ///
 /// # Errors
 /// Reports a directory or unlink failure. A well-formed file is not an error.
 pub fn force_discard_legacy_registry_session(root: &Path) -> Result<bool> {
+    let directory = PackageRoot::open(root)?;
     match classify_legacy(root)? {
         LegacyRead::Missing => Ok(false),
-        LegacyRead::Unusable => unlink_legacy_entry(root),
+        LegacyRead::Unusable => directory.unlink_legacy(),
         LegacyRead::Bytes(bytes) => {
             if serde_json::from_slice::<LegacySession>(&bytes).is_err() {
-                unlink_legacy_entry(root)
+                directory.unlink_legacy()
             } else {
                 Ok(false)
             }
@@ -223,6 +226,7 @@ fn discard(vault: &SecretVault, root: &Path) -> Result<Vec<RetiredRegistrySessio
         }
     }
     drop(transaction);
+    let directory = PackageRoot::open(root)?;
     let legacy_action = match classify_legacy(root)? {
         LegacyRead::Missing => LegacyDiscard::Leave,
         LegacyRead::Unusable => LegacyDiscard::Unlink,
@@ -265,9 +269,9 @@ fn discard(vault: &SecretVault, root: &Path) -> Result<Vec<RetiredRegistrySessio
     }
     match legacy_action {
         LegacyDiscard::Unlink => {
-            unlink_legacy_entry(root)?;
+            directory.unlink_legacy()?;
         }
-        LegacyDiscard::RemoveWellFormed => remove_legacy(root)?,
+        LegacyDiscard::RemoveWellFormed => remove_legacy(&directory)?,
         LegacyDiscard::Leave => {}
     }
     Ok(found)
@@ -296,6 +300,7 @@ pub fn migrate_registry_token(
 fn migrate(vault: &SecretVault, root: &Path, origin: &str) -> Result<bool> {
     let id = identity(origin)?;
     let mut transaction = vault.lock_blocking(&CancellationToken::new())?;
+    let directory = PackageRoot::open(root)?;
     let Some(legacy) = read_legacy_session(root)? else {
         return Ok(false);
     };
@@ -328,7 +333,7 @@ fn migrate(vault: &SecretVault, root: &Path, origin: &str) -> Result<bool> {
         // A concurrent new client may already have replaced or deleted the record.
         // Its committed marker remains authoritative and prevents stale reimport.
     }
-    remove_legacy(root).context("registry vault committed; legacy cleanup failed, retry migration with older clients stopped")?;
+    remove_legacy(&directory).context("registry vault committed; legacy cleanup failed, retry migration with older clients stopped")?;
     Ok(true)
 }
 
@@ -378,18 +383,73 @@ fn read_legacy_session(root: &Path) -> Result<Option<LegacySession>> {
     }
 }
 
-/// Remove the legacy directory entry itself. `symlink_metadata` does not follow,
-/// and `remove_file` unlinks that entry. File bytes are not read here.
-fn unlink_legacy_entry(root: &Path) -> Result<bool> {
-    let path = root.join(LEGACY);
-    match fs::symlink_metadata(&path) {
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(error) => Err(error).context("cannot inspect legacy registry session"),
-        Ok(_) => {
-            fs::remove_file(&path).context("cannot discard legacy registry session")?;
-            #[cfg(unix)]
-            fs::File::open(root)?.sync_all()?;
-            Ok(true)
+/// The package root that legacy deletes are relative to. Callers open it before
+/// their safety checks. On Unix it is a directory handle opened without following
+/// the final component and checked against the path, and deletes use `unlinkat`
+/// on it, so a parent directory swapped after the checks cannot redirect a delete
+/// outside the package root. On Windows deletes go through `rightkit_fs` by path;
+/// a parent swapped between the checks and the delete is not detected there.
+struct PackageRoot {
+    #[cfg(unix)]
+    handle: rustix::fd::OwnedFd,
+    #[cfg(not(unix))]
+    path: std::path::PathBuf,
+}
+
+impl PackageRoot {
+    #[cfg(unix)]
+    fn open(root: &Path) -> Result<Self> {
+        use rustix::fs::{Mode, OFlags};
+        crate::manager::private_directory(root)?;
+        let handle = rustix::fs::open(
+            root,
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
+        )
+        .context("cannot open package root")?;
+        let opened = rustix::fs::fstat(&handle)?;
+        let listed = rustix::fs::lstat(root)?;
+        ensure!(
+            opened.st_dev == listed.st_dev && opened.st_ino == listed.st_ino,
+            "package root changed while it was opened"
+        );
+        Ok(Self { handle })
+    }
+
+    #[cfg(not(unix))]
+    fn open(root: &Path) -> Result<Self> {
+        crate::manager::private_directory(root)?;
+        Ok(Self {
+            path: root.to_path_buf(),
+        })
+    }
+
+    /// Remove the legacy directory entry itself, without following it. File bytes are
+    /// not read here. Returns `false` when the entry is absent.
+    #[cfg(unix)]
+    fn unlink_legacy(&self) -> Result<bool> {
+        use rustix::fs::AtFlags;
+        match rustix::fs::statat(&self.handle, LEGACY, AtFlags::SYMLINK_NOFOLLOW) {
+            Err(rustix::io::Errno::NOENT) => return Ok(false),
+            Err(error) => return Err(error).context("cannot inspect legacy registry session"),
+            Ok(_) => {}
+        }
+        rustix::fs::unlinkat(&self.handle, LEGACY, AtFlags::empty())
+            .context("cannot discard legacy registry session")?;
+        rustix::fs::fsync(&self.handle).context("cannot sync package root")?;
+        Ok(true)
+    }
+
+    #[cfg(not(unix))]
+    fn unlink_legacy(&self) -> Result<bool> {
+        let path = self.path.join(LEGACY);
+        match fs::symlink_metadata(&path) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(error) => Err(error).context("cannot inspect legacy registry session"),
+            Ok(_) => {
+                fs::remove_file(&path).context("cannot discard legacy registry session")?;
+                Ok(true)
+            }
         }
     }
 }
@@ -495,16 +555,18 @@ fn read_bounded(file: fs::File) -> Result<Zeroizing<Vec<u8>>> {
 }
 
 #[cfg(unix)]
-fn remove_legacy(root: &Path) -> Result<()> {
-    fs::remove_file(root.join(LEGACY))?;
-    fs::File::open(root)?.sync_all()?;
+fn remove_legacy(directory: &PackageRoot) -> Result<()> {
+    ensure!(
+        directory.unlink_legacy()?,
+        "legacy registry session disappeared during cleanup"
+    );
     Ok(())
 }
 
 #[cfg(windows)]
-fn remove_legacy(root: &Path) -> Result<()> {
+fn remove_legacy(directory: &PackageRoot) -> Result<()> {
     ensure!(
-        rightkit_fs::StateDir::open(root)?.remove(LEGACY)?,
+        rightkit_fs::StateDir::open(&directory.path)?.remove(LEGACY)?,
         "legacy registry session disappeared during cleanup"
     );
     Ok(())

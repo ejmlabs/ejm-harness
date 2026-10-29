@@ -3,7 +3,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use anyhow::{Result, bail, ensure};
+use anyhow::{Context, Result, bail, ensure};
 use ejm_harness_auth::VaultKeyStore;
 use tokio_util::sync::CancellationToken;
 
@@ -382,6 +382,32 @@ fn world_readable_retired_legacy_file_is_force_discarded() -> Result<()> {
         ORIGIN,
         &ejm_harness_auth::SecretString::new("current-after-discard"),
     )?;
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn a_parent_swapped_after_the_checks_cannot_redirect_the_unlink() -> Result<()> {
+    let fixture = Fixture::new()?;
+    let base = fixture.root.parent().context("fixture base")?.to_path_buf();
+    let outside = base.join("outside");
+    fs::create_dir(&outside)?;
+    write_legacy_mode(&outside.join(LEGACY), b"{}", 0o600)?;
+    write_legacy_mode(&fixture.root.join(LEGACY), b"{}", 0o600)?;
+    let directory = PackageRoot::open(&fixture.root)?;
+    // Swap the package root for a symlink to a directory outside it, after the checks.
+    let moved = base.join("moved");
+    fs::rename(&fixture.root, &moved)?;
+    std::os::unix::fs::symlink(&outside, &fixture.root)?;
+    ensure!(directory.unlink_legacy()?);
+    ensure!(
+        fs::symlink_metadata(outside.join(LEGACY)).is_ok(),
+        "the outside file stays"
+    );
+    ensure!(fs::symlink_metadata(moved.join(LEGACY)).is_err());
+    // A package root that is now a symlink is refused before any check runs.
+    ensure!(PackageRoot::open(&fixture.root).is_err());
+    ensure!(fs::symlink_metadata(outside.join(LEGACY)).is_ok());
     Ok(())
 }
 
