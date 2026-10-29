@@ -1,4 +1,4 @@
-use std::{fs::TryLockError, time::Duration};
+use std::{fs::TryLockError, path::Path, time::Duration};
 
 use anyhow::Result;
 use tokio::time::Instant;
@@ -53,29 +53,8 @@ async fn owner_died(owner: &NativeOwner, ad: &Advertisement) -> bool {
     let root = owner.inner.root.clone();
     let domain = owner.inner.domain.clone();
     let original = ad.clone();
-    let dead = tokio::task::spawn_blocking(move || -> Result<bool> {
-        let directory = wire::directory(&root, &domain)?;
-        if let Some(bytes) = directory.read_opt(wire::DISCOVERY, 4096)?
-            && let Ok(current) = serde_json::from_slice::<Advertisement>(&bytes)
-            && current.protocol == wire::PROTOCOL
-            && current.domain == domain
-            && current.epoch != original.epoch
-        {
-            // Only a replacement holding the same lifetime lock publishes
-            // a new epoch in this protected directory.
-            return Ok(true);
-        }
-        let ownership = wire::stable_lock(&directory, "owner.lock")?;
-        match ownership.try_lock() {
-            Ok(()) => {
-                ownership.unlock()?;
-                Ok(true)
-            }
-            Err(TryLockError::WouldBlock) => Ok(false),
-            Err(TryLockError::Error(error)) => Err(error.into()),
-        }
-    })
-    .await;
+    let dead =
+        tokio::task::spawn_blocking(move || owner_lock_released(&root, &domain, &original)).await;
     if !matches!(dead, Ok(Ok(true))) {
         return false;
     }
@@ -89,6 +68,29 @@ async fn owner_died(owner: &NativeOwner, ad: &Advertisement) -> bool {
         activity.last_dead_epoch = Some(ad.epoch);
     }
     true
+}
+
+fn owner_lock_released(root: &Path, domain: &str, original: &Advertisement) -> Result<bool> {
+    let directory = wire::directory(root, domain)?;
+    if let Some(bytes) = directory.read_opt(wire::DISCOVERY, 4096)?
+        && let Ok(current) = serde_json::from_slice::<Advertisement>(&bytes)
+        && current.protocol == wire::PROTOCOL
+        && current.domain == domain
+        && current.epoch != original.epoch
+    {
+        // Only a replacement holding the same lifetime lock publishes
+        // a new epoch in this protected directory.
+        return Ok(true);
+    }
+    let ownership = wire::stable_lock(&directory, "owner.lock")?;
+    match ownership.try_lock() {
+        Ok(()) => {
+            ownership.unlock()?;
+            Ok(true)
+        }
+        Err(TryLockError::WouldBlock) => Ok(false),
+        Err(TryLockError::Error(error)) => Err(error.into()),
+    }
 }
 
 #[cfg(test)]
@@ -134,6 +136,7 @@ mod tests {
         );
         assert_eq!(handle.snapshot().owner_deaths, 0);
         ownership.unlock().unwrap();
+        assert!(owner_lock_released(&root, "fixture", &ad).unwrap());
         let completed = tokio::time::timeout(wire::TIMEOUT + PROBE_INTERVAL * 2, &mut pending)
             .await
             .unwrap();
