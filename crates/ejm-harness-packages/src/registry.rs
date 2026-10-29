@@ -1,22 +1,23 @@
 //! Native registry client. Account tokens are never sent to package download hosts.
 
-use std::{fmt, time::Duration};
-
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Result, ensure};
 use ejm_harness_auth::SecretString;
 use ejm_harness_package_spec::{
     MAX_ARCHIVE_BYTES, Manifest, archive_sha256, validate_archive, validate_name,
 };
-use futures_util::StreamExt;
-use reqwest::{Client, Response, Url, redirect::Policy};
+use reqwest::{Client, Response, Url};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
-use tokio_util::sync::CancellationToken;
+
+use crate::http::{bounded_body, client_builder};
 
 mod credentials;
+mod login;
+
 pub use credentials::{
     delete_registry_token, load_registry_token, migrate_registry_token, save_registry_token,
 };
+pub use login::DeviceCode;
 
 const MAX_JSON_BYTES: usize = 64 * 1024;
 
@@ -26,32 +27,6 @@ pub struct VersionRecord {
     pub sha256: String,
     pub size: usize,
     pub download_url: String,
-}
-
-#[derive(Deserialize)]
-pub struct DeviceCode {
-    pub device_code: String,
-    pub user_code: String,
-    pub verification_uri: String,
-    #[serde(default)]
-    pub verification_uri_complete: Option<String>,
-    pub expires_in: u64,
-    #[serde(default = "default_poll_interval")]
-    pub interval: u64,
-}
-
-impl fmt::Debug for DeviceCode {
-    fn fmt(&self, output: &mut fmt::Formatter<'_>) -> fmt::Result {
-        output
-            .debug_struct("DeviceCode")
-            .field("device_code", &"[REDACTED]")
-            .field("expires_in", &self.expires_in)
-            .finish_non_exhaustive()
-    }
-}
-
-fn default_poll_interval() -> u64 {
-    5
 }
 
 /// Fixed-origin client with no redirects and bounded responses.
@@ -68,10 +43,7 @@ impl RegistryClient {
     /// Rejects unsafe origins, credentials in URLs, and HTTP client setup errors.
     pub fn new(origin: &str) -> Result<Self> {
         let origin = parse_origin(origin)?;
-        let http = Client::builder()
-            .redirect(Policy::none())
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(30))
+        let http = client_builder()
             .user_agent(concat!("ejm-harness/", env!("CARGO_PKG_VERSION")))
             .build()?;
         Ok(Self { origin, http })
@@ -217,88 +189,6 @@ impl RegistryClient {
         .await
     }
 
-    /// Start the maintained device flow. The host shows the code and registry verification URL.
-    ///
-    /// # Errors
-    /// Rejects invalid or unsafe device-flow responses.
-    pub async fn device_code(&self) -> Result<DeviceCode> {
-        let code: DeviceCode = json_response(
-            self.http
-                .post(self.url("api/auth/device/code")?)
-                .json(&json!({"client_id":"ejm-cli","scope":"registry"}))
-                .send()
-                .await?,
-        )
-        .await?;
-        let url = Url::parse(&code.verification_uri)?;
-        ensure!(
-            url.origin() == self.origin.origin()
-                && code.device_code.len() <= 512
-                && code.user_code.len() <= 32
-                && code.expires_in <= 3600,
-            "invalid device authorization response"
-        );
-        Ok(code)
-    }
-
-    /// Poll for a revocable account session, respecting the server's device-flow backoff.
-    ///
-    /// # Errors
-    /// Returns denial, expiry, cancellation, or bounded transport failures.
-    pub async fn wait_for_login(
-        &self,
-        code: &DeviceCode,
-        cancel: CancellationToken,
-    ) -> Result<SecretString> {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(code.expires_in);
-        let mut interval = code.interval.clamp(5, 60);
-        loop {
-            tokio::select! { () = cancel.cancelled() => bail!("registry login cancelled"), () = tokio::time::sleep(Duration::from_secs(interval)) => {} }
-            ensure!(
-                tokio::time::Instant::now() < deadline,
-                "registry login expired"
-            );
-            let response = self.http.post(self.url("api/auth/device/token")?).json(&json!({"client_id":"ejm-cli","device_code":code.device_code,"grant_type":"urn:ietf:params:oauth:grant-type:device_code"})).send().await?;
-            let status = response.status();
-            let value: Value =
-                serde_json::from_slice(&bounded_response(response, MAX_JSON_BYTES).await?)?;
-            if status.is_success() {
-                let token = value["access_token"]
-                    .as_str()
-                    .context("registry returned no account token")?;
-                ensure!(
-                    !token.is_empty() && token.len() <= 4096,
-                    "invalid registry account token"
-                );
-                return Ok(SecretString::new(token));
-            }
-            match value["error"].as_str() {
-                Some("authorization_pending") => {}
-                Some("slow_down") => interval = interval.saturating_add(5).min(60),
-                Some("access_denied") => bail!("registry login denied"),
-                Some("expired_token") => bail!("registry login expired"),
-                _ => bail!("registry login failed (HTTP {status})"),
-            }
-        }
-    }
-
-    /// Revoke this registry session through the maintained authentication service.
-    ///
-    /// # Errors
-    /// Returns authentication or transport errors.
-    pub async fn logout(&self, token: &SecretString) -> Result<()> {
-        let _: Value = json_response(
-            self.http
-                .post(self.url("api/auth/sign-out")?)
-                .bearer_auth(token.expose_secret())
-                .json(&json!({}))
-                .send()
-                .await?,
-        )
-        .await?;
-        Ok(())
-    }
-
     /// Inspect safe signed-in account metadata.
     ///
     /// # Errors
@@ -351,21 +241,5 @@ async fn json_response<T: DeserializeOwned>(response: Response) -> Result<T> {
 }
 
 async fn bounded_response(response: Response, max: usize) -> Result<Vec<u8>> {
-    ensure!(
-        response
-            .content_length()
-            .is_none_or(|length| length <= u64::try_from(max).unwrap_or(u64::MAX)),
-        "registry response exceeds byte limit"
-    );
-    let mut stream = response.bytes_stream();
-    let mut bytes = Vec::new();
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk?;
-        ensure!(
-            bytes.len().saturating_add(chunk.len()) <= max,
-            "registry response exceeds byte limit"
-        );
-        bytes.extend_from_slice(&chunk);
-    }
-    Ok(bytes)
+    bounded_body(response, max, "registry response").await
 }
