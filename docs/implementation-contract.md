@@ -103,7 +103,9 @@ One UTF-8 JSON object per line. Maximum inbound frame 1 MiB. Stdout is protocol 
 
 Client request: `{id: string, method: string, params: object}`. Response: `{id, result: value}` or `{id, error: {code: string, message: string}}`.
 
-Handshake first: `hello {protocol: 1}` -> `{protocol: 1, version: "0.1.1", capabilities: ["tools", "cancel", "steer", "queue", "replay"]}`.
+Handshake first: `hello {protocol: 1}` returns the protocol version, worker
+version, and capabilities. The [worker implementation](../crates/ejm-harness-worker/src/server.rs)
+owns the advertised capability list.
 
 The `shell_process_tree_cancellation` capability advertises support for the
 strict shell configuration option, not an enforced native executor capability.

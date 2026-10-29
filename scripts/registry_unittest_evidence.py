@@ -60,7 +60,9 @@ class EvidenceResult(unittest.TextTestResult):
         truncated = len(identity) > 1024 or len(message) > 8192
         self.first_diagnostic = {
             "test": identity[:1024],
-            "message": message if len(message) <= 8192 else message[:4096] + "\n...\n" + message[-4096:],
+            "message": message
+            if len(message) <= 8192
+            else message[:4096] + "\n...\n" + message[-4096:],
             "truncated": truncated,
         }
         return True
@@ -152,9 +154,15 @@ def write_evidence(result: EvidenceResult, incomplete: bool) -> bool:
         if reference_path:
             try:
                 path = Path(reference_path)
-                if path.is_file() and not path.is_symlink() and path.stat().st_size <= 4 * 1024 * 1024:
+                if (
+                    path.is_file()
+                    and not path.is_symlink()
+                    and path.stat().st_size <= 4 * 1024 * 1024
+                ):
                     previous = json.loads(path.read_bytes())
-                    reference = {key for key, value in previous["outcomes"].items() if value == "failed"}
+                    reference = {
+                        key for key, value in previous["outcomes"].items() if value == "failed"
+                    }
             except (OSError, ValueError, KeyError, TypeError, AttributeError):
                 reference.clear()
         ordered = sorted(
@@ -170,11 +178,14 @@ def write_evidence(result: EvidenceResult, incomplete: bool) -> bool:
                 break
             retained[identity] = outcome
             budget -= cost
-        data = json.dumps({
-            **base,
-            "outcomes": retained,
-            "ineligible": sorted(result.ineligible.intersection(retained)),
-        }, sort_keys=True)
+        data = json.dumps(
+            {
+                **base,
+                "outcomes": retained,
+                "ineligible": sorted(result.ineligible.intersection(retained)),
+            },
+            sort_keys=True,
+        )
     temporary = result.report.with_name(result.report.name + ".tmp")
     temporary.write_text(data, encoding="utf-8")
     temporary.replace(result.report)
@@ -255,7 +266,11 @@ def compare(first: Path, second: Path, original: Path | None = None) -> int:
             record_incomplete = record["incomplete"]
             incomplete |= record_incomplete
             record = record["outcomes"]
-        if not isinstance(record, dict) or (not record and not record_incomplete) or len(record) > 20_000:
+        if (
+            not isinstance(record, dict)
+            or (not record and not record_incomplete)
+            or len(record) > 20_000
+        ):
             raise ValueError("Invalid unittest evidence")
         if any(
             not isinstance(key, str)

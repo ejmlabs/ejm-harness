@@ -21,12 +21,15 @@ export default class EvidenceReporter {
       file: test.module.moduleId.slice(0, 1025),
       name: test.fullName.slice(0, 1025),
       status: result.state,
-      ...(typeof message === "string" ? {
-        message: message.length > 8192
-          ? `${message.slice(0, 4096)}\n...\n${message.slice(-4096)}`
-          : message,
-        truncated: message.length > 8192,
-      } : {}),
+      ...(typeof message === "string"
+        ? {
+            message:
+              message.length > 8192
+                ? `${message.slice(0, 4096)}\n...\n${message.slice(-4096)}`
+                : message,
+            truncated: message.length > 8192,
+          }
+        : {}),
     });
   }
 
@@ -38,9 +41,12 @@ export default class EvidenceReporter {
     this.write({
       kind: "diagnostic",
       test: test.slice(0, 1024),
-      message: typeof message === "string" && message.length > 8192
-        ? `${message.slice(0, 4096)}\n...\n${message.slice(-4096)}`
-        : typeof message === "string" ? message : "",
+      message:
+        typeof message === "string" && message.length > 8192
+          ? `${message.slice(0, 4096)}\n...\n${message.slice(-4096)}`
+          : typeof message === "string"
+            ? message
+            : "",
       truncated: typeof message === "string" && message.length > 8192,
     });
   }
@@ -65,9 +71,14 @@ export default class EvidenceReporter {
       this.errors(module.errors(), module.moduleId);
       for (const suite of module.children.allSuites()) this.errors(suite.errors(), suite.name);
     }
-    const incomplete = errors.length > 0 || !["passed", "failed"].includes(reason) || modules.some(
-      (module) => module.errors().length || [...module.children.allSuites()].some((suite) => suite.errors().length),
-    );
+    const incomplete =
+      errors.length > 0 ||
+      !["passed", "failed"].includes(reason) ||
+      modules.some(
+        (module) =>
+          module.errors().length ||
+          [...module.children.allSuites()].some((suite) => suite.errors().length),
+      );
     this.write({ kind: "end", incomplete });
     closeSync(this.output);
   }

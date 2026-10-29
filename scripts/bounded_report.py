@@ -13,9 +13,11 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import BinaryIO
+from typing import Any, BinaryIO
 
-spec = importlib.util.spec_from_file_location("junit_stream", Path(__file__).with_name("junit_stream.py"))
+spec = importlib.util.spec_from_file_location(
+    "junit_stream", Path(__file__).with_name("junit_stream.py")
+)
 if spec is None or spec.loader is None:
     raise RuntimeError("Cannot load JUnit evidence collector")
 junit_stream = importlib.util.module_from_spec(spec)
@@ -88,12 +90,22 @@ class VitestRecords:
             if kind != "case":
                 raise ValueError("invalid case")
             file, name, status = record["file"], record["name"], record["status"]
-            if not isinstance(file, str) or not isinstance(name, str) or status not in ("passed", "failed", "skipped"):
+            if (
+                not isinstance(file, str)
+                or not isinstance(name, str)
+                or status not in ("passed", "failed", "skipped")
+            ):
                 raise ValueError("invalid case")
             first = status == "failed" and not self.first_failure
             if first:
-                self.save_diagnostic({"kind": "diagnostic", "file": file, "name": name,
-                                      "message": record.get("message", "")})
+                self.save_diagnostic(
+                    {
+                        "kind": "diagnostic",
+                        "file": file,
+                        "name": name,
+                        "message": record.get("message", ""),
+                    }
+                )
             self.first_failure |= status == "failed"
             key = json.dumps([file, name])
             maybe_duplicate = self.seen.add(key)
@@ -115,13 +127,15 @@ class VitestRecords:
                 record["message"] = message[:half] + "\n...\n" + (message[-half:] if half else "")
                 self.incomplete = True
             raw = json.dumps(record, ensure_ascii=False, separators=(",", ":")).encode() + b"\n"
-            priority = 3 if first else 2 if status == "failed" else 1 if key in self.reference else 0
+            priority = (
+                3 if first else 2 if status == "failed" else 1 if key in self.reference else 0
+            )
             digest = int.from_bytes(hashlib.sha256(key.encode()).digest(), "big")
             rank = (priority, -digest)
             if len(raw) > self.limit:
                 self.incomplete = True
                 return
-            evicted = []
+            evicted: list[tuple[tuple[int, int], str, bytes]] = []
             while self.size + len(raw) > self.limit or len(self.records) >= 20_000:
                 if not self.records or self.records[0][0] >= rank:
                     for item in evicted:
@@ -142,7 +156,7 @@ class VitestRecords:
         except (ValueError, KeyError, TypeError, RecursionError):
             self.incomplete = True
 
-    def save_diagnostic(self, record: dict) -> None:
+    def save_diagnostic(self, record: dict[str, Any]) -> None:
         if self.diagnostic:
             return
         message = record.get("message", "")
@@ -179,7 +193,9 @@ class VitestRecords:
             self.incomplete = True
 
     def write(self, stream: BinaryIO, *, partial: bool = False) -> bool:
-        incomplete = partial or self.incomplete or not self.header or not self.finished or bool(self.buffer)
+        incomplete = (
+            partial or self.incomplete or not self.header or not self.finished or bool(self.buffer)
+        )
         if self.header:
             stream.write(b'{"kind":"start"}\n')
             if self.diagnostic:
@@ -187,7 +203,12 @@ class VitestRecords:
             for _, key, line in sorted(self.records, key=lambda item: (-item[0][0], item[1])):
                 if key not in self.ambiguous:
                     stream.write(line)
-            stream.write(json.dumps({"kind": "end", "incomplete": incomplete}, separators=(",", ":")).encode() + b"\n")
+            stream.write(
+                json.dumps(
+                    {"kind": "end", "incomplete": incomplete}, separators=(",", ":")
+                ).encode()
+                + b"\n"
+            )
         return incomplete
 
 
@@ -215,7 +236,11 @@ def capture(mode: str, output: Path, limit: int, command: list[str]) -> int:
         written = 0
         overflow = False
         records = VitestRecords(limit) if mode == "fifo-jsonl" else None
-        junit = junit_stream.JunitRecords(limit, os.environ.get("EJM_HARNESS_JUNIT_REFERENCE")) if mode == "fifo-xml" else None
+        junit = (
+            junit_stream.JunitRecords(limit, os.environ.get("EJM_HARNESS_JUNIT_REFERENCE"))
+            if mode == "fifo-xml"
+            else None
+        )
         with output.open("wb") as stream, selectors.DefaultSelector() as selector:
             dirty = False
             last_snapshot = time.monotonic()
@@ -269,7 +294,12 @@ def capture(mode: str, output: Path, limit: int, command: list[str]) -> int:
                     break
             code = process.wait()
             if records is not None:
-                overflow |= records.incomplete or not records.header or not records.finished or bool(records.buffer)
+                overflow |= (
+                    records.incomplete
+                    or not records.header
+                    or not records.finished
+                    or bool(records.buffer)
+                )
                 dirty = True
                 snapshot(final=True)
             if junit is not None:
@@ -293,8 +323,15 @@ def capture(mode: str, output: Path, limit: int, command: list[str]) -> int:
 
 
 def main() -> int:
-    if len(sys.argv) < 6 or sys.argv[4] != "--" or sys.argv[1] not in ("fifo", "fifo-jsonl", "fifo-xml", "stdout"):
-        raise SystemExit("usage: bounded_report.py fifo|fifo-jsonl|fifo-xml|stdout OUTPUT LIMIT -- COMMAND [ARG...]")
+    if (
+        len(sys.argv) < 6
+        or sys.argv[4] != "--"
+        or sys.argv[1] not in ("fifo", "fifo-jsonl", "fifo-xml", "stdout")
+    ):
+        raise SystemExit(
+            "usage: bounded_report.py fifo|fifo-jsonl|fifo-xml|stdout "
+            "OUTPUT LIMIT -- COMMAND [ARG...]"
+        )
     try:
         limit = int(sys.argv[3])
         if limit <= 0 or (sys.argv[1] in ("fifo-jsonl", "fifo-xml") and limit < 64):

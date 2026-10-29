@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import IO, Any, cast
 
 _identity_spec = importlib.util.spec_from_file_location(
     "junit_stream", Path(__file__).with_name("junit_stream.py")
@@ -127,7 +127,7 @@ def partial_outcomes(
             except ET.ParseError:
                 broken = True
             try:
-                for event, element in parser.read_events():
+                for event, element in cast(Iterable[tuple[str, ET.Element]], parser.read_events()):
                     if event == "start":
                         stack.append(element.tag)
                         if stack == ["testsuites", "testsuite"]:
@@ -158,7 +158,11 @@ def partial_outcomes(
                 continue
             key = (suite_name, name)
             states = [child.tag for child in case if child.tag in ("failure", "error", "skipped")]
-            if case.get("classname") == suite_name and "failure" in states and len(failures) < 20_000:
+            if (
+                case.get("classname") == suite_name
+                and "failure" in states
+                and len(failures) < 20_000
+            ):
                 failures.add(key)
             maybe_duplicate = identities.add(repr(key))
             if len(exact_identities) < 20_000:
@@ -262,7 +266,7 @@ def run(
 
     truncated: list[Path] = []
 
-    def capture(pipe: BinaryIO, path: Path, limit: int, echo: bool) -> None:
+    def capture(pipe: IO[bytes], path: Path, limit: int, echo: bool) -> None:
         written = 0
         search_tail = b""
         failure: bytes | None = None
@@ -315,8 +319,10 @@ def run(
                     candidate = search_tail + chunk
                     marker = re.search(
                         rb"(?m)^(?:thread '[^\r\n]{0,512}'(?: \([^\r\n]{0,64}\))? panicked at|"
-                        rb"Error:|error: test failed|[ \t]*FAIL \[|test [^\r\n]{1,1024} \.\.\. FAILED|"
-                        rb"---- [^\r\n]{1,1024} stdout ----|Caused by:|process didn't exit successfully)",
+                        rb"Error:|error: test failed|[ \t]*FAIL \[|"
+                        rb"test [^\r\n]{1,1024} \.\.\. FAILED|"
+                        rb"---- [^\r\n]{1,1024} stdout ----|Caused by:|"
+                        rb"process didn't exit successfully)",
                         candidate,
                     )
                     if marker:
@@ -385,15 +391,25 @@ def run(
                             if duplicate:
                                 previous = seen.pop(key, None)
                                 if previous is not None:
-                                    result_bytes -= len(
-                                        json.dumps([suite, name, previous], ensure_ascii=False).encode()
-                                    ) + 2
+                                    result_bytes -= (
+                                        len(
+                                            json.dumps(
+                                                [suite, name, previous], ensure_ascii=False
+                                            ).encode()
+                                        )
+                                        + 2
+                                    )
                                     evictable.pop(key, None)
                                 results_incomplete = True
                             else:
-                                size = len(
-                                    json.dumps([suite, name, state], ensure_ascii=False).encode()
-                                ) + 2
+                                size = (
+                                    len(
+                                        json.dumps(
+                                            [suite, name, state], ensure_ascii=False
+                                        ).encode()
+                                    )
+                                    + 2
+                                )
                                 preferred = state == "failure" or (
                                     priority is not None and key in priority
                                 )
@@ -407,11 +423,19 @@ def run(
                                         victim = next(iter(evictable))
                                         evictable.pop(victim)
                                         old = seen.pop(victim)
-                                        result_bytes -= len(
-                                            json.dumps([*victim, old], ensure_ascii=False).encode()
-                                        ) + 2
+                                        result_bytes -= (
+                                            len(
+                                                json.dumps(
+                                                    [*victim, old], ensure_ascii=False
+                                                ).encode()
+                                            )
+                                            + 2
+                                        )
                                         results_incomplete = True
-                                if len(seen) < 20_000 and result_bytes + size + 2 <= 3 * 1024 * 1024:
+                                if (
+                                    len(seen) < 20_000
+                                    and result_bytes + size + 2 <= 3 * 1024 * 1024
+                                ):
                                     seen[key] = state
                                     result_bytes += size
                                     if not preferred:
@@ -507,8 +531,11 @@ def doctest_outcomes(path: Path, expected: Counter[str]) -> tuple[dict[tuple[str
             if (
                 running is None
                 or running != len(statuses)
-                or (passed, failed, ignored) != (counts["passed"], counts["failure"], counts["skipped"])
-                or ignored or measured or filtered
+                or (passed, failed, ignored)
+                != (counts["passed"], counts["failure"], counts["skipped"])
+                or ignored
+                or measured
+                or filtered
             ):
                 complete = False
             suite = None
@@ -546,7 +573,7 @@ def doctest_inventory(path: Path, expected: Counter[str]) -> set[tuple[str, str]
 
 
 def failure_keys(paths: Iterable[Path]) -> set[tuple[str, str]]:
-    failures = set()
+    failures: set[tuple[str, str]] = set()
     for path in paths:
         try:
             failures.update(
@@ -618,31 +645,51 @@ def main() -> int:
     docs = []
     try:
         metadata_path = output / "metadata.json"
-        if run(
-            ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"],
-            output / "metadata.log",
-            metadata_path,
-        ) != 0:
+        if (
+            run(
+                ["cargo", "metadata", "--locked", "--no-deps", "--format-version", "1"],
+                output / "metadata.log",
+                metadata_path,
+            )
+            != 0
+        ):
             raise ValueError("cargo metadata did not complete")
         metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
         members = set(metadata["workspace_members"])
         if any(
             not target["doctest"]
-            for package in metadata["packages"] if package["id"] in members
+            for package in metadata["packages"]
+            if package["id"] in members
             for target in package["targets"]
-            if any(kind in ("lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro") for kind in target["kind"])
+            if any(
+                kind in ("lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro")
+                for kind in target["kind"]
+            )
         ):
             raise ValueError("workspace library disables doctests")
         doc_targets = Counter(
             target["name"].replace("-", "_")
-            for package in metadata["packages"] if package["id"] in members
-            for target in package["targets"] if target["doctest"]
+            for package in metadata["packages"]
+            if package["id"] in members
+            for target in package["targets"]
+            if target["doctest"]
         )
     except (OSError, subprocess.CalledProcessError, ValueError, KeyError, TypeError) as error:
         print(f"Cannot inventory doctest targets: {error}", file=sys.stderr)
         doc_targets = None
     doc_inventory_code = run(
-        ["cargo", "test", "--locked", "--workspace", "--doc", "--no-fail-fast", "--color", "never", "--", "--list"],
+        [
+            "cargo",
+            "test",
+            "--locked",
+            "--workspace",
+            "--doc",
+            "--no-fail-fast",
+            "--color",
+            "never",
+            "--",
+            "--list",
+        ],
         output / "doctest-inventory.log",
     )
     for number in (1, 2):
@@ -667,7 +714,9 @@ def main() -> int:
             + "\nstore-failure-output = true\n",
             encoding="utf-8",
         )
-        os.environ["EJM_HARNESS_JUNIT_REFERENCE"] = str(output / "attempt-1.xml") if number == 2 else ""
+        os.environ["EJM_HARNESS_JUNIT_REFERENCE"] = (
+            str(output / "attempt-1.xml") if number == 2 else ""
+        )
         attempts.append(
             run(
                 [
@@ -704,7 +753,16 @@ def main() -> int:
         # nextest does not run doctests; keep their logs and exit codes separately.
         docs.append(
             run(
-                ["cargo", "test", "--locked", "--workspace", "--doc", "--no-fail-fast", "--color", "never"],
+                [
+                    "cargo",
+                    "test",
+                    "--locked",
+                    "--workspace",
+                    "--doc",
+                    "--no-fail-fast",
+                    "--color",
+                    "never",
+                ],
                 output / f"doctest-{number}.log",
                 cargo_results=output / f"doctest-{number}.json",
                 priority=prior | failure_keys([output / f"cargo-test-{number}.json"]),
@@ -794,9 +852,7 @@ def main() -> int:
     for kind in ("cargo-test", "doctest"):
         for number in (1, 2):
             try:
-                records = json.loads(
-                    (output / f"{kind}-{number}.json").read_text(encoding="utf-8")
-                )
+                records = json.loads((output / f"{kind}-{number}.json").read_text(encoding="utf-8"))
                 for suite, name, state in records:
                     if suite.startswith("doctest:"):
                         streamed_docs.setdefault((suite, name), set()).add(state)

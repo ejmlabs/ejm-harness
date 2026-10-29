@@ -4,7 +4,7 @@ import hashlib
 import heapq
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any
+from typing import Any, Never
 from xml.parsers import expat
 
 
@@ -14,7 +14,9 @@ class IdentityFilter:
 
     def add(self, identity: str) -> bool:
         digest = hashlib.sha256(identity.encode("utf-8")).digest()
-        positions = [int.from_bytes(digest[i : i + 4], "big") % (len(self.bits) * 8) for i in (0, 4, 8, 12)]
+        positions = [
+            int.from_bytes(digest[i : i + 4], "big") % (len(self.bits) * 8) for i in (0, 4, 8, 12)
+        ]
         present = all(self.bits[position // 8] & (1 << (position % 8)) for position in positions)
         for position in positions:
             self.bits[position // 8] |= 1 << (position % 8)
@@ -60,7 +62,7 @@ class JunitRecords:
         self.parser.EntityDeclHandler = self.reject
         self.parser.ExternalEntityRefHandler = self.reject
 
-    def reject(self, *_args: object) -> None:
+    def reject(self, *_args: object) -> Never:
         raise ValueError("unsafe XML")
 
     def start(self, name: str, attrs: dict[str, str]) -> None:
@@ -79,7 +81,9 @@ class JunitRecords:
             self.diagnostic_tail = ""
         elif self.case is not None and len(self.stack) == 4:
             if name in ("failure", "error") and self.diagnostic is None:
-                self.diagnostic = f"{self.suite[:1024]} :: {self.case.get('name', '')[:1024]} :: {name}"
+                self.diagnostic = (
+                    f"{self.suite[:1024]} :: {self.case.get('name', '')[:1024]} :: {name}"
+                )
                 self.diagnostic_case = True
                 if attrs.get("message"):
                     self.add_diagnostic("\n" + attrs["message"])
@@ -103,9 +107,11 @@ class JunitRecords:
 
     def characters(self, data: str) -> None:
         self.pending = 0
-        if (self.stack == ["testsuites", "first-diagnostic"] or
-                (self.diagnostic_case and len(self.stack) == 4 and
-                 self.stack[-1] in ("failure", "error", "system-out", "system-err"))):
+        if self.stack == ["testsuites", "first-diagnostic"] or (
+            self.diagnostic_case
+            and len(self.stack) == 4
+            and self.stack[-1] in ("failure", "error", "system-out", "system-err")
+        ):
             self.add_diagnostic(data)
 
     def first_diagnostic(self) -> str | None:
@@ -133,8 +139,10 @@ class JunitRecords:
                 self.ambiguous.add(key)
             self.invalid = True
             return
-        if self.case.get("classname") != self.suite or len(self.states) > 1 or any(
-            state.startswith(("flaky", "rerun")) for state in self.states
+        if (
+            self.case.get("classname") != self.suite
+            or len(self.states) > 1
+            or any(state.startswith(("flaky", "rerun")) for state in self.states)
         ):
             self.invalid = True
             return
@@ -146,13 +154,21 @@ class JunitRecords:
         raw = ET.tostring(suite, encoding="utf-8")
         first = state in ("failure", "error") and not self.first_failure
         self.first_failure |= state in ("failure", "error")
-        priority = 3 if first else 2 if state in ("failure", "error") else 1 if key in self.reference else 0
+        priority = (
+            3
+            if first
+            else 2
+            if state in ("failure", "error")
+            else 1
+            if key in self.reference
+            else 0
+        )
         digest = int.from_bytes(hashlib.sha256(repr(key).encode()).digest(), "big")
         rank = (priority, -digest)
         if len(raw) > self.limit:
             self.invalid = True
             return
-        evicted = []
+        evicted: list[tuple[tuple[int, int], tuple[str, str], bytes]] = []
         while self.size + len(raw) > self.limit or len(self.records) >= 20_000:
             if not self.records or self.records[0][0] >= rank:
                 for item in evicted:

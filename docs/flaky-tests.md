@@ -7,7 +7,7 @@ failure leaves the job failed. Doctests also run separately. The human-admitted 
 is unchanged; this workflow does not run unadmitted pull requests.
 
 To reproduce locally, install the pinned tool with
-`cargo install --locked --version 0.9.124 cargo-nextest`, then run
+`cargo install --locked --jobs 2 --version 0.9.124 cargo-nextest`, then run
 `python3 scripts/flake_check.py /tmp/harness-flakes` with a new output directory.
 The bounded report transport requires POSIX and fails closed on Windows before
 starting the report producer. Windows behavior has not been validated.

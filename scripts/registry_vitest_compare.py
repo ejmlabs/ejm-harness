@@ -49,7 +49,10 @@ def bounded_message(message: str) -> str:
 
 
 def retain_outcome(
-    outcomes: dict[str, str], evictable: dict[str, None], key: str, state: str,
+    outcomes: dict[str, str],
+    evictable: dict[str, None],
+    key: str,
+    state: str,
     priority: set[str],
 ) -> bool:
     preferred = state == "failed" or key in priority
@@ -138,7 +141,12 @@ def stream_report(
                         failures.add(key)
                         if diagnostic is None:
                             message = record.get("message", "")
-                            diagnostic = {"test": key, "message": bounded_message(message if isinstance(message, str) else "")}
+                            diagnostic = {
+                                "test": key,
+                                "message": bounded_message(
+                                    message if isinstance(message, str) else ""
+                                ),
+                            }
                     incomplete = True
                     continue
                 if status not in ("passed", "failed", "skipped"):
@@ -149,7 +157,10 @@ def stream_report(
                         failures.add(key)
                     if diagnostic is None:
                         message = record.get("message", "")
-                        diagnostic = {"test": key, "message": bounded_message(message if isinstance(message, str) else "")}
+                        diagnostic = {
+                            "test": key,
+                            "message": bounded_message(message if isinstance(message, str) else ""),
+                        }
                 if not retain_outcome(outcomes, evictable, key, status, priority):
                     incomplete = True
                 incomplete |= status == "skipped"
@@ -216,7 +227,11 @@ def report(
                     failures.add(key)
                     if diagnostic is None:
                         messages = case.get("failureMessages")
-                        message = next((item for item in messages if isinstance(item, str)), "") if isinstance(messages, list) else ""
+                        message = (
+                            next((item for item in messages if isinstance(item, str)), "")
+                            if isinstance(messages, list)
+                            else ""
+                        )
                         diagnostic = {"test": key, "message": bounded_message(message)}
                 incomplete = True
                 continue
@@ -244,10 +259,11 @@ def report(
         if suite.get("status") == "failed" and not suite_failed:
             incomplete = True
             if diagnostic is None:
-                message = suite.get("message")
-                if isinstance(message, str):
+                suite_message = suite.get("message")
+                if isinstance(suite_message, str):
                     diagnostic = {
-                        "test": suite["name"][:1024], "message": bounded_message(message)
+                        "test": suite["name"][:1024],
+                        "message": bounded_message(suite_message),
                     }
     expected_counts = {
         "numTotalTests": total,
@@ -287,7 +303,7 @@ def compare(listing: Path, first: Path, second: Path, root: Path) -> dict[str, A
             expected.add(key)
     except (OSError, ValueError, TypeError, RecursionError):
         incomplete = True
-    parsed = []
+    parsed: list[tuple[dict[str, str], set[str], set[str], bool, dict[str, str] | None]] = []
     for path in (first, second):
         try:
             parsed.append(report(path, root, parsed[0][2] if parsed else None))
@@ -326,7 +342,9 @@ def main() -> int:
             result[name.lower()] = (
                 outcome if outcome in ("success", "failure", "cancelled", "skipped") else "invalid"
             )
-    encoded, truncated = reporter.bounded_summary(result, ("mixed", "first_failed", "second_failed"))
+    encoded, truncated = reporter.bounded_summary(
+        result, ("mixed", "first_failed", "second_failed")
+    )
     result["incomplete"] |= truncated
     summary.write_text(encoded, encoding="utf-8")
     for key in result["mixed"]:
