@@ -3,12 +3,12 @@ use serde_json::json;
 use tokio_util::sync::CancellationToken;
 
 use super::*;
+#[cfg(unix)]
 use crate::{
     edit::{Edit, edit},
-    list::list_files,
-    read::{read_file, sha256_hex},
-    search::search,
+    read::sha256_hex,
 };
+use crate::{list::list_files, read::read_file, search::search};
 
 #[test]
 fn reads_cannot_traverse_parent_or_symlink_outside_workspace() -> Result<()> {

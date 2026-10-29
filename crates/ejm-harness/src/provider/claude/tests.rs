@@ -2,16 +2,14 @@ use std::path::PathBuf;
 
 use ejm_harness_exec::CommandOutput;
 use serde_json::{Value, json};
-use tokio::sync::mpsc;
-use tokio_util::sync::CancellationToken;
 
 use super::{
-    ClaudeCodeConfig, ClaudeCodeProvider,
+    ClaudeCodeConfig,
     protocol::{MAX_CALLS, MAX_INPUT, decode_response, request_input, response_schema},
 };
 use crate::{
-    Effect, Message, ModelDelta, ModelRequest, ModelResponse, Provider, ProviderContinuation,
-    ToolCall, ToolDefinition, ToolOutput, provider::MAX_RESPONSE,
+    Effect, Message, ModelRequest, ModelResponse, ProviderContinuation, ToolCall, ToolDefinition,
+    ToolOutput, provider::MAX_RESPONSE,
 };
 
 fn definition() -> ToolDefinition {
@@ -196,8 +194,12 @@ fn input_replays_readable_tool_evidence_without_foreign_continuation() {
 mod process {
     use std::{os::unix::fs::PermissionsExt, sync::Arc, time::Duration};
 
-    use super::*;
     use ejm_harness_exec::{Executor, Governor, GovernorSnapshot, Reservation, ResourceLimits};
+    use tokio::sync::mpsc;
+    use tokio_util::sync::CancellationToken;
+
+    use super::{super::ClaudeCodeProvider, *};
+    use crate::{ModelDelta, Provider};
 
     fn fixture(script: &str) -> (tempfile::TempDir, Arc<Governor>, ClaudeCodeProvider) {
         let root = tempfile::tempdir().unwrap();
