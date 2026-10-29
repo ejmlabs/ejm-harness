@@ -550,6 +550,14 @@ raise SystemExit(0)
             self.assertEqual(summary["doctest_exit_codes"], [0, 0])
             self.assertFalse(summary["incomplete"])
             self.assertEqual(summary["mixed"], [["pkg::suite", "write"]])
+            comparison = subprocess.run(
+                [sys.executable, "-I", str(Path(__file__).with_name("compare_partial_flakes.py")),
+                 str(root / "evidence")],
+                env={**env, "PRODUCER_OUTCOME": "failure"},
+                capture_output=True, text=True, timeout=10, check=False,
+            )
+            self.assertNotEqual(comparison.returncode, 0)
+            self.assertEqual(json.loads((root / "evidence/summary.json").read_text()), summary)
             env["FAKE_DOCTEST_STATUS"] = "ignored"
             result = subprocess.run(
                 [sys.executable, str(script), str(root / "ignored-evidence")],

@@ -53,8 +53,25 @@ def main() -> int:
         if not existing.is_symlink() and existing.stat().st_size <= 4 * 1024 * 1024:
             value = json.loads(existing.read_bytes())
             if isinstance(value, dict) and isinstance(value.get("incomplete"), bool) and isinstance(value.get("mixed"), list):
-                if os.environ.get("PRODUCER_OUTCOME") == "success":
-                    return 0
+                if (not value["incomplete"]
+                        and all(type(value.get(key)) is int and value[key] == 0
+                                for key in ("inventory_exit_code", "native_helper_build_exit_code"))
+                        and not value.get("summary_truncated", False)
+                        and all(type(value.get(key)) is bool for key in
+                                ("cargo_test_inconsistent", "doctest_inconsistent"))
+                        and all(isinstance(value.get(key), list) and len(value[key]) == 2
+                                and all(type(code) is int for code in value[key])
+                                for key in ("cargo_test_exit_codes", "exit_codes", "doctest_exit_codes"))
+                        and all(isinstance(item, list) and len(item) == 2
+                                and all(isinstance(part, str) and part for part in item)
+                                for item in value["mixed"])
+                        and all(code in (0, 100) for code in value["exit_codes"])):
+                    return int(os.environ.get("PRODUCER_OUTCOME") != "success"
+                               or bool(value["mixed"])
+                               or value["cargo_test_inconsistent"]
+                               or value["doctest_inconsistent"]
+                               or any(code != 0 for key in ("cargo_test_exit_codes", "exit_codes",
+                                                            "doctest_exit_codes") for code in value[key]))
                 prior = value
     except (OSError, ValueError, TypeError, RecursionError):
         pass

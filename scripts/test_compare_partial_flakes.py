@@ -9,21 +9,50 @@ from pathlib import Path
 
 
 class PartialFlakeComparisonTests(unittest.TestCase):
-    def test_failed_producer_marks_existing_summary_incomplete(self) -> None:
+    def test_complete_summary_is_preserved_for_each_producer_outcome(self) -> None:
         script = Path(__file__).with_name("compare_partial_flakes.py")
-        with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory)
-            summary = output / "summary.json"
-            summary.write_text(json.dumps({"incomplete": False, "mixed": [["suite", "case"]]}))
-            result = subprocess.run(
-                [sys.executable, "-I", str(script), str(output)],
-                env={**os.environ, "PRODUCER_OUTCOME": "failure"},
-                capture_output=True, timeout=10, check=False,
-            )
-            self.assertNotEqual(result.returncode, 0)
-            value = json.loads(summary.read_text())
-            self.assertTrue(value["incomplete"])
-            self.assertEqual(value["mixed"], [["suite", "case"]])
+        data = {"incomplete": False, "mixed": [["suite", "case"]],
+                "inventory_exit_code": 0, "native_helper_build_exit_code": 0,
+                "cargo_test_inconsistent": False, "doctest_inconsistent": False,
+                "cargo_test_exit_codes": [0, 0], "exit_codes": [100, 0],
+                "doctest_exit_codes": [0, 0]}
+        for outcome, failed, inconsistent in (
+            ("success", False, False), ("success", False, True), ("success", True, False),
+            ("failure", True, False), ("cancelled", True, False),
+        ):
+            with (self.subTest(outcome=outcome, failed=failed, inconsistent=inconsistent),
+                  tempfile.TemporaryDirectory() as directory):
+                summary = Path(directory) / "summary.json"
+                original = json.dumps(data if failed else {
+                    **data, "mixed": [], "exit_codes": [0, 0],
+                    "cargo_test_inconsistent": inconsistent,
+                })
+                summary.write_text(original)
+                result = subprocess.run(
+                    [sys.executable, "-I", str(script), directory],
+                    env={**os.environ, "PRODUCER_OUTCOME": outcome},
+                    capture_output=True, timeout=10, check=False,
+                )
+                self.assertEqual(result.returncode, int(outcome != "success" or failed or inconsistent))
+                self.assertEqual(summary.read_text(), original)
+
+    def test_incomplete_or_malformed_summary_stays_incomplete(self) -> None:
+        script = Path(__file__).with_name("compare_partial_flakes.py")
+        for outcome, incomplete in (("failure", False), ("failure", True), ("success", True)):
+            with (self.subTest(outcome=outcome, incomplete=incomplete),
+                  tempfile.TemporaryDirectory() as directory):
+                output = Path(directory)
+                summary = output / "summary.json"
+                summary.write_text(json.dumps({"incomplete": incomplete, "mixed": [["suite", "case"]]}))
+                result = subprocess.run(
+                    [sys.executable, "-I", str(script), str(output)],
+                    env={**os.environ, "PRODUCER_OUTCOME": outcome},
+                    capture_output=True, timeout=10, check=False,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                value = json.loads(summary.read_text())
+                self.assertTrue(value["incomplete"])
+                self.assertEqual(value["mixed"], [["suite", "case"]])
 
     def test_interrupted_producer_preserves_comparable_outcomes(self) -> None:
         script = Path(__file__).with_name("compare_partial_flakes.py")
