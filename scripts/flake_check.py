@@ -11,7 +11,30 @@ import xml.etree.ElementTree as ET
 from collections import Counter
 from collections.abc import Iterable
 from pathlib import Path
-from typing import BinaryIO
+from typing import Any, BinaryIO
+
+
+def bounded_summary(data: dict[str, Any], keys: tuple[str, ...]) -> tuple[str, bool]:
+    limit = 4 * 1024 * 1024
+    encoded = json.dumps(data, ensure_ascii=True, separators=(",", ":")) + "\n"
+    if len(encoded.encode("utf-8")) <= limit:
+        return encoded, False
+    retained = {**data, "incomplete": True, "summary_truncated": True}
+    for key in keys:
+        retained[key] = []
+    budget = limit - len(
+        (json.dumps(retained, ensure_ascii=True, separators=(",", ":")) + "\n").encode("utf-8")
+    )
+    for index, key in enumerate(keys):
+        quota = budget // (len(keys) - index)
+        for item in data[key]:
+            size = len(json.dumps(item, ensure_ascii=True, separators=(",", ":")).encode("utf-8"))
+            size += bool(retained[key])
+            if size <= quota:
+                retained[key].append(item)
+                quota -= size
+                budget -= size
+    return json.dumps(retained, ensure_ascii=True, separators=(",", ":")) + "\n", True
 
 
 def outcomes(path: Path) -> dict[tuple[str, str], str]:
@@ -25,6 +48,8 @@ def outcomes(path: Path) -> dict[tuple[str, str], str]:
     root = ET.fromstring(data)
     if root.tag != "testsuites":
         raise ValueError("not a nextest JUnit report")
+    if root.get("incomplete") == "true":
+        raise ValueError("test report is incomplete")
     results = {}
     count = 0
     for suite in root.findall("testsuite"):
@@ -176,7 +201,11 @@ def mixed_tests(first: Path, second: Path, expected: set[tuple[str, str]]) -> li
 
 
 def run(
-    command: list[str], log: Path, output: Path | None = None, cargo_results: Path | None = None
+    command: list[str],
+    log: Path,
+    output: Path | None = None,
+    cargo_results: Path | None = None,
+    priority: set[tuple[str, str]] | None = None,
 ) -> int | None:
     try:
         process = subprocess.Popen(
@@ -202,7 +231,9 @@ def run(
         remaining = 0
         seen: dict[tuple[str, str], str] = {}
         ambiguous: set[tuple[str, str]] = set()
+        evictable: dict[tuple[str, str], None] = {}
         result_bytes = 0
+        results_incomplete = False
         with path.open("wb") as stream:
             while chunk := pipe.read(65536):
                 if echo:
@@ -238,13 +269,24 @@ def run(
                     while b"\n" in line_buffer:
                         line, line_buffer = line_buffer.split(b"\n", 1)
                         if dropping_line or len(line) > 4096:
+                            if (
+                                not dropping_line
+                                and line.startswith(b"test ")
+                                and suite is not None
+                                and remaining
+                            ):
+                                results_incomplete = True
                             dropping_line = False
                             continue
                         heading = re.fullmatch(rb"\s*Running (?:unittests |tests/).+ \(.+\)", line)
+                        doc_heading = re.fullmatch(rb"\s*Doc-tests (\S+)\s*", line)
                         count = re.fullmatch(rb"running (\d+) tests?", line)
                         case = re.fullmatch(rb"test (.+) \.\.\. (ok|FAILED|ignored)", line)
                         if heading:
                             suite = line.strip().decode("utf-8", "replace")
+                            remaining = 0
+                        elif doc_heading:
+                            suite = "doctest:" + doc_heading[1].decode("utf-8", "replace")
                             remaining = 0
                         elif count and suite is not None:
                             remaining = int(count[1])
@@ -258,17 +300,55 @@ def run(
                                 b"ignored": "skipped",
                             }[case[2]]
                             if key in seen or key in ambiguous:
-                                seen.pop(key, None)
+                                previous = seen.pop(key, None)
+                                if previous is not None:
+                                    result_bytes -= len(
+                                        json.dumps([suite, name, previous], ensure_ascii=False).encode()
+                                    ) + 2
+                                    evictable.pop(key, None)
                                 ambiguous.add(key)
+                                results_incomplete = True
+                            elif len(ambiguous) >= 20_000:
+                                results_incomplete = True
                             elif len(name) <= 1024 and len(suite) <= 2048:
-                                size = len(json.dumps([suite, name, state], ensure_ascii=False).encode()) + 1
-                                if len(seen) < 20_000 and result_bytes + size <= 3 * 1024 * 1024:
+                                size = len(
+                                    json.dumps([suite, name, state], ensure_ascii=False).encode()
+                                ) + 2
+                                preferred = state == "failure" or (
+                                    priority is not None and key in priority
+                                )
+                                if preferred:
+                                    while (
+                                        len(seen) >= 20_000
+                                        or result_bytes + size + 2 > 3 * 1024 * 1024
+                                    ):
+                                        if not evictable:
+                                            break
+                                        victim = next(iter(evictable))
+                                        evictable.pop(victim)
+                                        old = seen.pop(victim)
+                                        result_bytes -= len(
+                                            json.dumps([*victim, old], ensure_ascii=False).encode()
+                                        ) + 2
+                                        ambiguous.add(victim)
+                                        results_incomplete = True
+                                if len(seen) < 20_000 and result_bytes + size + 2 <= 3 * 1024 * 1024:
                                     seen[key] = state
                                     result_bytes += size
+                                    if not preferred:
+                                        evictable[key] = None
+                                else:
+                                    ambiguous.add(key)
+                                    results_incomplete = True
+                            else:
+                                ambiguous.add(key)
+                                results_incomplete = True
                         elif line.startswith(b"test result:"):
                             suite = None
                             remaining = 0
                     if len(line_buffer) > 4096:
+                        if line_buffer.startswith(b"test ") and suite is not None and remaining:
+                            results_incomplete = True
                         line_buffer = b""
                         dropping_line = True
                 kept = chunk[: max(0, limit - written)]
@@ -292,6 +372,8 @@ def run(
                 json.dumps([[*key, state] for key, state in seen.items()], ensure_ascii=False),
                 encoding="utf-8",
             )
+            if results_incomplete:
+                truncated.append(cargo_results)
 
     assert process.stdout is not None
     threads = []
@@ -394,6 +476,20 @@ def doctest_inventory(path: Path, expected: Counter[str]) -> set[tuple[str, str]
     return results
 
 
+def failure_keys(paths: Iterable[Path]) -> set[tuple[str, str]]:
+    failures = set()
+    for path in paths:
+        try:
+            failures.update(
+                (suite, name)
+                for suite, name, state in json.loads(path.read_text(encoding="utf-8"))
+                if state == "failure"
+            )
+        except (OSError, ValueError, TypeError):
+            continue
+    return failures
+
+
 def main() -> int:
     if len(sys.argv) != 2:
         raise SystemExit("usage: python3 scripts/flake_check.py OUTPUT_DIRECTORY")
@@ -481,11 +577,17 @@ def main() -> int:
         output / "doctest-inventory.log",
     )
     for number in (1, 2):
+        prior = failure_keys(
+            output / f"{kind}-{n}.json"
+            for kind, n in (("cargo-test", 1), ("doctest", 1))
+            if n < number
+        )
         baseline.append(
             run(
                 ["cargo", "test", "--locked", "--workspace", "--no-fail-fast", "--color", "never"],
                 output / f"cargo-test-{number}.log",
                 cargo_results=output / f"cargo-test-{number}.json",
+                priority=prior,
             )
         )
         report = output / f"attempt-{number}.xml"
@@ -496,12 +598,13 @@ def main() -> int:
             + "\nstore-failure-output = false\n",
             encoding="utf-8",
         )
+        os.environ["EJM_HARNESS_JUNIT_REFERENCE"] = str(output / "attempt-1.xml") if number == 2 else ""
         attempts.append(
             run(
                 [
                     sys.executable,
                     str(Path(__file__).with_name("bounded_report.py")),
-                    "fifo",
+                    "fifo-xml",
                     str(report),
                     str(50 * 1024 * 1024),
                     "--",
@@ -528,11 +631,14 @@ def main() -> int:
                 output / f"attempt-{number}.log",
             )
         )
+        os.environ.pop("EJM_HARNESS_JUNIT_REFERENCE", None)
         # nextest does not run doctests; keep their logs and exit codes separately.
         docs.append(
             run(
                 ["cargo", "test", "--locked", "--workspace", "--doc", "--no-fail-fast", "--color", "never"],
                 output / f"doctest-{number}.log",
+                cargo_results=output / f"doctest-{number}.json",
+                priority=prior | failure_keys([output / f"cargo-test-{number}.json"]),
             )
         )
     incomplete = (
@@ -581,6 +687,7 @@ def main() -> int:
         cargo_mixed = sorted(
             (f"cargo:{suite}", name)
             for suite, name in cargo_a.keys() & cargo_b.keys()
+            if not suite.startswith("doctest:")
             if {cargo_a[suite, name], cargo_b[suite, name]} == {"passed", "failure"}
         )
         mixed.extend(cargo_mixed)
@@ -614,6 +721,22 @@ def main() -> int:
         for suite, name in sorted(doc_keys)
         if {"passed", "failure"} <= {results.get((suite, name)) for results in doc_results}
     )
+    streamed_docs: dict[tuple[str, str], set[str]] = {}
+    for kind in ("cargo-test", "doctest"):
+        for number in (1, 2):
+            try:
+                records = json.loads(
+                    (output / f"{kind}-{number}.json").read_text(encoding="utf-8")
+                )
+                for suite, name, state in records:
+                    if suite.startswith("doctest:"):
+                        streamed_docs.setdefault((suite, name), set()).add(state)
+            except (OSError, ValueError, TypeError):
+                incomplete = True
+    mixed = sorted(
+        set(mixed)
+        | {key for key, states in streamed_docs.items() if {"passed", "failure"} <= states}
+    )
     summary = {
         "cargo_test_exit_codes": baseline,
         "cargo_test_inconsistent": baseline_differed,
@@ -625,7 +748,9 @@ def main() -> int:
         "mixed": mixed,
         "incomplete": incomplete,
     }
-    (output / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    encoded, truncated = bounded_summary(summary, ("mixed",))
+    incomplete |= truncated
+    (output / "summary.json").write_text(encoded, encoding="utf-8")
     for suite, name in mixed:
         print(f"Flaky test: {suite} :: {name}", file=sys.stderr)
     if baseline_differed:

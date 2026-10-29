@@ -2,7 +2,6 @@
 """Compare two registry nextest reports without hiding incomplete evidence."""
 
 import importlib.util
-import json
 import os
 import sys
 import xml.etree.ElementTree as ET
@@ -70,10 +69,8 @@ def main() -> int:
             result[name.lower()] = (
                 outcome if outcome in ("success", "failure", "cancelled", "skipped") else "invalid"
             )
-    encoded = json.dumps(result, ensure_ascii=True, separators=(",", ":")) + "\n"
-    if len(encoded.encode("utf-8")) > 4 * 1024 * 1024:
-        incomplete = True
-        encoded = '{"incomplete":true,"reason":"summary too large"}\n'
+    encoded, truncated = reporter.bounded_summary(result, ("mixed", "first_failed", "second_failed"))
+    incomplete |= truncated
     summary.write_text(encoded, encoding="utf-8")
     for suite, name in mixed:
         print(f"flaky-test: {suite} :: {name}")

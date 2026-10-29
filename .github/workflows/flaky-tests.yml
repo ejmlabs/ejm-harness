@@ -34,7 +34,7 @@ jobs:
           tar -xzf "$archive" -C "$bindir" cargo-nextest
           "$bindir/cargo-nextest" --version
           echo "$bindir" >> "$GITHUB_PATH"
-      - run: PYTHONPATH=scripts python3 -B -m unittest test_bounded_report test_flake_check test_registry_rust_compare test_registry_unittest_evidence test_registry_vitest_compare
+      - run: PYTHONPATH=scripts python3 -B -m unittest test_bounded_report test_flake_check test_nextest_evidence test_registry_rust_compare test_registry_unittest_evidence test_registry_vitest_compare
       - name: Compare two independent Rust test runs
         timeout-minutes: 50
         run: scripts/with-secret-service python3 scripts/flake_check.py "$RUNNER_TEMP/harness-flakes"
@@ -48,10 +48,10 @@ jobs:
           mkdir -p "$destination"
           shopt -s nullglob
           result=0
-          for file in "$source"/summary.json "$source"/inventory.json "$source"/attempt-*.xml "$source"/*.log; do
+          for file in "$source"/summary.json "$source"/inventory.json "$source"/attempt-*.xml "$source"/cargo-test-*.json "$source"/doctest-*.json "$source"/*.log; do
             [[ -e "$file" ]] || continue
             limit=52428800
-            [[ "$file" == *.log || "$file" == */summary.json ]] && limit=4194304
+            [[ "$file" == *.log || "$file" == */summary.json || "$file" == */cargo-test-*.json || "$file" == */doctest-*.json ]] && limit=4194304
             if [[ -L "$file" || ! -f "$file" ]] || (( $(wc -c < "$file") > limit )); then
               echo "Evidence exceeds its bound or is not a regular file: $file" >&2
               result=1
@@ -115,7 +115,7 @@ jobs:
         shell: bash
         run: |
           printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = false\n' "$RUNNER_TEMP/registry-flakes/rust-1.xml.fifo" > "$RUNNER_TEMP/registry-flakes/rust-1.toml"
-          python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/rust-1.xml" 52428800 -- cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-1.toml" --user-config-file none --no-tests fail --no-fail-fast
+          python3 -I ../scripts/bounded_report.py fifo-xml "$RUNNER_TEMP/registry-flakes/rust-1.xml" 52428800 -- cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-1.toml" --user-config-file none --no-tests fail --no-fail-fast
       - name: Run registry Rust tests, second attempt
         id: rust_second
         if: always() && !cancelled()
@@ -124,7 +124,7 @@ jobs:
         shell: bash
         run: |
           printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = false\n' "$RUNNER_TEMP/registry-flakes/rust-2.xml.fifo" > "$RUNNER_TEMP/registry-flakes/rust-2.toml"
-          python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/rust-2.xml" 52428800 -- cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-2.toml" --user-config-file none --no-tests fail --no-fail-fast
+          EJM_HARNESS_JUNIT_REFERENCE="$RUNNER_TEMP/registry-flakes/rust-1.xml" python3 -I ../scripts/bounded_report.py fifo-xml "$RUNNER_TEMP/registry-flakes/rust-2.xml" 52428800 -- cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-2.toml" --user-config-file none --no-tests fail --no-fail-fast
       - name: Compare registry Rust outcomes
         if: always() && !cancelled()
         timeout-minutes: 1
@@ -143,7 +143,7 @@ jobs:
         if: always() && !cancelled()
         timeout-minutes: 3
         working-directory: registry
-        run: python3 -I ../scripts/registry_unittest_evidence.py run "$RUNNER_TEMP/registry-flakes/schema-2.json" 'test_*.py'
+        run: EJM_REGISTRY_SCHEMA_REFERENCE="$RUNNER_TEMP/registry-flakes/schema-1.json" python3 -I ../scripts/registry_unittest_evidence.py run "$RUNNER_TEMP/registry-flakes/schema-2.json" 'test_*.py'
       - name: Compare registry schema outcomes
         if: always() && !cancelled()
         timeout-minutes: 1
@@ -181,13 +181,13 @@ jobs:
         if: always() && !cancelled()
         timeout-minutes: 4
         working-directory: registry
-        run: EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/worker-1.json.fifo" python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/worker-1.json" 4194304 -- node node_modules/vitest/vitest.mjs run --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
+        run: EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/worker-1.json.fifo" python3 -I ../scripts/bounded_report.py fifo-jsonl "$RUNNER_TEMP/registry-flakes/worker-1.json" 4194304 -- node node_modules/vitest/vitest.mjs run --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
       - name: Run registry Worker tests, second attempt
         id: worker_second
         if: always() && !cancelled()
         timeout-minutes: 4
         working-directory: registry
-        run: EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/worker-2.json.fifo" python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/worker-2.json" 4194304 -- node node_modules/vitest/vitest.mjs run --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
+        run: EJM_REGISTRY_VITEST_REFERENCE="$RUNNER_TEMP/registry-flakes/worker-1.json" EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/worker-2.json.fifo" python3 -I ../scripts/bounded_report.py fifo-jsonl "$RUNNER_TEMP/registry-flakes/worker-2.json" 4194304 -- node node_modules/vitest/vitest.mjs run --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
       - name: Compare registry Worker outcomes
         if: always() && !cancelled()
         timeout-minutes: 1
@@ -200,13 +200,13 @@ jobs:
         if: always() && !cancelled()
         timeout-minutes: 4
         working-directory: registry
-        run: EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/auth-1.json.fifo" python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/auth-1.json" 4194304 -- node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
+        run: EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/auth-1.json.fifo" python3 -I ../scripts/bounded_report.py fifo-jsonl "$RUNNER_TEMP/registry-flakes/auth-1.json" 4194304 -- node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
       - name: Run auth Worker tests, second attempt
         id: auth_second
         if: always() && !cancelled()
         timeout-minutes: 4
         working-directory: registry
-        run: EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/auth-2.json.fifo" python3 -I ../scripts/bounded_report.py fifo "$RUNNER_TEMP/registry-flakes/auth-2.json" 4194304 -- node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
+        run: EJM_REGISTRY_VITEST_REFERENCE="$RUNNER_TEMP/registry-flakes/auth-1.json" EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/auth-2.json.fifo" python3 -I ../scripts/bounded_report.py fifo-jsonl "$RUNNER_TEMP/registry-flakes/auth-2.json" 4194304 -- node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
       - name: Compare auth Worker outcomes
         if: always() && !cancelled()
         timeout-minutes: 1

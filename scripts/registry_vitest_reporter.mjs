@@ -23,6 +23,7 @@ export default class EvidenceReporter {
         message: message.length > 8192
           ? `${message.slice(0, 4096)}\n...\n${message.slice(-4096)}`
           : message,
+        truncated: message.length > 8192,
       } : {}),
     });
   }

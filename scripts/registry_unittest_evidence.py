@@ -2,6 +2,7 @@
 """Run and compare independent standard-library unittest outcomes."""
 
 import json
+import os
 import sys
 import unittest
 from pathlib import Path
@@ -131,7 +132,21 @@ def run(report: Path, pattern: str = "test*.py") -> int:
         incomplete = True
         retained: dict[str, str] = {}
         budget = 4 * 1024 * 1024 - 128
-        for identity, outcome in sorted(result.outcomes.items()):
+        reference: set[str] = set()
+        reference_path = os.environ.get("EJM_REGISTRY_SCHEMA_REFERENCE")
+        if reference_path:
+            try:
+                path = Path(reference_path)
+                if path.is_file() and not path.is_symlink() and path.stat().st_size <= 4 * 1024 * 1024:
+                    previous = json.loads(path.read_bytes())
+                    reference = {key for key, value in previous["outcomes"].items() if value == "failed"}
+            except (OSError, ValueError, KeyError, TypeError, AttributeError):
+                reference.clear()
+        ordered = sorted(
+            result.outcomes.items(),
+            key=lambda item: (item[1] != "failed", item[0] not in reference, item[0]),
+        )
+        for identity, outcome in ordered:
             encoded = json.dumps(identity).encode("utf-8")
             cost = 2 * len(encoded) + 24
             if len(identity) > 4096 or cost > budget:

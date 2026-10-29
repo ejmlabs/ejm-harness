@@ -24,7 +24,7 @@ class Case(unittest.TestCase):
     def id(self):
         return self.identity
     def runTest(self):
-        if self.identity.startswith("0000") and os.environ.get("FAIL_FLIP") == "1":
+        if (self.identity.startswith("0000") or self.identity == "zzzz-small") and os.environ.get("FAIL_FLIP") == "1":
             self.fail("first failure")
 
 def load_tests(loader, tests, pattern):
@@ -38,7 +38,8 @@ def load_tests(loader, tests, pattern):
             for report, fail in zip(reports, ("1", "0"), strict=True):
                 result = subprocess.run(
                     [sys.executable, "-I", str(script), "run", str(report), "test_*.py"],
-                    cwd=root, env={**os.environ, "FAIL_FLIP": fail},
+                    cwd=root, env={**os.environ, "FAIL_FLIP": fail,
+                                   "EJM_REGISTRY_SCHEMA_REFERENCE": str(reports[0]) if fail == "0" else ""},
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
                 )
                 self.assertNotEqual(result.returncode, 0)
@@ -53,6 +54,7 @@ def load_tests(loader, tests, pattern):
             )
             self.assertNotEqual(compared.returncode, 0)
             self.assertIn("flaky-test: 0000", compared.stdout)
+            self.assertIn("flaky-test: zzzz-small", compared.stdout)
 
 
 if __name__ == "__main__":

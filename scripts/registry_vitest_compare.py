@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Compare independent registry Vitest reports against a runtime inventory."""
 
+import importlib.util
 import json
 import os
 import sys
@@ -9,6 +10,14 @@ from typing import Any
 
 MAX_BYTES = 4 * 1024 * 1024
 MAX_TESTS = 20_000
+
+spec = importlib.util.spec_from_file_location(
+    "flake_check", Path(__file__).with_name("flake_check.py")
+)
+if spec is None or spec.loader is None:
+    raise RuntimeError("Cannot load the Rust test reporter")
+reporter = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(reporter)
 
 
 def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -249,18 +258,8 @@ def main() -> int:
             result[name.lower()] = (
                 outcome if outcome in ("success", "failure", "cancelled", "skipped") else "invalid"
             )
-    encoded = json.dumps(result, ensure_ascii=True, separators=(",", ":")) + "\n"
-    if len(encoded.encode("utf-8")) > MAX_BYTES:
-        result["incomplete"] = True
-        encoded = json.dumps(
-            {
-                "incomplete": True,
-                "reason": "summary too large",
-                "first_diagnostic": result["first_diagnostic"],
-                "second_diagnostic": result["second_diagnostic"],
-            },
-            ensure_ascii=True,
-        ) + "\n"
+    encoded, truncated = reporter.bounded_summary(result, ("mixed", "first_failed", "second_failed"))
+    result["incomplete"] |= truncated
     summary.write_text(encoded, encoding="utf-8")
     for key in result["mixed"]:
         print("flaky-test:", key)

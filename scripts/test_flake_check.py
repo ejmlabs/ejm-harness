@@ -9,7 +9,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from flake_check import doctest_inventory, doctest_outcomes, inventory, mixed_tests, outcomes, partial_outcomes
+from flake_check import bounded_summary, doctest_inventory, doctest_outcomes, inventory, mixed_tests, outcomes, partial_outcomes
 
 
 def report(cases: list[tuple[str, str]]) -> str:
@@ -57,6 +57,19 @@ if sys.argv[1] == "test":
 
 
 class FlakeCheckTests(unittest.TestCase):
+    def test_bounded_summary_retains_mixed_and_failures(self) -> None:
+        records = [f"{index:05}" + "x" * 900 for index in range(2500)]
+        encoded, truncated = bounded_summary({
+            "incomplete": False, "mixed": records, "first_failed": records,
+            "second_failed": records, "first_diagnostic": {"message": "failure"},
+        }, ("mixed", "first_failed", "second_failed"))
+        result = json.loads(encoded)
+        self.assertTrue(truncated)
+        self.assertLessEqual(len(encoded.encode()), 4 * 1024 * 1024)
+        self.assertTrue(result["incomplete"] and result["summary_truncated"])
+        self.assertTrue(result["mixed"] and result["first_failed"] and result["second_failed"])
+        self.assertEqual(result["first_diagnostic"]["message"], "failure")
+
     def write_reports(self, root: Path, first: str, second: str) -> tuple[Path, Path]:
         a, b = root / "first.xml", root / "second.xml"
         a.write_text(first, encoding="utf-8")
@@ -315,6 +328,45 @@ class FlakeCheckTests(unittest.TestCase):
                 {"tests::first": "failure", "tests::second": "passed"},
                 {"tests::first": "passed", "tests::second": "failure"},
             ])
+
+    def test_late_cargo_and_doctest_failures_survive_outcome_overflow(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            driver = (
+                "import sys; sys.path.insert(0, sys.argv[1]); "
+                "from flake_check import run, failure_keys; from pathlib import Path; "
+                "previous = Path(sys.argv[3]); "
+                "priority = failure_keys([previous]); "
+                "result = run([sys.executable, '-c', sys.argv[4], sys.argv[5]], "
+                "Path(sys.argv[2]), cargo_results=Path(sys.argv[6]), priority=priority); "
+                "print('capture-result:', result)"
+            )
+            child = (
+                "import sys; status = sys.argv[1]; "
+                "print('x' * 5000000); "
+                "print('     Running unittests src/lib.rs (target/debug/deps/example)'); "
+                "print('running 20002 tests'); "
+                "[print('test case_%05d ... ok' % n) for n in range(20001)]; "
+                "print('test last ... ' + status); "
+                "print('test result: FAILED. 20001 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out;'); "
+                "print('   Doc-tests example'); print('running 1 test'); "
+                "print('test src/lib.rs - last ... ' + status); "
+                "print('test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out;')"
+            )
+            outcomes = []
+            for number, state in ((1, "FAILED"), (2, "ok")):
+                path = root / f"{number}.json"
+                result = subprocess.run(
+                    [sys.executable, "-c", driver, str(Path(__file__).parent),
+                     str(root / f"{number}.log"), str(root / "1.json"), child, state, str(path)],
+                    capture_output=True, text=True, check=True,
+                )
+                self.assertIn("capture-result: None", result.stdout)
+                self.assertLessEqual(path.stat().st_size, 3 * 1024 * 1024 + 2)
+                outcomes.append({(suite, name): status for suite, name, status in json.loads(path.read_text())})
+            for key in (("Running unittests src/lib.rs (target/debug/deps/example)", "last"),
+                        ("doctest:example", "src/lib.rs - last")):
+                self.assertEqual([record[key] for record in outcomes], ["failure", "passed"])
 
     def test_captured_output_cannot_spoof_a_test_result(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

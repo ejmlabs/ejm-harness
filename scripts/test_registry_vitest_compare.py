@@ -12,6 +12,31 @@ from registry_vitest_compare import compare
 
 
 class RegistryVitestCompareTests(unittest.TestCase):
+    def test_oversized_summary_retains_comparable_failures(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = str(root / "worker.test.ts")
+            names = [f"{index:05}" + "x" * 900 for index in range(2500)]
+            listing = root / "inventory.json"
+            listing.write_text(json.dumps([{"file": file, "name": name} for name in names]))
+            first, second = root / "first.json", root / "second.json"
+            for path, status in ((first, "failed"), (second, "passed")):
+                records = [{"kind": "start"}] + [
+                    {"kind": "case", "file": file, "name": name, "status": status}
+                    for name in names
+                ] + [{"kind": "end", "incomplete": False}]
+                path.write_text("".join(json.dumps(item, separators=(",", ":")) + "\n" for item in records))
+            summary = root / "summary.json"
+            result = subprocess.run([
+                sys.executable, "-I", str(Path(__file__).with_name("registry_vitest_compare.py")),
+                str(listing), str(first), str(second), str(root), str(summary),
+            ], capture_output=True, check=False)
+            data = json.loads(summary.read_text())
+            self.assertEqual(result.returncode, 1)
+            self.assertLessEqual(summary.stat().st_size, 4 * 1024 * 1024)
+            self.assertTrue(data["incomplete"] and data["summary_truncated"])
+            self.assertTrue(data["mixed"] and data["first_failed"])
+
     def test_truncated_record_stream_keeps_earlier_failure(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
