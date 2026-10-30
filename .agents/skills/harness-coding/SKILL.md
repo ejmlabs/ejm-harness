@@ -35,3 +35,9 @@ and cancellation. Run `cargo test -p ejm-harness-coding` and strict Clippy, then
 `./scripts/check`. Use [harness-execution](../harness-execution/SKILL.md) when a change
 touches admission or process ownership, and
 [harness-maintenance](../harness-maintenance/SKILL.md) when a grant or limit contract changes.
+
+## Principles
+
+KISS, YAGNI, DRY and Clean Code: the simplest code that solves the whole problem, only what a
+task needs now, one authoritative home for each rule, and clear names, small functions and
+structure.
