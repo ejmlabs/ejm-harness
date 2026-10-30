@@ -33,6 +33,25 @@ these notes; see [RELEASING.md](RELEASING.md) and the known limits under
 - Retain immutable UI install metadata for static dependency review. This
   preparation selects no UI dependency and changes no product behavior.
 
+- The public package registry is `https://registry.ejmlabs.com`. Hosts must
+  explicitly select a registry origin. Both Workers' `REGISTRY_ORIGIN` and the
+  GitHub OAuth callback use the public origin.
+  `meetgerry.ai` and its subdomains are rejected, redirects are not followed, and
+  sessions saved for the retired origin are not saved, loaded, imported or sent.
+  Sign in again on the new origin. These
+  notes do not deploy a registry, and they do not create or replace a tag or
+  GitHub release. Builds from the earlier v0.1.0 tag (commit 8d3dc39) default
+  to a retired registry domain and must not be used for registry commands.
+  Upgrade to the reissued v0.1.0.
+
+### Fixed
+
+- Check authenticated HTTP loopback registry requests against the direct-route
+  proxy fixture, with a synthetic bearer and bounded child cleanup. The
+  harness-owned client disables proxies for these origins; HTTPS keeps proxy
+  support. Older host pins need a temporary configuration guard until they
+  adopt and verify this transport contract.
+
 ### Security
 
 - Override the registry's transitive undici to 7.30.1 (development and test

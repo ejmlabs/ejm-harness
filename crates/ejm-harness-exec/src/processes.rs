@@ -1,12 +1,15 @@
 //! Read-only process observations and best-effort identity-checked cleanup.
 
-use std::{collections::HashMap, io};
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+};
 
 // Linux exposes a short stat record, but still bound reads from procfs.
 #[cfg(any(target_os = "linux", test))]
 const MAX_STAT_BYTES: usize = 16 * 1024;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct ProcessInfo {
     pub parent: Option<u32>,
     pub start: u64,
@@ -14,10 +17,46 @@ pub(crate) struct ProcessInfo {
     pub zombie: bool,
 }
 
+#[cfg(target_os = "macos")]
+#[derive(Clone, Copy)]
+pub(crate) struct ProcessSeed {
+    pub pid: u32,
+    pub start: Option<u64>,
+}
+
+/// Native ancestry and birth data without a resident-memory observation.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ProcessMetadata {
+    pub parent: Option<u32>,
+    pub start: Option<u64>,
+}
+
+#[derive(Default)]
+pub(crate) struct ProcessSample {
+    pub current: HashMap<u32, ProcessInfo>,
+    pub uncertain: HashMap<u32, ProcessMetadata>,
+    // Positive exit progress retains identity and occupancy without claiming
+    // either a current RSS measurement or completed exit.
+    pub exiting: HashMap<u32, ProcessMetadata>,
+    pub exited: HashMap<u32, ProcessMetadata>,
+    pub replaced: HashSet<u32>,
+    pub sampling_failures: HashMap<u32, String>,
+}
+
+pub(crate) fn bounded_sampling_failure(mut detail: String) -> String {
+    detail.truncate(detail.floor_char_boundary(512));
+    detail
+}
+
 #[cfg(target_os = "linux")]
 pub(crate) use linux::{Sampler, supported};
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "macos")]
+pub(crate) use macos::{Sampler, supported};
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 pub(crate) use native::{Sampler, supported};
+
+#[cfg(target_os = "macos")]
+mod macos;
 
 #[cfg(target_os = "linux")]
 mod linux {
@@ -44,6 +83,10 @@ mod linux {
     }
 
     impl Sampler {
+        pub fn observe(&mut self, pid: u32) -> io::Result<ProcessInfo> {
+            self.read(pid)
+        }
+
         pub fn sample_all(&mut self) -> io::Result<HashMap<u32, ProcessInfo>> {
             if self.page_bytes == 0 {
                 return Err(io::Error::other("cannot read the system page size"));
@@ -103,7 +146,7 @@ mod linux {
     }
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 mod native {
     use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System};
 
@@ -126,6 +169,26 @@ mod native {
     }
 
     impl Sampler {
+        pub fn observe(&mut self, pid: u32) -> io::Result<ProcessInfo> {
+            let pid = Pid::from_u32(pid);
+            self.system.refresh_processes_specifics(
+                ProcessesToUpdate::Some(&[pid]),
+                true,
+                ProcessRefreshKind::nothing().with_memory(),
+            );
+            self.system
+                .process(pid)
+                .map(|process| ProcessInfo {
+                    parent: process.parent().map(Pid::as_u32),
+                    start: process.start_time(),
+                    memory: process.memory(),
+                    zombie: process.status() == ProcessStatus::Zombie,
+                })
+                .ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::NotFound, "process identity unavailable")
+                })
+        }
+
         #[allow(
             clippy::unnecessary_wraps,
             reason = "Match the fallible procfs sampler interface on Linux."
@@ -201,7 +264,17 @@ fn parse_linux_stat(bytes: &[u8], page_bytes: u64) -> Option<(u32, ProcessInfo)>
     reason = "Parser fixtures assert the presence of valid records."
 )]
 mod tests {
-    use super::{MAX_STAT_BYTES, parse_linux_stat};
+    use super::{MAX_STAT_BYTES, bounded_sampling_failure, parse_linux_stat};
+
+    #[test]
+    fn sampling_failure_details_keep_a_bounded_utf8_prefix() {
+        let prefix = "stage=owned_rss_retry pid=7 cause=";
+        let detail = bounded_sampling_failure(format!("{prefix}{}", "\u{00e9}".repeat(512)));
+        assert!(detail.starts_with(prefix));
+        assert!(detail.len() <= 512);
+        assert!(detail.ends_with('\u{00e9}'));
+        assert_eq!(bounded_sampling_failure(prefix.into()), prefix);
+    }
 
     fn stat(pid: i64, comm: &[u8], state: &str, parent: i64, start: u64, rss: i64) -> Vec<u8> {
         let mut bytes = format!("{pid} (").into_bytes();

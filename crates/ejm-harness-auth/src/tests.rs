@@ -1,16 +1,32 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
+use anyhow::{Context, Result, ensure};
+use async_trait::async_trait;
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use jsonwebtoken::{Algorithm, EncodingKey, Header, encode};
+use reqwest::Url;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use tokio::sync::{Mutex as AsyncMutex, Semaphore};
+use tokio_util::sync::CancellationToken;
 use wiremock::{
     Mock, MockGuard, MockServer, ResponseTemplate,
     matchers::{method, path},
 };
 
-use super::*;
-use crate::{FileStore, StoredAuth, VaultKeyStore};
+use super::{AuthEngine, DYNAMIC_CLIENT, Http, ISSUER, Inner, SCOPES, timestamp};
+use crate::{
+    AuthConfig, CredentialStore, CredentialTransaction, FileStore, LoginAttempt,
+    RegistrationStatus, RetryRequired, SecretString, StoredAuth, VaultKeyStore,
+    identity::IdentityValidator,
+};
 
 const CLIENT: &str = "oaiapp_test_client";
 const CALLBACK: &str = "http://127.0.0.1:54823/auth/callback";

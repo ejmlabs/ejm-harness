@@ -41,6 +41,8 @@ there. A rule below or a repository skill may add to them, never relax them.
 - Never replay an uncertain effect after recovery.
 - Report native restrictions as enforced, monitored, or unsupported. Native execution is not a sandbox.
 - Public traits are dependency injection ports. Add a trait where an external boundary or real variation needs one.
+- Follow an existing code pattern or define one, so the code stays uniform. [The code layout](docs/contributing.md#code-layout)
+  lists the patterns and shared helpers; add a new pattern there before you use it.
 - Inherit workspace lints. Do not relax groups or add production panic shortcuts.
 - Keep Cargo jobs at most two on constrained machines.
 - Do not publish packages or upload artifacts without explicit authorization. Releases follow
@@ -89,6 +91,7 @@ there. A rule below or a repository skill may add to them, never relax them.
 | SDK packages           | npm `ejm-harness`, Python `ejm_harness`                                                   |
 | Public page            | "harness by ejmlabs" at harness.ejmlabs.com                                               |
 | Hosts                  | `ejm-cli` at `../ejm-cli` and `ejm-ide` at `../ejm-ide`, not part of this repo            |
+| Package registry       | `https://registry.ejmlabs.com`                                                            |
 | Package manifest       | `ejm.package.json`; registry clients require an explicit origin                           |
 
 ## Commands

@@ -2,7 +2,7 @@ use std::{
     fmt::Write as _,
     path::PathBuf,
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, MutexGuard,
         atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     time::Duration,
@@ -44,6 +44,12 @@ impl RecordingProvider {
             ]),
         }
     }
+
+    fn captured(&self) -> Result<MutexGuard<'_, Vec<ModelRequest>>> {
+        self.requests
+            .lock()
+            .map_err(|_| anyhow::anyhow!("request capture lock poisoned"))
+    }
 }
 
 #[async_trait]
@@ -54,10 +60,7 @@ impl Provider for RecordingProvider {
         cancel: CancellationToken,
         deltas: mpsc::Sender<ModelDelta>,
     ) -> Result<ModelResponse> {
-        self.requests
-            .lock()
-            .map_err(|_| anyhow::anyhow!("request capture lock poisoned"))?
-            .push(request.clone());
+        self.captured()?.push(request.clone());
         self.replay.stream(request, cancel, deltas).await
     }
 }
@@ -115,6 +118,31 @@ async fn session(harness: &Harness, root: &tempfile::TempDir) -> Result<Session>
             cwd: root.path().into(),
             ..Default::default()
         })
+        .await
+}
+
+fn inspect_harness(
+    config: &HarnessConfig,
+    provider: &Arc<RecordingProvider>,
+    calls: &Arc<AtomicUsize>,
+    hooks: Vec<Arc<dyn Hook>>,
+) -> Result<Harness> {
+    Harness::with_hooks(
+        config.clone(),
+        provider.clone(),
+        vec![Arc::new(InspectTool {
+            state: config.state_dir.clone(),
+            calls: calls.clone(),
+        })],
+        hooks,
+    )
+}
+
+async fn run(harness: &Harness, session: &Session, prompt: &str) -> Result<RunSummary> {
+    harness
+        .start(&session.id, prompt.into())
+        .await?
+        .wait()
         .await
 }
 
@@ -238,21 +266,9 @@ async fn hooks_compose_in_order_without_extra_model_calls_or_mutating_raw_eviden
             }) as Arc<dyn Hook>
         })
         .collect();
-    let harness = Harness::with_hooks(
-        config.clone(),
-        provider.clone(),
-        vec![Arc::new(InspectTool {
-            state: config.state_dir.clone(),
-            calls: calls.clone(),
-        })],
-        hooks,
-    )?;
+    let harness = inspect_harness(&config, &provider, &calls, hooks)?;
     let session = session(&harness, &root).await?;
-    let result = harness
-        .start(&session.id, "request".into())
-        .await?
-        .wait()
-        .await?;
+    let result = run(&harness, &session, "request").await?;
     assert_eq!(result.status, RunStatus::Completed, "{:?}", result.error);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(
@@ -263,10 +279,7 @@ async fn hooks_compose_in_order_without_extra_model_calls_or_mutating_raw_eviden
         EXPECTED_ORDER
     );
     {
-        let requests = provider
-            .requests
-            .lock()
-            .map_err(|_| anyhow::anyhow!("request capture lock poisoned"))?;
+        let requests = provider.captured()?;
         assert_eq!(requests.len(), 2);
         assert_eq!(
             requests[0]
@@ -362,24 +375,13 @@ async fn hook_gates_cannot_bypass_grants_schema_or_argument_limits() -> Result<(
         let provider = Arc::new(RecordingProvider::tool_then_complete(name));
         let calls = Arc::new(AtomicUsize::new(0));
         let entered = Arc::new(AtomicUsize::new(0));
-        let harness = Harness::with_hooks(
-            config.clone(),
-            provider.clone(),
-            vec![Arc::new(InspectTool {
-                state: config.state_dir,
-                calls: calls.clone(),
-            })],
-            vec![Arc::new(GateHook {
-                mode,
-                entered: entered.clone(),
-            })],
-        )?;
+        let gate = GateHook {
+            mode,
+            entered: entered.clone(),
+        };
+        let harness = inspect_harness(&config, &provider, &calls, vec![Arc::new(gate)])?;
         let session = session(&harness, &root).await?;
-        let result = harness
-            .start(&session.id, "inspect".into())
-            .await?
-            .wait()
-            .await?;
+        let result = run(&harness, &session, "inspect").await?;
         assert_eq!(result.status, RunStatus::Completed, "{:?}", result.error);
         assert_eq!(calls.load(Ordering::SeqCst), 0);
         assert_eq!(
@@ -434,19 +436,12 @@ async fn cancellation_during_tool_hooks_preserves_effect_and_recovery_boundaries
         let provider = Arc::new(RecordingProvider::tool_then_complete("inspect"));
         let calls = Arc::new(AtomicUsize::new(0));
         let entered = Arc::new(Notify::new());
-        let harness = Harness::with_hooks(
-            config.clone(),
-            provider.clone(),
-            vec![Arc::new(InspectTool {
-                state: config.state_dir.clone(),
-                calls: calls.clone(),
-            })],
-            vec![Arc::new(BlockingHook {
-                entered: entered.clone(),
-                block_before_tool,
-                block_once: AtomicBool::new(true),
-            })],
-        )?;
+        let blocking = BlockingHook {
+            entered: entered.clone(),
+            block_before_tool,
+            block_once: AtomicBool::new(true),
+        };
+        let harness = inspect_harness(&config, &provider, &calls, vec![Arc::new(blocking)])?;
         let session = session(&harness, &root).await?;
         let mut handle = harness.start(&session.id, "inspect".into()).await?;
         tokio::time::timeout(Duration::from_secs(5), entered.notified())
@@ -467,21 +462,14 @@ async fn cancellation_during_tool_hooks_preserves_effect_and_recovery_boundaries
             calls.load(Ordering::SeqCst),
             usize::from(!block_before_tool)
         );
-        let result = harness
-            .start(&session.id, "Inspect existing evidence.".into())
-            .await?
-            .wait()
-            .await?;
+        let result = run(&harness, &session, "Inspect existing evidence.").await?;
         assert_eq!(result.status, RunStatus::Completed, "{:?}", result.error);
         assert_eq!(
             calls.load(Ordering::SeqCst),
             usize::from(!block_before_tool)
         );
         {
-            let requests = provider
-                .requests
-                .lock()
-                .map_err(|_| anyhow::anyhow!("request capture lock poisoned"))?;
+            let requests = provider.captured()?;
             assert_eq!(requests.len(), 2);
             let result = requests[1]
                 .messages
@@ -530,28 +518,14 @@ async fn failed_result_hooks_retain_confirmed_content_status_and_artifact() -> R
         let config = config(&root);
         let provider = Arc::new(RecordingProvider::tool_then_complete("inspect"));
         let calls = Arc::new(AtomicUsize::new(0));
-        let harness = Harness::with_hooks(
-            config.clone(),
-            provider.clone(),
-            vec![Arc::new(InspectTool {
-                state: config.state_dir,
-                calls: calls.clone(),
-            })],
-            vec![Arc::new(BadResultHook { strip_evidence })],
-        )?;
+        let hook = BadResultHook { strip_evidence };
+        let harness = inspect_harness(&config, &provider, &calls, vec![Arc::new(hook)])?;
         let session = session(&harness, &root).await?;
-        let result = harness
-            .start(&session.id, "inspect".into())
-            .await?
-            .wait()
-            .await?;
+        let result = run(&harness, &session, "inspect").await?;
         assert_eq!(result.status, RunStatus::Completed, "{:?}", result.error);
         assert_eq!(calls.load(Ordering::SeqCst), 1);
         {
-            let requests = provider
-                .requests
-                .lock()
-                .map_err(|_| anyhow::anyhow!("request capture lock poisoned"))?;
+            let requests = provider.captured()?;
             let result = requests[1].messages.last().context("missing tool result")?;
             assert!(result.content.starts_with("confirmed:\"original\""));
             assert!(
@@ -604,11 +578,7 @@ async fn invalid_context_hooks_fail_before_model_admission_and_registration_is_b
         vec![Arc::new(InvalidContextHook)],
     )?;
     let session = session(&harness, &root).await?;
-    let result = harness
-        .start(&session.id, "Original intent.".into())
-        .await?
-        .wait()
-        .await?;
+    let result = run(&harness, &session, "Original intent.").await?;
     assert_eq!(result.status, RunStatus::Failed);
     assert!(
         result
@@ -616,13 +586,7 @@ async fn invalid_context_hooks_fail_before_model_admission_and_registration_is_b
             .context("missing hook failure")?
             .contains("changed the latest user intent")
     );
-    assert!(
-        provider
-            .requests
-            .lock()
-            .map_err(|_| anyhow::anyhow!("request capture lock poisoned"))?
-            .is_empty()
-    );
+    assert!(provider.captured()?.is_empty());
     harness.shutdown().await?;
     Ok(())
 }
@@ -691,13 +655,7 @@ async fn hook_deadlines_and_run_end_observers_are_bounded() -> Result<()> {
                 RunStatus::BudgetExhausted
             }
         );
-        assert!(
-            provider
-                .requests
-                .lock()
-                .map_err(|_| anyhow::anyhow!("request capture lock poisoned"))?
-                .is_empty()
-        );
+        assert!(provider.captured()?.is_empty());
         assert!(
             end_token
                 .lock()

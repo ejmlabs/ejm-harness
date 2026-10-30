@@ -5,7 +5,8 @@ description: Change the native coding tools in ejm-harness-coding, including fil
 
 # ejm-harness coding tools
 
-Read `crates/ejm-harness-coding/src/lib.rs`, [the executor contract](../../../docs/executor.md),
+Read `crates/ejm-harness-coding/src/`: `lib.rs` registers the tools, `path.rs` owns path safety,
+and each tool has its own module. Then read [the executor contract](../../../docs/executor.md)
 and [harness engineering decisions](../../../docs/harness-engineering.md) for retrieval limits.
 The tool set is small on purpose. Prefer tightening an existing tool over adding one.
 

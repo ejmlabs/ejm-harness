@@ -1,15 +1,13 @@
-use std::time::Duration;
-
 use anyhow::{Context, Result, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD};
 use ejm_harness_package_spec::{MAX_ARCHIVE_BYTES, archive_sha256};
-use futures_util::StreamExt;
-use reqwest::{Client, Url, redirect::Policy};
+use reqwest::{Client, Url};
 use serde::Deserialize;
 use sha2::{Digest, Sha512};
 use tokio_util::sync::CancellationToken;
 
 use super::archives;
+use crate::http::{bounded_body, client_builder};
 
 const MAX_METADATA_BYTES: usize = 256 * 1024;
 
@@ -24,11 +22,7 @@ pub(super) struct Downloads {
 impl Downloads {
     pub(super) fn new() -> Result<Self> {
         Ok(Self {
-            http: Client::builder()
-                .redirect(Policy::none())
-                .connect_timeout(Duration::from_secs(10))
-                .timeout(Duration::from_secs(30))
-                .build()?,
+            http: client_builder().build()?,
             npm: Url::parse("https://registry.npmjs.org/")?,
             pypi: Url::parse("https://pypi.org/")?,
             wheels: Url::parse("https://files.pythonhosted.org/")?,
@@ -44,27 +38,8 @@ impl Downloads {
             semver::Version::parse(version)?.to_string() == version,
             "npm source requires exact semver"
         );
-        let package = name.strip_prefix('@').unwrap_or(name);
-        ensure!(
-            !package.is_empty()
-                && package.len() <= 214
-                && package.bytes().all(|byte| byte.is_ascii_lowercase()
-                    || byte.is_ascii_digit()
-                    || matches!(byte, b'-' | b'_' | b'.' | b'/'))
-                && if name.starts_with('@') {
-                    package.split('/').count() == 2
-                } else {
-                    !package.contains('/')
-                }
-                && package
-                    .split('/')
-                    .all(|part| !part.is_empty() && !part.starts_with('.')),
-            "invalid public npm package name"
-        );
-        let mut url = self.npm.clone();
-        url.path_segments_mut()
-            .map_err(|()| anyhow::anyhow!("invalid npm origin"))?
-            .extend([name, version]);
+        ensure!(valid_npm_name(name), "invalid public npm package name");
+        let url = with_segments(&self.npm, "npm", [name, version])?;
         let metadata: NpmMetadata =
             serde_json::from_slice(&self.bytes(url, MAX_METADATA_BYTES, cancel).await?)?;
         ensure!(
@@ -86,17 +61,10 @@ impl Downloads {
             .split_once("==")
             .context("PyPI source requires name==exact-version")?;
         ensure!(
-            valid_pypi_name(name)
-                && !version.is_empty()
-                && version.len() <= 48
-                && version.bytes().all(|byte| byte.is_ascii_alphanumeric()
-                    || matches!(byte, b'.' | b'+' | b'-' | b'!')),
+            valid_pypi_name(name) && valid_pypi_version(version),
             "invalid exact public PyPI source"
         );
-        let mut url = self.pypi.clone();
-        url.path_segments_mut()
-            .map_err(|()| anyhow::anyhow!("invalid PyPI origin"))?
-            .extend(["pypi", name, version, "json"]);
+        let url = with_segments(&self.pypi, "PyPI", ["pypi", name, version, "json"])?;
         let metadata: PypiMetadata =
             serde_json::from_slice(&self.bytes(url, MAX_METADATA_BYTES, cancel).await?)?;
         ensure!(
@@ -135,19 +103,14 @@ impl Downloads {
         let path = path.strip_suffix(".git").unwrap_or(path);
         let parts: Vec<_> = path.split('/').collect();
         ensure!(
-            parts.len() == 2
-                && parts.iter().all(|part| !part.is_empty()
-                    && !matches!(*part, "." | "..")
-                    && part
-                        .bytes()
-                        .all(|byte| byte.is_ascii_alphanumeric()
-                            || matches!(byte, b'-' | b'_' | b'.'))),
+            parts.len() == 2 && parts.iter().all(|part| valid_repository_part(part)),
             "GitHub source requires one owner and repository"
         );
-        let mut url = self.github.clone();
-        url.path_segments_mut()
-            .map_err(|()| anyhow::anyhow!("invalid GitHub archive origin"))?
-            .extend([parts[0], parts[1], "tar.gz", commit]);
+        let url = with_segments(
+            &self.github,
+            "GitHub archive",
+            [parts[0], parts[1], "tar.gz", commit],
+        )?;
         let bytes = self.bytes(url, MAX_ARCHIVE_BYTES, cancel).await?;
         archives::tar(&bytes, None, true)
     }
@@ -159,15 +122,7 @@ impl Downloads {
             result = async {
                 let response = self.http.get(url).send().await?;
                 ensure!(response.status().is_success(), "package source request failed (HTTP {})", response.status());
-                ensure!(response.content_length().is_none_or(|size| size <= max as u64), "package source exceeds byte limit");
-                let mut stream = response.bytes_stream();
-                let mut bytes = Vec::new();
-                while let Some(chunk) = stream.next().await {
-                    let chunk = chunk?;
-                    ensure!(bytes.len().saturating_add(chunk.len()) <= max, "package source exceeds byte limit");
-                    bytes.extend_from_slice(&chunk);
-                }
-                Ok(bytes)
+                bounded_body(response, max, "package source").await
             } => result,
         }
     }
@@ -184,6 +139,54 @@ fn checked_url(value: &str, origin: &Url) -> Result<Url> {
         "unsupported package download origin or credentials"
     );
     Ok(url)
+}
+
+/// The origin extended by percent-encoded path segments.
+fn with_segments<'a>(
+    origin: &Url,
+    what: &str,
+    segments: impl IntoIterator<Item = &'a str>,
+) -> Result<Url> {
+    let mut url = origin.clone();
+    url.path_segments_mut()
+        .map_err(|()| anyhow::anyhow!("invalid {what} origin"))?
+        .extend(segments);
+    Ok(url)
+}
+
+fn valid_npm_name(name: &str) -> bool {
+    let package = name.strip_prefix('@').unwrap_or(name);
+    !package.is_empty()
+        && package.len() <= 214
+        && package.bytes().all(|byte| {
+            byte.is_ascii_lowercase()
+                || byte.is_ascii_digit()
+                || matches!(byte, b'-' | b'_' | b'.' | b'/')
+        })
+        && if name.starts_with('@') {
+            package.split('/').count() == 2
+        } else {
+            !package.contains('/')
+        }
+        && package
+            .split('/')
+            .all(|part| !part.is_empty() && !part.starts_with('.'))
+}
+
+fn valid_pypi_version(version: &str) -> bool {
+    !version.is_empty()
+        && version.len() <= 48
+        && version
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'+' | b'-' | b'!'))
+}
+
+fn valid_repository_part(part: &str) -> bool {
+    !part.is_empty()
+        && !matches!(part, "." | "..")
+        && part
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
 }
 
 fn valid_pypi_name(name: &str) -> bool {

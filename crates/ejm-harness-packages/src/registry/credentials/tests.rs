@@ -3,8 +3,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use anyhow::Result;
+use anyhow::{Result, bail, ensure};
 use ejm_harness_auth::VaultKeyStore;
+use tokio_util::sync::CancellationToken;
 
 use super::*;
 
@@ -28,6 +29,7 @@ impl VaultKeyStore for Keys {
 }
 
 const ORIGIN: &str = "https://registry.example.invalid/";
+const RETIRED: &str = "https://harness.meetgerry.ai/";
 
 struct Fixture {
     _directory: tempfile::TempDir,
@@ -94,6 +96,67 @@ fn encrypted_registry_sessions_are_origin_bound_and_deletion_is_permanent() -> R
     assert!(migrate(&fixture.vault, &fixture.root, ORIGIN)?);
     assert!(load(&fixture.vault, &fixture.root, ORIGIN).is_err());
     assert!(!fixture.root.join(LEGACY).exists());
+    Ok(())
+}
+
+#[test]
+fn public_and_custom_registry_sessions_remain_origin_scoped() -> Result<()> {
+    let fixture = Fixture::new()?;
+    let public_origin = super::super::PUBLIC_REGISTRY_ORIGIN;
+    let public_token = SecretString::new("public-registry-fixture-token");
+    let custom_token = SecretString::new("custom-registry-fixture-token");
+    save(&fixture.vault, &fixture.root, ORIGIN, &custom_token)?;
+    save(&fixture.vault, &fixture.root, public_origin, &public_token)?;
+    assert_eq!(
+        load(&fixture.vault, &fixture.root, ORIGIN)?.expose_secret(),
+        custom_token.expose_secret()
+    );
+    assert_eq!(
+        load(&fixture.vault, &fixture.root, public_origin)?.expose_secret(),
+        public_token.expose_secret()
+    );
+    delete(&fixture.vault, public_origin)?;
+    assert!(load(&fixture.vault, &fixture.root, public_origin).is_err());
+    assert_eq!(
+        load(&fixture.vault, &fixture.root, ORIGIN)?.expose_secret(),
+        custom_token.expose_secret()
+    );
+    Ok(())
+}
+
+#[test]
+fn retired_sessions_are_never_saved_loaded_or_imported() -> Result<()> {
+    let fixture = Fixture::new()?;
+    let Err(refused) = save(
+        &fixture.vault,
+        &fixture.root,
+        RETIRED,
+        &SecretString::new("retired-fixture-token"),
+    ) else {
+        bail!("retired origin is not saved");
+    };
+    ensure!(
+        refused
+            .to_string()
+            .contains(super::super::PUBLIC_REGISTRY_ORIGIN)
+    );
+    // A record an older client stored is never returned, and can still be deleted.
+    let mut transaction = fixture.vault.lock_blocking(&CancellationToken::new())?;
+    transaction.set(
+        identity(RETIRED)?,
+        SecretString::new("retired-fixture-token"),
+    )?;
+    transaction.commit()?;
+    drop(transaction);
+    assert!(load(&fixture.vault, &fixture.root, RETIRED).is_err());
+    delete(&fixture.vault, RETIRED)?;
+    fixture.legacy(RETIRED)?;
+    assert!(migrate(&fixture.vault, &fixture.root, RETIRED).is_err());
+    assert!(migrate(&fixture.vault, &fixture.root, ORIGIN).is_err());
+    assert!(fixture.root.join(LEGACY).exists());
+    let transaction = fixture.vault.lock_blocking(&CancellationToken::new())?;
+    assert!(transaction.get(&identity(RETIRED)?).is_none());
+    assert!(transaction.get(&identity(ORIGIN)?).is_none());
     Ok(())
 }
 

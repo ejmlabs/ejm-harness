@@ -18,8 +18,20 @@ fn identity(origin: &str) -> Result<SecretId> {
     SecretId::new(
         "ejm-harness-packages",
         "registry-session",
-        super::parse_origin(origin)?.as_str(),
+        super::normalize_origin(origin)?.as_str(),
     )
+}
+
+/// A `meetgerry.ai` session is never saved, loaded, or imported, so its token cannot be sent.
+fn refuse_retired(origin: &str) -> Result<()> {
+    ensure!(
+        !super::normalize_origin(origin)?
+            .host_str()
+            .is_some_and(super::retired_registry_host),
+        "{}",
+        super::retired_registry_message()
+    );
+    Ok(())
 }
 
 fn legacy_exists(root: &Path) -> Result<bool> {
@@ -44,11 +56,12 @@ fn save(vault: &SecretVault, root: &Path, origin: &str, token: &SecretString) ->
         !token.expose_secret().is_empty() && token.expose_secret().len() <= 4096,
         "invalid registry account token"
     );
+    refuse_retired(origin)?;
     let id = identity(origin)?;
     let mut transaction = vault.lock_blocking(&CancellationToken::new())?;
     ensure!(
         transaction.migrated(&id) || !legacy_exists(root)?,
-        "legacy registry credentials require a controlled upgrade; stop older clients and run ejm-cli package migrate-credentials --old-clients-stopped"
+        "legacy registry credentials require a controlled upgrade; stop older clients and call migrate_registry_token for this same origin"
     );
     transaction.set(id.clone(), token.clone())?;
     transaction.mark_migrated(id)?;
@@ -65,6 +78,7 @@ pub fn load_registry_token(root: &Path, origin: &str) -> Result<SecretString> {
 }
 
 fn load(vault: &SecretVault, root: &Path, origin: &str) -> Result<SecretString> {
+    refuse_retired(origin)?;
     let id = identity(origin)?;
     let transaction = vault.lock_blocking(&CancellationToken::new())?;
     if let Some(token) = transaction.get(&id) {
@@ -72,7 +86,7 @@ fn load(vault: &SecretVault, root: &Path, origin: &str) -> Result<SecretString> 
     }
     ensure!(
         transaction.migrated(&id) || !legacy_exists(root)?,
-        "legacy registry credentials require a controlled upgrade; stop older clients and run ejm-cli package migrate-credentials --old-clients-stopped"
+        "legacy registry credentials require a controlled upgrade; stop older clients and call migrate_registry_token for this same origin"
     );
     bail!("sign in with ejm-cli package login first")
 }
@@ -115,6 +129,8 @@ pub fn migrate_registry_token(
 }
 
 fn migrate(vault: &SecretVault, root: &Path, origin: &str) -> Result<bool> {
+    // The legacy origin must equal this one, so a retired session is never imported.
+    refuse_retired(origin)?;
     let id = identity(origin)?;
     let mut transaction = vault.lock_blocking(&CancellationToken::new())?;
     let Some(source) = read_legacy(root)? else {

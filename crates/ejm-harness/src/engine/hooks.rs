@@ -1,20 +1,25 @@
-use std::{
-    collections::{HashMap, HashSet},
-    future::Future,
-    panic::AssertUnwindSafe,
-    time::Duration,
-};
+//! Runs the host hooks in order around the run loop. Each hook has one failure rule:
+//! preparation stops the turn, tool gates become error results, result views keep the
+//! confirmed result, and run end observers cannot change a durable completion.
+mod context;
+
+use std::{future::Future, panic::AssertUnwindSafe, time::Duration};
 
 use anyhow::{Context, Result, ensure};
 use futures_util::FutureExt;
+use tokio_util::sync::CancellationToken;
 
 use super::{Harness, validate_prompt};
 use crate::{
-    EventKind, HookContext, Message, Role, RunSummary, Session, ToolCall, ToolDecision, ToolOutput,
+    EventKind, HookContext, Message, RunSummary, Session, ToolCall, ToolDecision, ToolOutput,
     types::{timestamp_ms, truncate_utf8},
 };
+use context::validate_context;
 
 const MAX_TOOL_OUTPUT: usize = 16 * 1024;
+const MAX_HOOK_ARGUMENTS: usize = 64 * 1024;
+const MAX_FAILURE_NOTE: usize = 1024;
+const RUN_END_BUDGET_MS: u64 = 1000;
 
 impl Harness {
     pub(super) async fn prepare_prompt(
@@ -62,7 +67,7 @@ impl Harness {
             {
                 ToolDecision::Execute { arguments } => {
                     ensure!(
-                        serde_json::to_vec(&arguments)?.len() <= 64 * 1024,
+                        serde_json::to_vec(&arguments)?.len() <= MAX_HOOK_ARGUMENTS,
                         "before_tool hook {index} exceeded the argument byte budget"
                     );
                     call.arguments = arguments;
@@ -76,6 +81,8 @@ impl Harness {
         Ok((call, None))
     }
 
+    /// Journal the confirmed result, let the hooks prepare the model's view of it, and
+    /// announce the final view.
     pub(super) async fn record_hooked_output(
         &self,
         session: &Session,
@@ -84,19 +91,52 @@ impl Harness {
         mut output: ToolOutput,
     ) -> Result<()> {
         bound_output(&mut output)?;
+        let sequence = self.journal_original(&session.id, call, &output).await?;
+        let output = self
+            .apply_result_hooks(context, call, sequence, output)
+            .await?;
+        self.emit(
+            &session.id,
+            Some(&context.run_id),
+            EventKind::ToolFinished {
+                call_id: call.id.clone(),
+                output,
+            },
+        )
+        .await
+    }
+
+    /// The confirmed original pair survives cancellation or a failed prepared view write.
+    async fn journal_original(
+        &self,
+        session_id: &str,
+        call: &ToolCall,
+        output: &ToolOutput,
+    ) -> Result<i64> {
         let sequence = self
             .inner
             .store
-            .message(&session.id, Message::tool(&call.id, &output))
+            .message(session_id, Message::tool(&call.id, output))
             .await;
         let sequence = self.require_journal(sequence)?;
-        // The confirmed original pair survives cancellation or a failed prepared view write.
         let remembered = self
             .inner
             .store
             .remember_tool_output(sequence, output.clone())
             .await;
         self.require_journal(remembered)?;
+        Ok(sequence)
+    }
+
+    /// Chain `after_tool` hooks, storing each prepared view. The first failure keeps the
+    /// last good result with a failure note and stops the chain.
+    async fn apply_result_hooks(
+        &self,
+        context: &HookContext,
+        call: &ToolCall,
+        sequence: i64,
+        mut output: ToolOutput,
+    ) -> Result<ToolOutput> {
         for (index, hook) in self.inner.hooks.iter().enumerate() {
             let transformed = guarded(
                 "after_tool",
@@ -104,25 +144,11 @@ impl Harness {
                 hook.after_tool(context, call.clone(), output.clone()),
             )
             .await
-            .and_then(|mut next| {
-                ensure!(
-                    next.is_error == output.is_error && next.artifact == output.artifact,
-                    "after_tool hook {index} changed error status or artifact evidence"
-                );
-                bound_output(&mut next)?;
-                Ok(next)
-            });
+            .and_then(|next| checked_transform(index, &output, next));
             let failed = transformed.is_err();
             output = match transformed {
                 Ok(next) => next,
-                Err(error) => {
-                    let mut detail =
-                        format!("\n[Result hook failed; confirmed result retained: {error:#}]");
-                    truncate_utf8(&mut detail, 1024);
-                    truncate_utf8(&mut output.content, MAX_TOOL_OUTPUT - detail.len());
-                    output.content.push_str(&detail);
-                    output
-                }
+                Err(error) => with_failure_note(output, &error),
             };
             let prepared = self
                 .inner
@@ -134,15 +160,7 @@ impl Harness {
                 break;
             }
         }
-        self.emit(
-            &session.id,
-            Some(&context.run_id),
-            EventKind::ToolFinished {
-                call_id: call.id.clone(),
-                output,
-            },
-        )
-        .await
+        Ok(output)
     }
 
     fn require_journal<T>(&self, result: Result<T>) -> Result<T> {
@@ -158,14 +176,14 @@ impl Harness {
         }
         let mut context = context.clone();
         context.step = summary.steps;
-        context.deadline_ms = timestamp_ms().saturating_add(1000);
-        context.cancel = tokio_util::sync::CancellationToken::new();
+        context.deadline_ms = timestamp_ms().saturating_add(RUN_END_BUDGET_MS);
+        context.cancel = CancellationToken::new();
         let observers = async {
             for (index, hook) in self.inner.hooks.iter().enumerate() {
                 let _ = guarded("run_end", index, hook.run_end(&context, summary)).await;
             }
         };
-        let _ = tokio::time::timeout(Duration::from_secs(1), observers).await;
+        let _ = tokio::time::timeout(Duration::from_millis(RUN_END_BUDGET_MS), observers).await;
         context.cancel.cancel();
     }
 }
@@ -182,6 +200,28 @@ async fn guarded<T>(
         .with_context(|| format!("{phase} hook {index} failed"))
 }
 
+/// A hook result view must keep the original's error status and artifact evidence.
+fn checked_transform(
+    index: usize,
+    original: &ToolOutput,
+    mut next: ToolOutput,
+) -> Result<ToolOutput> {
+    ensure!(
+        next.is_error == original.is_error && next.artifact == original.artifact,
+        "after_tool hook {index} changed error status or artifact evidence"
+    );
+    bound_output(&mut next)?;
+    Ok(next)
+}
+
+fn with_failure_note(mut output: ToolOutput, error: &anyhow::Error) -> ToolOutput {
+    let mut note = format!("\n[Result hook failed; confirmed result retained: {error:#}]");
+    truncate_utf8(&mut note, MAX_FAILURE_NOTE);
+    truncate_utf8(&mut output.content, MAX_TOOL_OUTPUT - note.len());
+    output.content.push_str(&note);
+    output
+}
+
 pub(super) fn bound_output(output: &mut ToolOutput) -> Result<()> {
     if truncate_utf8(&mut output.content, MAX_TOOL_OUTPUT) {
         output
@@ -192,181 +232,4 @@ pub(super) fn bound_output(output: &mut ToolOutput) -> Result<()> {
         output.data = serde_json::json!({"truncated":true});
     }
     Ok(())
-}
-
-fn validate_context(original: &[Message], prepared: &[Message], max_bytes: usize) -> Result<()> {
-    ensure!(
-        serde_json::to_vec(prepared)?.len() <= max_bytes,
-        "context hook exceeded the configured byte budget"
-    );
-    validate_intent(original, prepared)?;
-    let mut pending = HashSet::new();
-    let mut seen = HashSet::new();
-    let original_protocols: HashSet<Vec<u8>> = original
-        .iter()
-        .filter(|message| message.role == Role::Assistant)
-        .map(protocol_key)
-        .collect::<Result<_>>()?;
-    let results: HashMap<&str, &Message> = original
-        .iter()
-        .filter_map(|message| message.tool_call_id.as_deref().map(|id| (id, message)))
-        .collect();
-    let mut prepared_protocols = HashSet::new();
-    for message in prepared {
-        match message.role {
-            Role::User => {
-                ensure!(pending.is_empty(), "context hook split a tool exchange");
-                ensure!(
-                    message.tool_calls.is_empty()
-                        && message.tool_call_id.is_none()
-                        && message.continuation.is_none()
-                        && !message.is_error
-                        && message.artifact.is_none(),
-                    "context hook added protocol state to a user message"
-                );
-            }
-            Role::Assistant => {
-                ensure!(pending.is_empty(), "context hook split a tool exchange");
-                ensure!(
-                    message.tool_call_id.is_none()
-                        && !message.is_error
-                        && message.artifact.is_none(),
-                    "context hook added tool result state to an assistant message"
-                );
-                let protocol = protocol_key(message)?;
-                if !message.tool_calls.is_empty() || message.continuation.is_some() {
-                    ensure!(
-                        original_protocols.contains(&protocol),
-                        "context hook forged tool calls or changed provider continuation"
-                    );
-                }
-                prepared_protocols.insert(protocol);
-                for call in &message.tool_calls {
-                    ensure!(seen.insert(&call.id), "context hook duplicated a tool call");
-                    pending.insert(&call.id);
-                }
-            }
-            Role::Tool => {
-                let id = message
-                    .tool_call_id
-                    .as_ref()
-                    .context("context hook removed a tool result identity")?;
-                ensure!(
-                    pending.remove(id),
-                    "context hook added an orphan tool result"
-                );
-                ensure!(
-                    message.tool_calls.is_empty() && message.continuation.is_none(),
-                    "context hook added protocol state to a tool result"
-                );
-                let source = results
-                    .get(id.as_str())
-                    .context("context hook forged a tool result")?;
-                ensure!(
-                    message.is_error == source.is_error && message.artifact == source.artifact,
-                    "context hook changed error status or artifact evidence"
-                );
-            }
-        }
-    }
-    ensure!(pending.is_empty(), "context hook removed a tool result");
-    if let Some(latest) = original
-        .iter()
-        .rfind(|message| message.role == Role::Assistant)
-    {
-        ensure!(
-            prepared_protocols.contains(&protocol_key(latest)?),
-            "context hook removed the latest assistant exchange"
-        );
-    }
-    for source in original
-        .iter()
-        .filter(|message| message.continuation.is_some())
-    {
-        ensure!(
-            prepared_protocols.contains(&protocol_key(source)?),
-            "context hook removed provider continuation"
-        );
-    }
-    Ok(())
-}
-
-fn protocol_key(message: &Message) -> Result<Vec<u8>> {
-    serde_json::to_vec(&(&message.tool_calls, &message.continuation)).map_err(Into::into)
-}
-
-fn validate_intent(original: &[Message], prepared: &[Message]) -> Result<()> {
-    let intent = original
-        .iter()
-        .rfind(|message| message.role == Role::User)
-        .context("context has no user intent")?;
-    let prepared_intent = prepared
-        .iter()
-        .rfind(|message| message.role == Role::User)
-        .context("context hook removed the latest user intent")?;
-    ensure!(
-        serde_json::to_value(intent)? == serde_json::to_value(prepared_intent)?,
-        "context hook changed the latest user intent"
-    );
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{ModelResponse, ProviderContinuation};
-    use serde_json::json;
-
-    #[test]
-    fn context_hooks_preserve_intent_pairs_continuation_and_failure_evidence() -> Result<()> {
-        let original = vec![
-            Message::user("Keep this intent."),
-            Message::assistant(&ModelResponse {
-                tool_calls: vec![ToolCall {
-                    id: "call".into(),
-                    name: "read".into(),
-                    arguments: json!({"path":"a"}),
-                }],
-                continuation: Some(ProviderContinuation::OpenAiResponses {
-                    reasoning: vec![json!({"encrypted_content":"state"})],
-                }),
-                ..Default::default()
-            }),
-            Message::tool(
-                "call",
-                &ToolOutput {
-                    artifact: Some("artifacts/error.txt".into()),
-                    ..ToolOutput::error("Confirmed failure.")
-                },
-            ),
-        ];
-        validate_context(&original, &original, 4096)?;
-        let mut prepared = original.clone();
-        prepared.insert(0, Message::user("Extra host context."));
-        prepared[3].content = "A prepared failure description.".into();
-        validate_context(&original, &prepared, 4096)?;
-        for mutation in 0..8 {
-            let mut prepared = original.clone();
-            match mutation {
-                0 => {
-                    prepared.remove(0);
-                }
-                1 => prepared[0].content = "Changed intent.".into(),
-                2 => {
-                    prepared.pop();
-                }
-                3 => prepared[1].tool_calls[0].arguments = json!({"path":"forged"}),
-                4 => prepared[1].continuation = None,
-                5 => prepared[2].artifact = None,
-                6 => prepared[2].is_error = false,
-                _ => prepared.push(prepared[2].clone()),
-            }
-            assert!(
-                validate_context(&original, &prepared, 4096).is_err(),
-                "mutation {mutation} was accepted"
-            );
-        }
-        assert!(validate_context(&original, &original, 100).is_err());
-        Ok(())
-    }
 }

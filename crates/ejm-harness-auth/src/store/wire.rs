@@ -8,17 +8,32 @@ use std::{
 use zeroize::Zeroizing;
 pub(crate) const MAX_STORE_BYTES: usize = 1024 * 1024;
 const MAX_REGISTRATIONS: usize = 64;
-struct JsonBuffer {
+
+/// Zeroizing JSON output buffer that refuses to grow past `limit`.
+pub(crate) struct BoundedJson {
     bytes: Zeroizing<Vec<u8>>,
+    limit: usize,
+    message: &'static str,
 }
 
-impl Write for JsonBuffer {
+impl BoundedJson {
+    pub(crate) fn new(limit: usize, message: &'static str) -> Self {
+        Self {
+            bytes: Zeroizing::new(Vec::new()),
+            limit,
+            message,
+        }
+    }
+
+    pub(crate) fn into_bytes(self) -> Zeroizing<Vec<u8>> {
+        self.bytes
+    }
+}
+
+impl Write for BoundedJson {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        if bytes.len() > MAX_STORE_BYTES.saturating_sub(self.bytes.len()) {
-            return Err(io::Error::new(
-                io::ErrorKind::FileTooLarge,
-                "credential state exceeds 1 MiB",
-            ));
+        if bytes.len() > self.limit.saturating_sub(self.bytes.len()) {
+            return Err(io::Error::new(io::ErrorKind::FileTooLarge, self.message));
         }
         self.bytes.extend_from_slice(bytes);
         Ok(bytes.len())
@@ -42,61 +57,73 @@ pub(crate) fn validate_state(state: &StoredAuth) -> Result<()> {
     let mut bytes = state.host_id.len();
     for registration in &state.registrations {
         ensure!(
-            [
-                &registration.id,
-                &registration.issuer,
-                &registration.subject,
-                &registration.client_id
-            ]
-            .iter()
-            .all(|value| !value.is_empty()),
+            identity_fields(registration)
+                .iter()
+                .all(|value| !value.is_empty()),
             "credential registration has an empty identity field"
         );
         ensure!(
             identifiers.insert(&registration.id),
             "duplicate credential registration identifier"
         );
-        for value in [
-            &registration.id,
-            &registration.issuer,
-            &registration.subject,
-            &registration.client_id,
-        ] {
-            bytes = bytes.saturating_add(value.len());
-        }
-        bytes = bytes.saturating_add(registration.email.as_ref().map_or(0, String::len));
-        if let Some(credentials) = &registration.credentials {
-            ensure!(
-                !credentials.id_token.expose_secret().is_empty(),
-                "credential identity token is empty"
-            );
-            for token in [
-                credentials.access_token.as_ref(),
-                credentials.refresh_token.as_ref(),
-                Some(&credentials.id_token),
-            ]
-            .into_iter()
-            .flatten()
-            {
-                ensure!(
-                    !token.expose_secret().is_empty(),
-                    "credential token is empty"
-                );
-                bytes = bytes.saturating_add(token.expose_secret().len());
-            }
-            ensure!(
-                credentials.scopes.len() <= 256,
-                "credential state has too many scopes"
-            );
-            for scope in &credentials.scopes {
-                ensure!(!scope.is_empty(), "credential scope is empty");
-                bytes = bytes.saturating_add(scope.len());
-            }
-        }
+        bytes = bytes.saturating_add(registration_bytes(registration)?);
         ensure!(bytes <= MAX_STORE_BYTES, "credential state exceeds 1 MiB");
     }
     ensure!(bytes <= MAX_STORE_BYTES, "credential state exceeds 1 MiB");
     Ok(())
+}
+
+fn identity_fields(registration: &StoredRegistration) -> [&String; 4] {
+    [
+        &registration.id,
+        &registration.issuer,
+        &registration.subject,
+        &registration.client_id,
+    ]
+}
+
+/// Validate the registration's credentials and return the bytes it adds to the state.
+fn registration_bytes(registration: &StoredRegistration) -> Result<usize> {
+    let mut bytes = 0usize;
+    for value in identity_fields(registration) {
+        bytes = bytes.saturating_add(value.len());
+    }
+    bytes = bytes.saturating_add(registration.email.as_ref().map_or(0, String::len));
+    if let Some(credentials) = &registration.credentials {
+        bytes = bytes.saturating_add(credentials_bytes(credentials)?);
+    }
+    Ok(bytes)
+}
+
+fn credentials_bytes(credentials: &StoredCredentials) -> Result<usize> {
+    ensure!(
+        !credentials.id_token.expose_secret().is_empty(),
+        "credential identity token is empty"
+    );
+    let mut bytes = 0usize;
+    for token in [
+        credentials.access_token.as_ref(),
+        credentials.refresh_token.as_ref(),
+        Some(&credentials.id_token),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        ensure!(
+            !token.expose_secret().is_empty(),
+            "credential token is empty"
+        );
+        bytes = bytes.saturating_add(token.expose_secret().len());
+    }
+    ensure!(
+        credentials.scopes.len() <= 256,
+        "credential state has too many scopes"
+    );
+    for scope in &credentials.scopes {
+        ensure!(!scope.is_empty(), "credential scope is empty");
+        bytes = bytes.saturating_add(scope.len());
+    }
+    Ok(bytes)
 }
 
 // Only private wire adapters can serialize a secret. Both owned token copies and
@@ -214,12 +241,10 @@ impl WireAuth {
 
 pub(crate) fn encode(state: &StoredAuth) -> Result<Zeroizing<Vec<u8>>> {
     validate_state(state)?;
-    let mut out = JsonBuffer {
-        bytes: Zeroizing::new(Vec::new()),
-    };
+    let mut out = BoundedJson::new(MAX_STORE_BYTES, "credential state exceeds 1 MiB");
     serde_json::to_writer(&mut out, &WireAuth::from_state(state))
         .map_err(|_| anyhow::anyhow!("credential state exceeds supported JSON size"))?;
-    Ok(out.bytes)
+    Ok(out.into_bytes())
 }
 pub(crate) fn decode(bytes: &[u8]) -> Result<StoredAuth> {
     ensure!(

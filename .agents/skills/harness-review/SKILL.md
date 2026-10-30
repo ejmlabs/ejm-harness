@@ -38,6 +38,8 @@ concrete way each step can leave state inconsistent.
   the exact crate and version and the upstream constraint.
 - **Lint and style.** No relaxed lint group or broad exception. No em dashes. Tests cover the
   changed boundary, not only a unit.
+- **Consistency.** New code follows [the code layout](../../../docs/contributing.md#code-layout)
+  and reuses its shared helpers. A new pattern is added there in the same patch.
 
 Run the focused proof first, then `./scripts/check`. Report each finding with severity, file and
 line, a reproducible condition, and the user-visible effect. Keep speculative style advice
