@@ -11,6 +11,10 @@ use serde_json::json;
 use tokio::sync::{Notify, mpsc, watch};
 use tokio_util::sync::CancellationToken;
 
+// Hang guard, not a latency assertion: parallel debug tests on Windows can spend
+// seconds syncing durable journals. Keep cancellation's latency assertion separate.
+const HANG_GUARD: std::time::Duration = std::time::Duration::from_secs(60);
+
 struct CountingTool {
     calls: Arc<AtomicUsize>,
     active: Arc<AtomicUsize>,
@@ -155,8 +159,7 @@ async fn hundred_agents_share_one_governor_and_durable_events() -> Result<()> {
     assert_eq!(harness.status().await.active_agents, 100);
     gate.send(true)?;
     for handle in &mut handles {
-        let result =
-            tokio::time::timeout(std::time::Duration::from_secs(20), handle.wait()).await??;
+        let result = tokio::time::timeout(HANG_GUARD, handle.wait()).await??;
         assert_eq!(result.status, RunStatus::Completed, "{:?}", result.error);
         assert_eq!(result.text, "Verified.");
     }
@@ -331,7 +334,7 @@ async fn queued_turns_get_distinct_runs_and_slow_receivers_can_replay() -> Resul
     let mut run = harness.start(&session.id, "first".into()).await?;
     harness.enqueue(&session.id, "second".into()).await?;
     assert_eq!(run.wait().await?.status, RunStatus::Completed);
-    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+    tokio::time::timeout(HANG_GUARD, async {
         loop {
             if let Ok(event) = live.recv().await && matches!(event.kind, EventKind::RunFinished { ref summary } if summary.text.contains("second")) { break; }
         }
@@ -406,7 +409,7 @@ async fn old_run_controls_cannot_change_a_new_queued_run() -> Result<()> {
         .await?;
     first_ready.add_permits(1);
     assert_eq!(first.wait().await?.status, RunStatus::Completed);
-    tokio::time::timeout(std::time::Duration::from_secs(2), second_entered.notified()).await?;
+    tokio::time::timeout(HANG_GUARD, second_entered.notified()).await?;
     assert!(harness.cancel_run(&session.id, &first.id).await.is_err());
     assert!(
         harness
@@ -453,7 +456,7 @@ async fn provider_panic_finishes_the_run_and_releases_shutdown() -> Result<()> {
         })
         .await?;
     let mut run = harness.start(&session.id, "trigger".into()).await?;
-    let summary = tokio::time::timeout(std::time::Duration::from_secs(2), run.wait()).await??;
+    let summary = tokio::time::timeout(HANG_GUARD, run.wait()).await??;
     assert_eq!(summary.status, RunStatus::Failed);
     assert!(
         summary
@@ -461,7 +464,7 @@ async fn provider_panic_finishes_the_run_and_releases_shutdown() -> Result<()> {
             .context("missing panic summary")?
             .contains("panicked")
     );
-    tokio::time::timeout(std::time::Duration::from_secs(2), harness.shutdown()).await??;
+    tokio::time::timeout(HANG_GUARD, harness.shutdown()).await??;
     assert_eq!(harness.status().await.active_agents, 0);
     Ok(())
 }
@@ -542,12 +545,12 @@ async fn steering_during_read_skips_the_following_write() -> Result<()> {
         })
         .await?;
     let mut run = harness.start(&session.id, "read then write".into()).await?;
-    tokio::time::timeout(std::time::Duration::from_secs(2), entered.notified()).await?;
+    tokio::time::timeout(HANG_GUARD, entered.notified()).await?;
     harness
         .steer_run(&session.id, &run.id, "Do not write.".into())
         .await?;
     release.notify_one();
-    let result = tokio::time::timeout(std::time::Duration::from_secs(2), run.wait()).await??;
+    let result = tokio::time::timeout(HANG_GUARD, run.wait()).await??;
     assert_eq!(result.status, RunStatus::Completed);
     assert_eq!(effects.load(Ordering::SeqCst), 0);
     assert!(harness.events(&session.id, 0, 100).await?.iter().any(|event| matches!(&event.kind, EventKind::ToolFinished { output, .. } if output.content.contains("Skipped because the user steered"))));
@@ -574,7 +577,7 @@ async fn full_journal_returns_a_failed_summary_and_stops_admission() -> Result<(
         .await?;
     for _ in 0..40 {
         let mut run = harness.start(&session.id, "x".repeat(16_000)).await?;
-        let summary = tokio::time::timeout(std::time::Duration::from_secs(2), run.wait()).await??;
+        let summary = tokio::time::timeout(HANG_GUARD, run.wait()).await??;
         if harness.is_stopped() {
             assert_eq!(summary.status, RunStatus::Failed);
             assert!(

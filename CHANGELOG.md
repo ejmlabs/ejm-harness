@@ -22,6 +22,8 @@ these notes; see [RELEASING.md](RELEASING.md) and the known limits under
 
 ### Changed
 
+- Propose the first optional UI source checkout with exact retained install metadata; no runtime UI dependency or site migration.
+
 - **Breaking:** packages require `ejm.package.json` with no legacy alias. Rename
   earlier manifests and repack archives; their sizes and hashes change.
 - **Breaking:** remove the default registry export. `install_source` now accepts
