@@ -4,11 +4,13 @@ Start with the [README](README.md) and [development guide](docs/contributing.md)
 
 ## Human admission and review
 
-Opening or updating a PR does not authorize CI or AI spending. A current human maintainer with GitHub **maintain** or **admin** permission posts `/ready FULL_HEAD_SHA` as a standalone PR comment after checking the scope and proposed workflow changes. Use the full current 40-character commit SHA. Draft PRs cannot be admitted. A new commit needs a new decision. Check limits and run time are bounded; repeated events do not authorize another review.
+Opening or updating a draft PR does not authorize CI spending. Mark the PR Ready for review when the work is ready for checks.
 
-After reviewing that commit, a maintainer posts `/approve FULL_HEAD_SHA`. Maintainers may explicitly approve their own work. GitHub cannot record an author's native approval, so trusted automation records the human comment as a bot approval and a required **Maintainer approval** status. The comment and all checks remain required. Native review alone does not replace this explicit gate. Keep both readiness and approval comments unchanged. Editing or deleting one revokes the decisions. `/revoke FULL_HEAD_SHA` cancels the admitted run and blocks merge. To retry a failed run, revoke, investigate, and post a fresh ready comment. Do not use Actions rerun to replay an admission.
+A same-repository non-draft PR whose author is a current human maintainer or admin with GitHub **maintain** or **admin** permission is admitted automatically. Outsiders and forks are admitted only when a current human maintainer marks the PR Ready. Draft PRs cannot be admitted. A new commit needs a new admission. Check limits and run time are bounded.
 
-The required statuses are **Human readiness**, **Maintainer approval**, **Quality**, **Repository standards**, and **AI review**. Automated review uses high reasoning effort. A missing key, a review that does not complete, or a `Possible security concern` label fails the gate. A maintainer may remove that label after reviewing the concern; the removal is logged on the PR and re-evaluates the gate. Address other findings in a new commit and request fresh admission. Automated review does not cover files the reviewer excludes (lockfiles, minified files, assets and binaries) or files clipped by its token budget, which its coverage footer lists. **Maintainer approval** covers them: inspect those files before approving. Do not bypass the requirements as an administrator.
+After reviewing that commit, a maintainer leaves an approving GitHub review, or adds the `gate:approve` label for self-approve under administrator-enforced required reviews. Trusted automation records that label as a bot approval for the current head and removes the label so it can be re-applied after a new push. The `gate:revoke` label cancels an admitted run and dismisses bot approvals for that head. Do not use Actions rerun to replay an admission.
+
+The required statuses are **Quality** and **Repository standards**, plus one approving GitHub review. Address findings in a new commit. Do not bypass the requirements as an administrator.
 
 ## Changes and reporting
 
