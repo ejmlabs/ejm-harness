@@ -49,6 +49,15 @@ there. A rule below or a repository skill may add to them, never relax them.
   [harness-site](.agents/skills/harness-site/SKILL.md) after merge.
 - This is a source release. Nothing is published or packaged yet.
 
+## Code principles
+
+- **KISS.** Write the simplest code that solves the whole problem.
+- **YAGNI.** Build only what a task needs now. No speculative options, layers or abstractions.
+- **DRY.** Give each rule, constant, type and behavior one authoritative home. Extend the shared
+  helper; never copy it.
+- **Clean Code.** Use clear names and small functions at one level of abstraction. Delete dead
+  code. Comment only the why. No hidden side effects.
+
 ## Repository map
 
 | Path                              | Owns                                                                             |

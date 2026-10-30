@@ -15,6 +15,10 @@ concrete way each step can leave state inconsistent.
 
 ## Check
 
+- **Principles.** KISS, YAGNI, DRY and Clean Code hold: the simplest design that solves the
+  whole problem, no speculative option or abstraction, one authoritative home for each rule,
+  and clear names, functions and structure. A finding that names one of these must point to
+  the concrete simpler or shared form.
 - **Boundaries.** The change respects `scripts/architecture-policy.toml`. The engine has no
   frontend, coding, or worker dependency. Hosts own UI, browser launch, and listeners.
 - **Admission.** Work goes through the shared governor. A queue, buffer, retry, step count,
