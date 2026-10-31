@@ -13,8 +13,8 @@ new one, and match it.
 - A repository that already runs pytest keeps it. There, a plain `def test_x()` with `assert` is
   the default, and async tests follow the form of the file you edit. Add no new async form and no
   `pytest-asyncio`.
-- Tests meet the strict lint layer, except `assert`, private access, and `Any`, which test paths
-  may use. Type-check tests with mypy when the repository lists them in `files`.
+- Tests meet the strict lint layer, except `assert`, private access, `Any` and placeholder
+  credentials, which test paths may use. Type-check tests with mypy when the repository lists them in `files`.
 - A test that runs the strict tools (ruff and mypy from the locked group) lets the gate's unit-test
   step enforce them with no workflow change. It fails, not skips, when `uv` is missing.
 

@@ -33,4 +33,4 @@ user's request.
 - Never move a released tag or replace its assets. Fix a bad release with a new version and say
   why in the notes.
 - Shared workflow updates land through reviewed PRs that change the full commit pins in each
-  consumer.
+  consumer. A pin move, any caller form change and the community resync are one PR.

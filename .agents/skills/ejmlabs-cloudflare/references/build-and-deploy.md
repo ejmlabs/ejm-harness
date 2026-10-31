@@ -14,6 +14,14 @@ your change did not touch, or a bundle that differs from CI. The revision the re
 The same goes for the site repository: a local checkout may hold another agent's work. Build
 the merge commit, not your working tree.
 
+## Config details
+
+- Pin wrangler as an exact devDependency of the package that owns the config, run it from that
+  package (`npx wrangler`), and point `$schema` at `./node_modules/wrangler/config-schema.json`.
+- Set `not_found_handling` and ship a 404 page.
+- Keep `observability` off unless a reviewed need exists. Logs can hold request content.
+- Change `compatibility_date` only in its own reviewed change, with the tests run.
+
 ## Before you start
 
 1. The PR merged through the gate (see `ejmlabs-workflow`). Read the merge commit:
@@ -41,7 +49,7 @@ cd "$work/SITE/site"
 npm ci --ignore-scripts
 ```
 
-Then run the repository's checks in its order and stop at the first failure. For ejmlabs.com:
+Then run the repository's checks in its order and stop at the first failure. For example:
 
 ```sh
 npm run typecheck

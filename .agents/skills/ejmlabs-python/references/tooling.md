@@ -38,16 +38,17 @@ extend = "ruff.strict.toml"
 target-version = "py312"
 ```
 
-- The layer selects `ALL` and ignores only rules that are style, formatter-owned, or reviewed by
-  other means (for example `S603` and `S607`: every subprocess call's inputs are reviewed). A
-  repository may add rules and excludes. It never removes a rule from the layer.
+- The layer selects `ALL` and ignores only rules that are style, or reviewed by other means (for
+  example `S603` and `S607`: every subprocess call's inputs are reviewed). `BLE001` and `TRY400`
+  are off because the house error-logging form catches `Exception` and logs only the exception
+  type. A repository may add rules and excludes. It never removes a rule from the layer.
 - Never edit `ruff.strict.toml` in a consumer repository; change it in the shared lint layer.
 - A file that runs on a different interpreter than the project (a git hook on the system
   `python3`, a CI step on the runner's Python) gets its own entry in
   `[tool.ruff.per-file-target-version]`, and the reason in a comment.
 - Generated files go in `exclude`. Do not lint or edit them by hand.
-- Tests may use `assert`, private access, and `Any` (`S101`, `SLF001`, `ANN401` are ignored for
-  test paths). Every other rule applies to tests.
+- Tests may use `assert`, private access, `Any`, and placeholder credentials (`S101`, `SLF001`,
+  `ANN401`, `S105`, `S106`, `S107` are ignored for test paths). Every other rule applies to tests.
 
 ## Suppressions
 
@@ -71,11 +72,12 @@ Run the tools from the locked environment, from the repository root:
 
 ```sh
 uv run --locked --group dev ruff check .
-uv run --locked --group dev ruff format --check .
 uv run --locked --group dev mypy
 uv run --locked python -m unittest discover -s tests
 ```
 
+- Formatting is not gated: no gate runs `ruff format --check`. Run `ruff format` on a file you
+  are writing anyway, never on files you did not change.
 - `uv sync --locked` fails when `uv.lock` is stale. Fix it with `uv lock`, never by hand.
 - Add a dependency with `uv add <name>` (or `uv add --group dev <name>==<version>` for a tool), then
   commit `pyproject.toml` and `uv.lock` together.
@@ -87,3 +89,17 @@ uv run --locked python -m unittest discover -s tests
   repository.
 - Some repositories still select a subset of ruff rules or pin older tool versions. Moving them to
   the strict layer is a separate change with its own fixes; do not loosen the layer to match them.
+
+## Scripts and untrusted input
+
+- `python -I` skips the script's directory and the working directory, user site packages, and
+  `PYTHON*` variables, so a planted `json.py` cannot load. Use it for any Python that reads
+  downloads, archives or PR checkouts, keep the script outside the untrusted directory, and pass
+  paths as arguments.
+- Untrusted CPU work runs in a child: `[sys.executable, "-I", ...]`, `env={}`, a timeout, and a
+  kill in `finally`. Pass subprocess arguments as a list, never `shell=True`, and check the
+  status.
+- Every network call has a timeout and reads at most its byte limit plus one byte.
+- Never use `functools.cache` or `maxsize=None` on user-chosen keys.
+- A mutable default (`items=[]`) is shared between calls. Use `None` or an immutable value, and
+  test absence with `is None`, so a `None` never skips a check.

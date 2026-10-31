@@ -1,4 +1,18 @@
-# State, hooks and data
+# Files, state, hooks and data
+
+## Files and modules
+
+| Kind                         | Name                                                       |
+| ---------------------------- | ---------------------------------------------------------- |
+| Components, pages, providers | `PascalCase.tsx`, exporting the component of the same name |
+| Hooks                        | `useThing.ts`, exporting `useThing`                        |
+| Other modules                | kebab-case `.ts`, such as `theme-store.ts`                 |
+| Tests                        | Beside the source, same stem plus `.test`: `Hero.test.tsx` |
+| Folders                      | Lowercase, one per feature or capability                   |
+
+- Imports point one way. Feature and shared code never import the app shell or routes. No cycles.
+- Route and page files stay thin and compose feature hooks and components.
+- When you split a file, the original stays as the composition root and keeps its exports.
 
 ## Who owns which state
 

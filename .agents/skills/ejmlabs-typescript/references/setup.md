@@ -40,8 +40,9 @@ it when you touch it.
 ## eslint.config.mjs
 
 `eslint.strict.mjs` is synced beside it. It holds `strictTypeChecked`, `stylisticTypeChecked`,
-the ban on `@ts-` directives, required reasons on disable comments, `consistent-type-imports` and
-`switch-exhaustiveness-check`.
+the ban on `@ts-` directives, required reasons on disable comments, `consistent-type-imports`,
+`switch-exhaustiveness-check`, the ban on `innerHTML`, `outerHTML`, `insertAdjacentHTML` and
+`eval`, and relaxed `unbound-method` and non-null rules in test files.
 
 ```js
 import jsxA11y from "eslint-plugin-jsx-a11y";
