@@ -10,6 +10,9 @@
 | Tests                        | Beside the source, same stem plus `.test`: `Hero.test.tsx` |
 | Folders                      | Lowercase, one per feature or capability                   |
 
+A repository with another settled convention (for example kebab-case hook files such as
+`use-thing.ts`) records it in its own skill and applies it everywhere; follow that instead.
+
 - Imports point one way. Feature and shared code never import the app shell or routes. No cycles.
 - Route and page files stay thin and compose feature hooks and components.
 - When you split a file, the original stays as the composition root and keeps its exports.
