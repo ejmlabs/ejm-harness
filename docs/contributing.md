@@ -130,11 +130,10 @@ change. No public site publication or native platform certification is claimed.
 
 ### Site deploys
 
-`deploy.yml` deploys `site/` on each push to main: staging first, then production once staging
-succeeds. The merge is the human decision, so nothing waits for a second approval. The deploy
-fails closed until the owner has created the `staging` and `production` environments and added
-`CLOUDFLARE_API_TOKEN` to each. [harness-site](../.agents/skills/harness-site/SKILL.md) holds
-the procedure, the owner setup and rollback.
+A push to main deploys `site/`, staging then production.
+[harness-site](../.agents/skills/harness-site/SKILL.md) holds the site's Workers and checks. The
+[CI deploys reference](../.agents/skills/ejmlabs-cloudflare/references/ci-deploys.md) holds the
+pipeline, the owner setup and rollback.
 
 ## Plan changes
 
