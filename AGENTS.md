@@ -79,7 +79,7 @@ there. A rule below or a repository skill may add to them, never relax them.
 | `crates/ejm-harness-bench`        | Deterministic concurrency and command workloads                                  |
 | `sdk/typescript`, `sdk/python`    | Typed language facades over the worker. Wire types are generated                 |
 | `registry/`                       | Cloudflare extension registry and its Better Auth Worker                         |
-| `site/`                           | Static harness.ejmlabs.com marketing site                                        |
+| `site/`                           | harness.ejmlabs.com, an ejm-ui site built with ejm-ssg                           |
 | `docs/`                           | Contracts, decisions, evidence. `docs/contributing.md` holds the decision record |
 | `scripts/`                        | The gate, policy checker, generators, benchmark, and hook installer              |
 
@@ -150,7 +150,7 @@ Repository skills:
 | Reviewing a patch for correctness, bounds, recovery, boundaries, and honest claims | [harness-review](.agents/skills/harness-review/SKILL.md)                   |
 | Toolchain and tool pins, locks, cargo-deny exceptions, and local build problems    | [harness-dependencies](.agents/skills/harness-dependencies/SKILL.md)       |
 | Removing, renaming, or retyping a public item used by ejm-cli or ejm-ide           | [harness-hosts](.agents/skills/harness-hosts/SKILL.md)                     |
-| The static harness.ejmlabs.com site, its headers, and deployment                   | [harness-site](.agents/skills/harness-site/SKILL.md)                       |
+| The harness.ejmlabs.com site on ejm-ui, its pin, headers, and deployment           | [harness-site](.agents/skills/harness-site/SKILL.md)                       |
 | Architecture decisions, strict gates, and updating these rules from evidence       | [harness-maintenance](.agents/skills/harness-maintenance/SKILL.md)         |
 | Investigating and clarifying a change                                              | [openspec-explore](.agents/skills/openspec-explore/SKILL.md)               |
 | Creating its planning artifacts                                                    | [openspec-propose](.agents/skills/openspec-propose/SKILL.md)               |
