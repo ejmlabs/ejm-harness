@@ -63,14 +63,15 @@ as unverified evidence instead of describing a partial run as green.
 
 ## Shared workflows and source releases
 
-`pr.yml` and `release.yml` call the shared workflows in `ejmlabs/.github`. Every `uses` pin is
-the same full 40-character SHA, and the `standards-ref` input in `release.yml` equals it. The
-Repository standards check fails when any of them differ, and a draft release checks
-`standards-ref` again against that commit's own `release.yml`. A pin move is one protected PR that
-changes every pin and `standards-ref` together. Dependabot ignores `ejmlabs/.github`, so the pins
-move only by hand. The shared repository owns the workflow implementation, standards and release
-validator; this repository owns its product gates and release metadata. Product repositories
-consume the harness public APIs. No product runtime becomes a harness dependency.
+`pr.yml`, `release.yml`, `cache.yml` and `deploy.yml` call the shared workflows in
+`ejmlabs/.github`. Every `uses` pin is the same full 40-character SHA, and the `standards-ref`
+input in `release.yml` equals it. The Repository standards check fails when any of them differ,
+and a draft release checks `standards-ref` again against that commit's own `release.yml`. A pin
+move is one protected PR that changes every pin and `standards-ref` together. Dependabot ignores
+`ejmlabs/.github`, so the pins move only by hand. The shared repository owns the workflow
+implementation, standards and release validator; this repository owns its product gates and
+release metadata. Product repositories consume the harness public APIs. No product runtime
+becomes a harness dependency.
 
 The gate admits work from pull request fields, labels and maintainer permissions, never from
 comment text. No model review runs.
@@ -119,13 +120,21 @@ archives, original notice bytes, checksums and provenance before any publication
 
 A release dispatch permits only its first attempt. If it fails after reserving
 a version, inspect the protected tag and draft before deciding on a new version.
-Do not rerun the failed attempt, move a tag or replace assets. Installing these
-callers creates no tag, draft, installer, package or deployment. Product release
-writes and publication require separate authorization.
+Do not rerun the failed attempt, move a tag or replace assets. Installing the release
+callers creates no tag, draft, installer or package. Product release writes and
+publication require separate authorization.
 
 This contributor and release guidance changes no product API, public product
 page or generated site output, so the public site needs no content or build
 change. No public site publication or native platform certification is claimed.
+
+### Site deploys
+
+`deploy.yml` deploys `site/` on each push to main: staging first, then production once staging
+succeeds. The merge is the human decision, so nothing waits for a second approval. The deploy
+fails closed until the owner has created the `staging` and `production` environments and added
+`CLOUDFLARE_API_TOKEN` to each. [harness-site](../.agents/skills/harness-site/SKILL.md) holds
+the procedure, the owner setup and rollback.
 
 ## Plan changes
 

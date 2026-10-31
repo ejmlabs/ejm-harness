@@ -12,7 +12,7 @@ updates:
       compatible-updates:
         update-types: [minor, patch]
     ignore:
-      # The ejmlabs/.github pins in pr.yml and release.yml move by hand, together with standards-ref, in one PR.
+      # The ejmlabs/.github pins in the caller workflows move by hand, together with standards-ref, in one PR.
       # The star also matches reusable workflow paths such as ejmlabs/.github/.github/workflows/governance.yml.
       - dependency-name: "ejmlabs/.github*"
   - package-ecosystem: "cargo"

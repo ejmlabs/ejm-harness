@@ -1,7 +1,7 @@
 # Build and deploy
 
 Read this before a deploy, a dry run, or a rollback. The repository's own deploy skill names
-its site directory, check script, Worker and approval rule.
+its site directory, check script and Worker.
 
 ## Why a clean build
 
@@ -26,8 +26,8 @@ the merge commit, not your working tree.
 
 1. The PR merged through the gate (see `ejmlabs-workflow`). Read the merge commit:
    `gh pr view N --json mergeCommit --jq .mergeCommit.oid`.
-2. The repository's approval rule allows this deploy. If production deploys are marked
-   approval-gated, the user asked for this one.
+2. The repository has no `deploy.yml` caller, or the user asked for this manual deploy. With
+   the caller, CI deploys staging and then production; you only check them live.
 3. You know the Worker name and config path from the repository's deploy skill or README.
 
 ## Sequence
