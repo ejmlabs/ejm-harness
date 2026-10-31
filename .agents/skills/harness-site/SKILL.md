@@ -55,7 +55,7 @@ Nobody approves a deploy afterward. The run then:
 1. Builds with `contents: read` and no secrets. The site has no build step, so the job archives
    `site/wrangler.jsonc` and `site/public` from the main commit.
 2. Deploys staging with `wrangler deploy --env staging`: the Worker `ejmlabs-harness-staging` at
-   `harness-staging.ejmlabs.com`.
+   `staging.harness.ejmlabs.com`.
 3. Deploys production once staging succeeds, with the same files and the top-level config: the
    Worker `ejmlabs-harness` at `harness.ejmlabs.com`.
 
@@ -77,7 +77,7 @@ The shared deploy fails closed until the owner has done these:
   stores the `CLOUDFLARE_API_TOKEN` secret in each, for every site repository at once. The token
   needs Worker and custom-domain rights on the account that owns `ejmlabs.com`.
 
-If a DNS record for `harness-staging.ejmlabs.com` exists outside Wrangler, Wrangler prompts in CI
+If a DNS record for `staging.harness.ejmlabs.com` exists outside Wrangler, Wrangler prompts in CI
 and nobody can answer. Stop and give the owner the exact command to run.
 
 ### After each merge
