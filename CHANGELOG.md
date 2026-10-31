@@ -4,6 +4,14 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ## [Unreleased]
 
+### Changed
+
+- The harness.ejmlabs.com site in `site/` is rebuilt on ejm-ui: `ejmlabs({ project: 'harness' })`,
+  `Hero`, `Section` and `DocsLayout` pages, and the simulated harness window from `@ejm/demos`.
+  The copied design kit and `scripts/sync-design-kit.sh` are removed. The page text and routes
+  (`/` and `/docs/host-auth/`) are unchanged. The ejm-ui revision is recorded in
+  `.github/ui-source.json`.
+
 ## [0.1.1] - 2026-10-26
 
 First public release of the worker and SDK sources. The `0.1.0` source notes below
