@@ -56,7 +56,7 @@ fn creator_death_preserves_the_first_visible_lock_identity() {
         return;
     }
 
-    let root = tempfile::tempdir().unwrap();
+    let root = super::private_tempdir().unwrap();
     let path = root.path().canonicalize().unwrap();
     let directory = wire::directory(&path, "creator-death").unwrap();
     let mut child = FixtureChild(
@@ -112,7 +112,7 @@ fn creator_death_preserves_the_first_visible_lock_identity() {
 fn failed_creation_keeps_the_inode_and_private_reopen_refuses_it() {
     use std::os::unix::fs::PermissionsExt;
 
-    let root = tempfile::tempdir().unwrap();
+    let root = super::private_tempdir().unwrap();
     let directory =
         wire::directory(&root.path().canonicalize().unwrap(), "permission-failure").unwrap();
     let captured = Arc::new(Mutex::new(None));
@@ -149,7 +149,7 @@ fn failed_creation_keeps_the_inode_and_private_reopen_refuses_it() {
 #[cfg(target_os = "macos")]
 #[test]
 fn failed_acl_creation_keeps_the_inode_and_private_reopen_refuses_it() {
-    let root = tempfile::tempdir().unwrap();
+    let root = super::private_tempdir().unwrap();
     let directory = wire::directory(&root.path().canonicalize().unwrap(), "acl-failure").unwrap();
     let path = directory.path().join("startup.lock");
     let captured = Arc::new(Mutex::new(None));

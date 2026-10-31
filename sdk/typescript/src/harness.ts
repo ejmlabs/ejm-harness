@@ -124,6 +124,16 @@ export class Harness extends Transport {
     if (hello.protocol !== PROTOCOL_VERSION)
       throw new HarnessError("protocol", "worker protocol 1 is required");
     if (
+      options.require_shell_process_tree_cancellation &&
+      (!Array.isArray(hello.capabilities) ||
+        !hello.capabilities.includes("shell_process_tree_cancellation"))
+    ) {
+      throw new HarnessError(
+        "protocol",
+        "update ejm-harness-worker to a version that supports strict shell process-tree cancellation",
+      );
+    }
+    if (
       ((options.packages?.length ?? 0) > 0 || options.provider?.kind === "package") &&
       (!Array.isArray(hello.capabilities) || !hello.capabilities.includes("packages"))
     ) {

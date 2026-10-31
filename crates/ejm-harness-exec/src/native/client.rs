@@ -144,30 +144,7 @@ async fn start_helper(
     ownership: File,
 ) -> Result<Option<Advertisement>> {
     let generation = uuid::Uuid::new_v4();
-    let admission = owner.admission.clone();
-    let request = NativeOwnerRequest::new(
-        owner.inner.root.clone(),
-        owner.inner.domain.clone(),
-        generation,
-        directory.path().join("owner.lock"),
-    );
-    let (ownership, accounted) = tokio::task::spawn_blocking(move || -> Result<_> {
-        let accounted = if let Some(admission) = admission {
-            let permit = admission.admit(&request)?;
-            ensure!(
-                permit.generation == generation,
-                "native helper admission generation mismatch"
-            );
-            true
-        } else {
-            false
-        };
-        // Cancellation may discard this result. Closing the locked description
-        // then supplies recovery proof; the permit itself never refunds a row.
-        Ok((ownership, accounted))
-    })
-    .await
-    .context("admit native execution helper")??;
+    let (ownership, accounted) = admit_helper(owner, directory, ownership, generation).await?;
     // Shared admission has its own bounded wait. Give process startup a fresh
     // transport window after that commitment, within the caller's deadline.
     let deadline = Instant::now() + wire::TIMEOUT;
@@ -175,13 +152,45 @@ async fn start_helper(
         .helper_executable
         .clone()
         .map_or_else(std::env::current_exe, Ok)?;
-    let mut helper_command = tokio::process::Command::new(executable);
+    let mut helper_command = tokio::process::Command::new(&executable);
+    #[cfg(test)]
+    let test_executable = owner
+        .helper_executable
+        .as_ref()
+        .is_some_and(|_| std::env::current_exe().is_ok_and(|current| current == executable));
+    #[cfg(test)]
+    if test_executable {
+        helper_command
+            .args([
+                "--exact",
+                "native::tests::competing_startup_clients_share_one_stable_lock",
+                "--nocapture",
+            ])
+            .env("EJM_TEST_NATIVE_ROOT", &owner.inner.root)
+            .env("EJM_TEST_NATIVE_DOMAIN", &owner.inner.domain)
+            .env("EJM_TEST_NATIVE_GENERATION", generation.to_string())
+            .env(
+                "EJM_TEST_NATIVE_ACCOUNTED",
+                if accounted { "admitted" } else { "local" },
+            );
+    }
+    #[cfg(test)]
+    if !test_executable {
+        helper_command
+            .arg(HELPER_ARG)
+            .arg(&owner.inner.root)
+            .arg(&owner.inner.domain)
+            .arg(generation.to_string())
+            .arg(if accounted { "admitted" } else { "local" });
+    }
+    #[cfg(not(test))]
     helper_command
         .arg(HELPER_ARG)
         .arg(&owner.inner.root)
         .arg(&owner.inner.domain)
         .arg(generation.to_string())
-        .arg(if accounted { "admitted" } else { "local" })
+        .arg(if accounted { "admitted" } else { "local" });
+    helper_command
         .stdin(Stdio::from(ownership.try_clone()?))
         .stdout(Stdio::null())
         .stderr(Stdio::null());
@@ -223,6 +232,38 @@ async fn start_helper(
         let _ = helper.wait().await;
     });
     Ok(Some(ad))
+}
+
+async fn admit_helper(
+    owner: &NativeOwner,
+    directory: &rightkit_fs::StateDir,
+    ownership: File,
+    generation: uuid::Uuid,
+) -> Result<(File, bool)> {
+    let admission = owner.admission.clone();
+    let request = NativeOwnerRequest::new(
+        owner.inner.root.clone(),
+        owner.inner.domain.clone(),
+        generation,
+        directory.path().join("owner.lock"),
+    );
+    tokio::task::spawn_blocking(move || -> Result<_> {
+        let accounted = if let Some(admission) = admission {
+            let permit = admission.admit(&request)?;
+            ensure!(
+                permit.generation == generation,
+                "native helper admission generation mismatch"
+            );
+            true
+        } else {
+            false
+        };
+        // Cancellation may discard this result. Closing the locked description
+        // then supplies recovery proof; the permit itself never refunds a row.
+        Ok((ownership, accounted))
+    })
+    .await
+    .context("admit native execution helper")?
 }
 
 fn require_accounted(owner: &NativeOwner, ad: &Advertisement) -> Result<()> {

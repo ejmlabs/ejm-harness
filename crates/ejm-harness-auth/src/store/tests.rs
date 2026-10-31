@@ -15,12 +15,14 @@ use base64::{Engine as _, engine::general_purpose::STANDARD};
 use tokio_util::sync::CancellationToken;
 
 use super::{
-    BOOTSTRAP, Backend, LOCK_WAIT, SecretId, SecretVault, VaultKeyStore,
+    BOOTSTRAP, LOCK_WAIT, SecretId, SecretVault, VaultKeyStore,
     format::{decode, encode},
-    key_store::native_entry,
     lock::Prepared,
     state::{Migration, VaultState},
 };
+#[cfg(not(target_os = "linux"))]
+use super::{Backend, key_store::native_entry};
+
 use crate::{
     CredentialStore, FileStore, SecretString, StoredAuth, StoredCredentials, StoredRegistration,
     store::wire,
@@ -672,8 +674,57 @@ fn unsupported_nested_provider_versions_are_rejected() -> Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn native_os_key_service_round_trip() -> Result<()> {
+    let project = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let target = project.join("target/auth-native-fixture");
+    let cargo = Path::new(env!("CARGO"));
+    let tools = cargo
+        .parent()
+        .context("Cargo executable has no tool directory")?;
+    let trusted_path = std::env::join_paths([tools, Path::new("/usr/bin"), Path::new("/bin")])?;
+    let status = std::process::Command::new(cargo)
+        .args([
+            "build",
+            "--locked",
+            "-p",
+            "ejm-harness-auth",
+            "--example",
+            "native_key_fixture",
+            "--target-dir",
+        ])
+        .arg(&target)
+        .env("CARGO_BUILD_JOBS", "2")
+        .env("PATH", trusted_path)
+        .env("RUSTC", tools.join("rustc"))
+        .env_remove("CARGO_BUILD_TARGET")
+        .env_remove("RUSTC_WRAPPER")
+        .env_remove("RUSTC_WORKSPACE_WRAPPER")
+        .env_remove("CARGO_BUILD_RUSTC_WRAPPER")
+        .env_remove("CARGO_BUILD_RUSTC_WORKSPACE_WRAPPER")
+        .env_remove("RUSTFLAGS")
+        .env_remove("CARGO_ENCODED_RUSTFLAGS")
+        .env_remove("CARGO_BUILD_RUSTFLAGS")
+        .env_remove("LD_PRELOAD")
+        .env_remove("LD_LIBRARY_PATH")
+        .status()
+        .context("build isolated native key fixture")?;
+    ensure!(status.success(), "native key fixture build failed");
+    let status = std::process::Command::new(target.join("debug/examples/native_key_fixture"))
+        .env("PATH", "/usr/bin:/bin")
+        .env_remove("LD_PRELOAD")
+        .env_remove("LD_LIBRARY_PATH")
+        .env_remove("DBUS_SESSION_BUS_ADDRESS")
+        .env_remove("GNOME_KEYRING_CONTROL")
+        .status()
+        .context("run isolated native key fixture")?;
+    ensure!(status.success(), "isolated native key fixture failed");
+    Ok(())
+}
+
+#[cfg(not(target_os = "linux"))]
 #[tokio::test]
-#[ignore = "uses the native user credential service; run explicitly on each supported OS"]
 async fn native_os_key_service_round_trip() -> Result<()> {
     let root = tempfile::tempdir()?;
     let vault = SecretVault::open(root.path().join("native-key-fixture"))?;
@@ -932,7 +983,6 @@ async fn macos_allow_acls_and_inherited_creation_are_rejected() -> Result<()> {
 }
 
 #[test]
-#[ignore = "explicit local vault measurement; uses a synthetic injected key"]
 fn vault_save_reopen_profile() -> Result<()> {
     // Keep OS key-service latency separate from repeatable file/format costs.
     // Run this exact test alone under the native process resource profiler.

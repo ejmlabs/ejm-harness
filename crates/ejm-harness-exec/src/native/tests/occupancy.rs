@@ -4,8 +4,7 @@ use std::{
     collections::HashSet,
     fs::{File, TryLockError},
     io,
-    os::unix::fs::PermissionsExt,
-    path::{Path, PathBuf},
+    path::Path,
     time::Duration,
 };
 
@@ -39,11 +38,10 @@ struct Fixture {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[ignore = "requires EJM_NATIVE_OCCUPANCY_HELPER and room for 1312 control connections"]
 async fn real_helper_control_state_saturation() -> Result<()> {
-    let helper = helper_path()?;
+    let helper = super::helper_path(HELPER_ENV)?;
     preflight_descriptors()?;
-    let temporary = tempfile::tempdir()?;
+    let temporary = super::private_tempdir()?;
     let root = temporary.path().canonicalize()?.join("capacity");
     let directory = wire::directory(&root, "occupancy")?;
     let witness = wire::stable_lock(&directory, "owner.lock")?;
@@ -75,21 +73,6 @@ async fn real_helper_control_state_saturation() -> Result<()> {
         );
     }
     result
-}
-
-fn helper_path() -> Result<PathBuf> {
-    let path = PathBuf::from(std::env::var_os(HELPER_ENV).with_context(|| {
-        format!(
-            "set {HELPER_ENV} to the absolute path of a test helper implementing dispatch_helper"
-        )
-    })?);
-    ensure!(path.is_absolute(), "{HELPER_ENV} must be absolute");
-    let metadata = path.metadata().context("inspect explicit test helper")?;
-    ensure!(
-        metadata.is_file() && metadata.permissions().mode() & 0o111 != 0,
-        "{HELPER_ENV} must name an executable file"
-    );
-    path.canonicalize().context("resolve explicit test helper")
 }
 
 fn preflight_descriptors() -> Result<()> {
@@ -449,28 +432,32 @@ async fn prepare(
 }
 
 async fn require_handshake_disconnect(advertisement: &Advertisement) -> Result<()> {
-    let mut transport = wire::connect(advertisement).await?;
+    // At capacity the server drops the socket before issuing its authentication proof.
+    // Observe that boundary directly: the normal connect helper requires the proof.
+    let stream =
+        tokio::net::TcpStream::connect((std::net::Ipv4Addr::LOCALHOST, advertisement.port)).await?;
+    let mut transport = wire::framed(stream);
     timeout(Duration::from_millis(300), async {
-        if let Err(error) =
-            wire::send(&mut transport, &hello(advertisement, None, Action::Hold)).await
-        {
+        if let Err(error) = wire::send(&mut transport, &uuid::Uuid::new_v4()).await {
             if error
                 .chain()
                 .any(|cause| cause.downcast_ref::<io::Error>().is_some_and(is_disconnect))
             {
                 return Ok(());
             }
-            return Err(error.context("overflow Hello failed without a proved disconnect"));
+            return Err(error.context("overflow challenge failed without a proved disconnect"));
         }
         match transport.next().await {
             None => Ok(()),
             Some(Err(error)) if is_disconnect(&error) => Ok(()),
             Some(Err(error)) => Err(error.into()),
-            Some(Ok(_)) => bail!("33rd Hello received a frame; handshake occupancy is unproved"),
+            Some(Ok(_)) => {
+                bail!("33rd challenge received a frame; handshake occupancy is unproved")
+            }
         }
     })
     .await
-    .context("33rd Hello did not disconnect before its proof deadline")?
+    .context("33rd challenge did not disconnect before its proof deadline")?
 }
 
 fn is_disconnect(error: &io::Error) -> bool {

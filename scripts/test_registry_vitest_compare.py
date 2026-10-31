@@ -1,0 +1,281 @@
+"""Test registry report comparison with incomplete and mixed evidence."""
+
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+from registry_vitest_compare import compare
+
+
+class RegistryVitestCompareTests(unittest.TestCase):
+    def test_oversized_summary_retains_comparable_failures(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = str(root / "worker.test.ts")
+            names = [f"{index:05}" + "x" * 900 for index in range(2500)]
+            listing = root / "inventory.json"
+            listing.write_text(json.dumps([{"file": file, "name": name} for name in names]))
+            first, second = root / "first.json", root / "second.json"
+            for path, status in ((first, "failed"), (second, "passed")):
+                records = (
+                    [{"kind": "start"}]
+                    + [
+                        {"kind": "case", "file": file, "name": name, "status": status}
+                        for name in names
+                    ]
+                    + [{"kind": "end", "incomplete": False}]
+                )
+                path.write_text(
+                    "".join(json.dumps(item, separators=(",", ":")) + "\n" for item in records)
+                )
+            summary = root / "summary.json"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-I",
+                    str(Path(__file__).with_name("registry_vitest_compare.py")),
+                    str(listing),
+                    str(first),
+                    str(second),
+                    str(root),
+                    str(summary),
+                ],
+                capture_output=True,
+                check=False,
+            )
+            data = json.loads(summary.read_text())
+            self.assertEqual(result.returncode, 1)
+            self.assertLessEqual(summary.stat().st_size, 4 * 1024 * 1024)
+            self.assertTrue(data["incomplete"] and data["summary_truncated"])
+            self.assertTrue(data["mixed"] and data["first_failed"])
+
+    def test_truncated_record_stream_keeps_earlier_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = str(root / "worker.test.ts")
+            listing = root / "inventory.json"
+            listing.write_text(json.dumps([{"file": file, "name": "flip"}]))
+            first, second = root / "first.json", root / "second.json"
+            for path, state in ((first, "failed"), (second, "passed")):
+                lines = [
+                    {"kind": "start"},
+                    {
+                        "kind": "case",
+                        "file": file,
+                        "name": "flip",
+                        "status": state,
+                        "message": "first failure",
+                    },
+                ]
+                path.write_bytes(
+                    b"".join(
+                        json.dumps(line, separators=(",", ":")).encode() + b"\n" for line in lines
+                    )
+                    + b'{"kind":"case","name":"\xc3'
+                )
+            result = compare(listing, first, second, root)
+            self.assertTrue(result["incomplete"])
+            self.assertEqual(result["mixed"], ['["worker.test.ts","flip"]'])
+            self.assertEqual(result["first_diagnostic"]["message"], "first failure")
+
+    def test_first_failure_diagnostic_is_bounded_and_retains_assertion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = str(root / "worker.test.ts")
+            listing = root / "inventory.json"
+            listing.write_text(json.dumps([{"file": file, "name": "case"}]))
+            reports = [root / "first.json", root / "second.json"]
+            for path in reports:
+                path.write_text(
+                    json.dumps(
+                        {
+                            "testResults": [
+                                {
+                                    "name": file,
+                                    "assertionResults": [
+                                        {
+                                            "fullName": "case",
+                                            "status": "failed",
+                                            "failureMessages": [
+                                                "failure start\n"
+                                                + "x" * 100000
+                                                + "\nassertion detail"
+                                            ],
+                                        }
+                                    ],
+                                }
+                            ],
+                            "numTotalTests": 1,
+                            "numPassedTests": 0,
+                            "numFailedTests": 1,
+                            "numPendingTests": 0,
+                            "numTodoTests": 0,
+                            "success": False,
+                        }
+                    )
+                )
+            result = compare(listing, reports[0], reports[1], root)
+            for field in ("first_diagnostic", "second_diagnostic"):
+                message = result[field]["message"]
+                self.assertTrue(message.startswith("failure start"))
+                self.assertTrue(message.endswith("assertion detail"))
+                self.assertLess(len(message), 9000)
+
+    def test_failed_attempt_cannot_be_reported_as_complete(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = str(root / "worker.test.ts")
+            listing = root / "inventory.json"
+            listing.write_text(json.dumps([{"file": file, "name": "case"}]))
+            reports = [root / "first.json", root / "second.json"]
+            report = {
+                "testResults": [
+                    {"name": file, "assertionResults": [{"fullName": "case", "status": "passed"}]}
+                ],
+                "numTotalTests": 1,
+                "numPassedTests": 1,
+                "numFailedTests": 0,
+                "numPendingTests": 0,
+                "numTodoTests": 0,
+                "success": True,
+            }
+            for path in reports:
+                path.write_text(json.dumps(report))
+            summary = root / "summary.json"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-I",
+                    str(Path(__file__).with_name("registry_vitest_compare.py")),
+                    str(listing),
+                    *(str(path) for path in reports),
+                    str(root),
+                    str(summary),
+                ],
+                env={**os.environ, "FIRST_OUTCOME": "failure", "SECOND_OUTCOME": "success"},
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertTrue(json.loads(summary.read_text())["incomplete"])
+
+    def test_incomplete_cases_do_not_hide_comparable_flakes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = str(root / "worker.test.ts")
+            listing = root / "inventory.json"
+            listing.write_text(
+                json.dumps(
+                    [
+                        {"file": file, "name": "flip"},
+                        {"file": file, "name": "skip"},
+                        {"file": file, "name": "missing"},
+                    ]
+                )
+            )
+            reports = [root / "first.json", root / "second.json"]
+            for path, state in zip(reports, ("failed", "passed"), strict=True):
+                cases = [
+                    {"fullName": "flip", "status": state},
+                    {"fullName": "skip", "status": "skipped"},
+                ]
+                path.write_text(
+                    json.dumps(
+                        {
+                            "testResults": [
+                                {
+                                    "name": file,
+                                    "status": "failed" if state == "failed" else "passed",
+                                    "assertionResults": cases,
+                                }
+                            ],
+                            "numTotalTests": 2,
+                            "numPassedTests": int(state == "passed"),
+                            "numFailedTests": int(state == "failed"),
+                            "numPendingTests": 1,
+                            "numTodoTests": 0,
+                            "success": state == "passed",
+                        }
+                    )
+                )
+            result = compare(listing, reports[0], reports[1], root)
+            self.assertTrue(result["incomplete"])
+            self.assertEqual(result["mixed"], ['["worker.test.ts","flip"]'])
+            self.assertEqual(result["first_failed"], ['["worker.test.ts","flip"]'])
+
+    def test_malformed_sibling_keeps_comparable_outcome(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = str(root / "worker.test.ts")
+            listing = root / "inventory.json"
+            listing.write_text(json.dumps([{"file": file, "name": "flip"}]))
+            reports = [root / "first.json", root / "second.json"]
+            for path, state in zip(reports, ("failed", "passed"), strict=True):
+                path.write_text(
+                    json.dumps(
+                        {
+                            "testResults": [
+                                {
+                                    "name": file,
+                                    "assertionResults": [
+                                        {"fullName": "flip", "status": state},
+                                        {"fullName": "bad", "status": "unknown"},
+                                    ],
+                                }
+                            ],
+                        }
+                    )
+                )
+            result = compare(listing, reports[0], reports[1], root)
+            self.assertTrue(result["incomplete"])
+            self.assertEqual(result["mixed"], ['["worker.test.ts","flip"]'])
+            self.assertEqual(result["first_failed"], ['["worker.test.ts","flip"]'])
+            first = json.loads(reports[0].read_text())
+            first["testResults"][0]["assertionResults"][1]["fullName"] = "flip"
+            reports[0].write_text(json.dumps(first))
+            self.assertEqual(compare(listing, reports[0], reports[1], root)["mixed"], [])
+
+    def test_duplicate_failure_is_preserved_without_a_flake(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            file = str(root / "worker.test.ts")
+            listing = root / "inventory.json"
+            listing.write_text(json.dumps([{"file": file, "name": "case"}]))
+            reports = [root / "first.json", root / "second.json"]
+            for path, cases in zip(
+                reports,
+                (
+                    [
+                        {"fullName": "case", "status": "failed"},
+                        {"fullName": "case", "status": "passed"},
+                    ],
+                    [{"fullName": "case", "status": "passed"}],
+                ),
+                strict=True,
+            ):
+                path.write_text(
+                    json.dumps(
+                        {
+                            "testResults": [{"name": file, "assertionResults": cases}],
+                            "numTotalTests": len(cases),
+                            "numPassedTests": 1,
+                            "numFailedTests": len(cases) - 1,
+                            "numPendingTests": 0,
+                            "numTodoTests": 0,
+                            "success": len(cases) == 1,
+                        }
+                    )
+                )
+            result = compare(listing, reports[0], reports[1], root)
+            self.assertTrue(result["incomplete"])
+            self.assertEqual(result["mixed"], [])
+            self.assertEqual(result["first_failed"], ['["worker.test.ts","case"]'])
+
+
+if __name__ == "__main__":
+    unittest.main()

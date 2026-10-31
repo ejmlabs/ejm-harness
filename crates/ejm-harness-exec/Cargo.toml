@@ -10,6 +10,12 @@ documentation.workspace = true
 readme.workspace = true
 description = "Shared resource admission and bounded native command execution for ejm-harness"
 
+[[bin]]
+name = "ejm-harness-exec-fixture"
+path = "tests/fixtures/exec_fixture.rs"
+test = false
+bench = false
+
 [lints]
 workspace = true
 
@@ -50,3 +56,4 @@ libproc = "=0.14.11"
 tempfile.workspace = true
 procfs-core.workspace = true
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+tokio = { workspace = true, features = ["test-util"] }

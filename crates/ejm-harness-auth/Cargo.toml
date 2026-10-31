@@ -13,6 +13,10 @@ readme.workspace = true
 [lints]
 workspace = true
 
+[[example]]
+name = "native_key_fixture"
+path = "tests/fixtures/native_key_fixture.rs"
+
 [dependencies]
 anyhow.workspace = true
 async-trait.workspace = true

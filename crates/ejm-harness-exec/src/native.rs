@@ -50,7 +50,10 @@ const HELPER_ARG: &str = "--ejm-native-owner-v2";
 /// small Tokio runtime and return an exit code to the host's `main` function.
 #[must_use]
 pub fn dispatch_helper() -> Option<Result<ExitCode>> {
-    let mut args = std::env::args_os().skip(1);
+    dispatch_helper_args(std::env::args_os().skip(1))
+}
+
+fn dispatch_helper_args(mut args: impl Iterator<Item = OsString>) -> Option<Result<ExitCode>> {
     if args.next().as_deref() != Some(OsStr::new(HELPER_ARG)) {
         return None;
     }

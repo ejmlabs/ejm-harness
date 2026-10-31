@@ -118,6 +118,15 @@ Both APIs support session listing, durable event pages, run cancellation, steeri
 
 Native tools start read-only. `allow_write` and `allow_shell` enable the corresponding native effects. Registering a callback is an explicit host grant for that tool, including its declared effect. Repository contents cannot register tools or change these grants.
 
+Set `require_shell_process_tree_cancellation` to `true` to require enforced
+process-tree cleanup for the native shell. Current native executors report that
+capability as monitored, so strict shell calls fail before launch. The default
+is `false`; native cleanup is best effort and a descendant may outlive a call.
+This option does not apply to custom callbacks or package tools.
+When strict mode is requested, both SDKs require the worker to advertise support
+for this option before configuring it. Older workers remain usable when strict
+mode is disabled.
+
 Custom callbacks execute in the host language process. Rust accounts for their declared tool admission reservation, but it does not isolate Python or JavaScript code or police arbitrary processes started by that code. Native command capability reports describe the actual operating system controls separately.
 
 The SDK never retries a request or an interrupted callback automatically. Request deadlines include time waiting for admission. If a request times out after sending, its effect can be uncertain and the transport closes. A timeout before admission sends no effect. On worker disconnection, pending requests fail and callback cancellation is signaled. Reopening the same state directory exposes interrupted runs without invoking their tools again. Inspect the state before starting new work.

@@ -26,6 +26,9 @@ The tool set is small on purpose. Prefer tightening an existing tool over adding
 - The shell tool runs through the shared `Executor`, reserves resources first, and writes
   large output to the artifact directory instead of memory. Keep normal Bash semantics when
   it is granted, and do not run a shell for work a native tool can do.
+- Rust hosts can use `tools_with_shell_process_tree_cancellation` to require enforced
+  process-tree cancellation; unsupported or monitored cleanup fails before launch.
+  Defaults remain unchanged.
 - Do not hand-roll traversal, diffing, or encoding. Use the maintained libraries already
   in the crate and keep custom code on grants, bounds, and preconditions.
 

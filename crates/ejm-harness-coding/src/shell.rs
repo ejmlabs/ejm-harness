@@ -4,11 +4,14 @@ use std::{collections::BTreeMap, path::PathBuf};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use ejm_harness::{Effect, Tool, ToolCall, ToolContext, ToolDefinition, ToolOutput};
-use ejm_harness_exec::{CommandOutput, CommandRequest, Executor, Reservation};
+use ejm_harness_exec::{
+    CommandOutput, CommandRequest, Executor, RequiredCapabilities, Reservation,
+};
 use serde_json::json;
 
 pub(super) struct ShellTool {
     pub(super) artifact_dir: PathBuf,
+    pub(super) require_process_tree_cancellation: bool,
 }
 
 #[async_trait]
@@ -44,7 +47,10 @@ impl Tool for ShellTool {
                     env: BTreeMap::new(),
                     timeout_ms: call.arguments["timeout_ms"].as_u64().unwrap_or(30_000),
                     reservation: reservation(call.arguments["heavy"].as_bool().unwrap_or(false)),
-                    ..Default::default()
+                    required: RequiredCapabilities {
+                        process_tree_cancellation: self.require_process_tree_cancellation,
+                        ..Default::default()
+                    },
                 },
                 context.cancel,
                 retained,

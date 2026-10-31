@@ -143,17 +143,24 @@ describe("registry publication boundary", () => {
     expect((await bindings.PACKAGES.list()).objects).toHaveLength(1);
   });
 
-  it.each(["linked_archive", "ancestor_conflict_archive"] as const)(
-    "rejects a malformed %s archive before R2 publication",
-    async (key) => {
-      const bytes = Uint8Array.from(atob(fixture[key]), (character) => character.charCodeAt(0));
-      const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
-      const sha256 = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
-      expect((await reserve("alice-token", { sha256, size: bytes.length })).status).toBe(200);
-      expect((await upload(bytes)).status).toBe(400);
-      expect((await bindings.PACKAGES.list()).objects).toHaveLength(0);
-    },
-  );
+  async function rejectsMalformedArchive(
+    key: "linked_archive" | "ancestor_conflict_archive",
+  ): Promise<void> {
+    const bytes = Uint8Array.from(atob(fixture[key]), (character) => character.charCodeAt(0));
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytes));
+    const sha256 = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+    expect((await reserve("alice-token", { sha256, size: bytes.length })).status).toBe(200);
+    expect((await upload(bytes)).status).toBe(400);
+    expect((await bindings.PACKAGES.list()).objects).toHaveLength(0);
+  }
+
+  it("rejects a malformed linked_archive archive before R2 publication", async () => {
+    await rejectsMalformedArchive("linked_archive");
+  });
+
+  it("rejects a malformed ancestor_conflict_archive archive before R2 publication", async () => {
+    await rejectsMalformedArchive("ancestor_conflict_archive");
+  });
 
   it("compares the archive manifest to the immutable reservation", async () => {
     await reserve("alice-token", {
@@ -205,51 +212,58 @@ describe("registry publication boundary", () => {
     expect(await (await call("/v1/packages")).json()).toMatchObject({ packages: [] });
   });
 
-  it.each(["daily_upload_bytes", "daily_upload_count"] as const)(
-    "enforces the global %s budget across different subjects",
-    async (column) => {
-      await reserve();
-      await bindings.DB.prepare(`UPDATE registry_limits SET ${column}=?`)
-        .bind(column === "daily_upload_bytes" ? fixture.size : 1)
-        .run();
-      expect((await upload()).status).toBe(200);
-      expect(
-        (
-          await call(
-            "/v1/publishers",
-            { method: "POST", body: JSON.stringify({ handle: "bob", display_name: "Bob" }) },
-            "bob-token",
-          )
-        ).status,
-      ).toBe(200);
-      expect(
-        (
-          await call(
-            "/v1/packages/bob/test/versions",
-            {
-              method: "POST",
-              body: JSON.stringify({
-                manifest: { ...fixture.manifest, name: "@bob/test" },
-                sha256: fixture.sha256,
-                size: fixture.size,
-              }),
-            },
-            "bob-token",
-          )
-        ).status,
-      ).toBe(200);
-      const blocked = await call(
-        "/v1/packages/bob/test/versions/1.0.0/archive",
-        { method: "PUT", body: archive },
-        "bob-token",
-      );
-      expect(blocked.status).toBe(429);
-      expect(await blocked.json()).toMatchObject({
-        error: { code: "registry_upload_budget_reached" },
-      });
-      expect((await bindings.PACKAGES.list()).objects).toHaveLength(1);
-    },
-  );
+  async function enforcesGlobalBudget(
+    column: "daily_upload_bytes" | "daily_upload_count",
+  ): Promise<void> {
+    await reserve();
+    await bindings.DB.prepare(`UPDATE registry_limits SET ${column}=?`)
+      .bind(column === "daily_upload_bytes" ? fixture.size : 1)
+      .run();
+    expect((await upload()).status).toBe(200);
+    expect(
+      (
+        await call(
+          "/v1/publishers",
+          { method: "POST", body: JSON.stringify({ handle: "bob", display_name: "Bob" }) },
+          "bob-token",
+        )
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await call(
+          "/v1/packages/bob/test/versions",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              manifest: { ...fixture.manifest, name: "@bob/test" },
+              sha256: fixture.sha256,
+              size: fixture.size,
+            }),
+          },
+          "bob-token",
+        )
+      ).status,
+    ).toBe(200);
+    const blocked = await call(
+      "/v1/packages/bob/test/versions/1.0.0/archive",
+      { method: "PUT", body: archive },
+      "bob-token",
+    );
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toMatchObject({
+      error: { code: "registry_upload_budget_reached" },
+    });
+    expect((await bindings.PACKAGES.list()).objects).toHaveLength(1);
+  }
+
+  it("enforces the global daily_upload_bytes budget across different subjects", async () => {
+    await enforcesGlobalBudget("daily_upload_bytes");
+  });
+
+  it("enforces the global daily_upload_count budget across different subjects", async () => {
+    await enforcesGlobalBudget("daily_upload_count");
+  });
 
   it("does not expose the private session path through the public Worker", async () => {
     expect((await call("/internal/session", {}, "operator-token")).status).toBe(404);

@@ -4,7 +4,8 @@ set -euo pipefail
 project_root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$project_root"
 registry_rustc=$(rustup which rustc)
-export PATH="$(dirname "$registry_rustc"):$PATH"
+PATH="$(dirname "$registry_rustc"):$PATH"
+export PATH
 export CARGO_BUILD_JOBS=2
 export CARGO_INCREMENTAL=0
 export CARGO_PROFILE_DEV_DEBUG=line-tables-only
@@ -15,16 +16,28 @@ node -e 'if (Number(process.versions.node.split(".")[0]) < 24) { console.error("
 
 cargo fmt --manifest-path registry/Cargo.toml -- --check
 cargo clippy --manifest-path registry/Cargo.toml --all-targets --locked -- -D warnings
-cargo test --manifest-path registry/Cargo.toml --lib --locked
+if [[ -n "${EJM_REGISTRY_CARGO_LOG:-}" ]]; then
+  cargo test --manifest-path registry/Cargo.toml --lib --locked | tee "$EJM_REGISTRY_CARGO_LOG"
+else
+  cargo test --manifest-path registry/Cargo.toml --lib --locked
+fi
 cargo clippy --manifest-path registry/Cargo.toml --target wasm32-unknown-unknown --lib --locked -- -D warnings
 cargo machete registry
 cargo deny --manifest-path registry/Cargo.toml --locked check
 npm --prefix registry run check:types
 npm --prefix registry run check:schema
-npm --prefix registry run test:schema
+if [[ -n "${EJM_REGISTRY_SCHEMA_REPORT:-}" && -n "${EJM_UNITTEST_RUNNER:-}" ]]; then
+  (cd registry && python3 -I "$EJM_UNITTEST_RUNNER" run "$EJM_REGISTRY_SCHEMA_REPORT" 'test_*.py')
+else
+  npm --prefix registry run test:schema
+fi
 npm exec -- eslint registry --max-warnings 0
 npm exec -- prettier --check registry
 npm --prefix registry audit --audit-level=moderate
 npm --prefix registry run build
 npm --prefix registry run build:auth
-npm --prefix registry test
+if [[ -n "${EJM_REGISTRY_VITEST_REPORT:-}" ]]; then
+  npm --prefix registry test -- --reporter=default --reporter=json --outputFile.json "$EJM_REGISTRY_VITEST_REPORT"
+else
+  npm --prefix registry test
+fi

@@ -18,9 +18,17 @@ and uv. `rust-toolchain.toml` and workspace `rust-version` agree on Rust 1.99.1.
 An older compiler is not a supported configuration. Linux builds require `pkg-config`
 and D-Bus development headers for the native Secret Service key adapter. On
 Debian/Ubuntu install `pkg-config` and `libdbus-1-dev` before the Cargo gate.
-Offline fixtures inject key storage and do not require a desktop secret service;
-real persistent use still requires an unlocked user Secret Service. Cargo, npm, and Python
-development locks belong in version control.
+Many offline fixtures inject key storage, but the workspace tests and required
+gate also run a real native credential-service round trip. They need an
+isolated Secret Service on Linux, an unlocked default Keychain on macOS, or
+a Windows logon session with Credential Manager available. On Linux, the test
+starts its own isolated Secret Service, including for direct Cargo invocations;
+it requires `dbus-daemon`, `gnome-keyring-daemon`, and `gdbus` in
+`/usr/bin` or `/bin`. An
+unavailable service fails the test; hosted runner availability and ephemeral
+service cleanup remain unverified on each platform. Real persistent use also
+needs the platform credential service. Cargo, npm, and Python development locks
+belong in version control.
 
 Install the quality tools once:
 
@@ -205,6 +213,7 @@ order, bounds, wire and persisted formats, and public paths stay as they were.
 | Moved code       | The original module re-exports what moved, so callers and hosts keep their paths. `sdk/typescript/src/index.ts` and `ejm_harness/client.py` stay as thin roots over the SDKs.     |
 | Large types      | One `impl` may span submodules, one per flow, as `Harness` does in `engine/`, `Store` in `store/`, and `AuthEngine` in the auth `engine/`.                                        |
 | Unit tests       | Inline `#[cfg(test)] mod tests` in a single-file module. A folder module may hold large tests in `<module>/tests.rs`. Existing test files keep their paths, since docs cite them. |
+| Child fixtures   | Child-only executable fixtures live under `tests/fixtures` as Cargo binary targets with tests and benchmarks disabled.                                                            |
 | Modes and limits | An enum instead of a boolean mode flag, such as `Edit::{Write, Patch}`. A repeated limit, timeout, or file name becomes a named constant.                                         |
 | Poisoned mutexes | A crate-private `lock` helper recovers the data, as in the governor, the package runtime, and the auth engine.                                                                    |
 

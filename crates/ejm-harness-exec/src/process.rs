@@ -111,15 +111,16 @@ impl OwnedChild {
         group.and(child)
     }
 
-    /// Terminate the group, reap the direct child, and finish native cleanup.
+    /// Signal the group, reap the direct child, and perform native cleanup.
     ///
     /// Windows retains the Job Object until a successful membership query says
     /// it is empty. Failed termination or membership queries keep cleanup
     /// pending and are retried, so a supervisor cannot release host leases while
     /// the tree may still run. Keep the Tokio runtime alive while this waits.
+    /// Unix group signals are best effort and do not confirm descendant exit.
     ///
     /// # Errors
-    /// Returns a termination or wait error after native cleanup has completed.
+    /// Returns a termination or wait error; on Unix descendants may remain alive.
     pub async fn kill(&mut self) -> io::Result<ExitStatus> {
         let termination = self.start_kill();
         #[cfg(windows)]

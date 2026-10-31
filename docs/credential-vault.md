@@ -81,9 +81,9 @@ CARGO_BUILD_JOBS=2 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 \
   cargo test --locked -p ejm-harness-auth --lib --no-run
 # Set AUTH_TEST_BINARY to the library test executable Cargo reports.
 /usr/bin/time -l "$AUTH_TEST_BINARY" --exact \
-  store::vault::tests::vault_save_reopen_profile --ignored --nocapture
+  store::vault::tests::vault_save_reopen_profile --nocapture
 EJM_HARNESS_VAULT_PROFILE_FULL=1 /usr/bin/time -l "$AUTH_TEST_BINARY" --exact \
-  store::vault::tests::vault_save_reopen_profile --ignored --nocapture
+  store::vault::tests::vault_save_reopen_profile --nocapture
 ```
 
 The [publication verification record](host-auth-verification.md) names the local

@@ -535,6 +535,7 @@ class ConfigureParams(TypedDict):
     max_store_bytes: NotRequired[int | None]
     packages: NotRequired[list[PackageConfig]]
     provider: NotRequired[ProviderConfig | None]
+    require_shell_process_tree_cancellation: NotRequired[bool]
     resources: NotRequired[ResourceLimits | None]
     run_timeout_ms: NotRequired[int | None]
     state_dir: NotRequired[str | None]

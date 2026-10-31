@@ -34,6 +34,12 @@ registry. The API fixtures substitute only the private normalized identity
 service. Separate auth fixtures run the real Better Auth device/session code
 against local D1 with locally created fixture users.
 
+For Cargo test output, set `EJM_REGISTRY_CARGO_LOG` to an absolute output path.
+For per-test evidence, set `EJM_REGISTRY_VITEST_REPORT` to an absolute output
+path. To report schema tests, set both `EJM_REGISTRY_SCHEMA_REPORT` to an
+absolute output path and `EJM_UNITTEST_RUNNER` to the trusted runner path. When
+these settings are absent, the usual test commands run unchanged.
+
 `npm --prefix registry run schema:auth` uses Better Auth's maintained migration
 generator with Node's in-memory SQLite driver. Commit the generated SQL. Never
 handwrite or silently apply auth schema changes. `check:schema` checks exact

@@ -10,7 +10,7 @@ import threading
 import unittest
 from pathlib import Path
 from typing import Any, cast
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from ejm_harness import (
     AsyncHarness,
@@ -106,6 +106,54 @@ async def widget(args, ctx):
 
 
 class AsyncSdkTests(unittest.IsolatedAsyncioTestCase):
+    async def test_strict_shell_requires_worker_capability_before_configure(self) -> None:
+        for capabilities in (None, [], "shell_process_tree_cancellation"):
+            for allow_shell in (False, True):
+                with self.subTest(capabilities=capabilities, allow_shell=allow_shell):
+                    hello: dict[str, object] = {"protocol": 1}
+                    if capabilities is not None:
+                        hello["capabilities"] = capabilities
+                    request = AsyncMock(return_value=hello)
+                    with (
+                        patch.object(AsyncHarness, "_start", new_callable=AsyncMock),
+                        patch.object(AsyncHarness, "_request", request),
+                        patch.object(AsyncHarness, "close", new_callable=AsyncMock) as close,
+                        self.assertRaisesRegex(HarnessError, "update ejm-harness-worker"),
+                    ):
+                        await AsyncHarness.create(
+                            config={
+                                "allow_shell": allow_shell,
+                                "require_shell_process_tree_cancellation": True,
+                            }
+                        )
+                    request.assert_awaited_once_with("hello", {"protocol": 1})
+                    close.assert_awaited_once()
+
+    async def test_shell_handshake_accepts_legacy_or_supported_worker(self) -> None:
+        for strict, capabilities in (
+            (None, None),
+            (False, []),
+            (True, ["shell_process_tree_cancellation"]),
+        ):
+            with self.subTest(strict=strict, capabilities=capabilities):
+                config: ConfigureParams = {"allow_shell": True}
+                if strict is not None:
+                    config["require_shell_process_tree_cancellation"] = strict
+                hello: dict[str, object] = {"protocol": 1}
+                if capabilities is not None:
+                    hello["capabilities"] = capabilities
+                request = AsyncMock(return_value=hello)
+                with (
+                    patch.object(AsyncHarness, "_start", new_callable=AsyncMock),
+                    patch.object(AsyncHarness, "_request", request),
+                    patch.object(AsyncHarness, "close", new_callable=AsyncMock),
+                ):
+                    await AsyncHarness.create(config=config)
+                self.assertEqual(
+                    request.await_args_list[1].args,
+                    ("configure", {**config, "tools": []}),
+                )
+
     async def test_package_configuration_requires_worker_capability(self) -> None:
         request = AsyncHarness._request
 

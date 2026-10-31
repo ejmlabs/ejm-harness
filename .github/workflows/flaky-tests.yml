@@ -1,0 +1,245 @@
+name: Test reliability
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "47 11 * * *"
+permissions:
+  contents: read
+env:
+  CARGO_BUILD_JOBS: 2
+  CARGO_INCREMENTAL: 0
+jobs:
+  reliability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 140
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        timeout-minutes: 5
+        with:
+          persist-credentials: false
+      - name: Install native test prerequisites
+        timeout-minutes: 15
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends pkg-config libdbus-1-dev dbus-x11 gnome-keyring libglib2.0-bin
+      - run: rustup toolchain install 1.99.1 --profile minimal
+        timeout-minutes: 10
+      - name: Install verified cargo-nextest
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/cargo-nextest.tar.gz"
+          bindir="$RUNNER_TEMP/nextest-bin"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.124/cargo-nextest-0.9.124-x86_64-unknown-linux-gnu.tar.gz \
+            --output "$archive"
+          printf '%s  %s\n' cf3694155011e6e19a7306448b7984e5d0d781417a31478996a9018b7ec78e25 "$archive" | shasum -a 256 --check --status
+          mkdir "$bindir"
+          tar -xzf "$archive" -C "$bindir" cargo-nextest
+          "$bindir/cargo-nextest" --version
+          echo "$bindir" >> "$GITHUB_PATH"
+      - run: PYTHONPATH=scripts python3 -B -m unittest test_bounded_report test_check_registry test_compare_partial_flakes test_evidence_identity test_flake_check test_nextest_evidence test_registry_rust_compare test_registry_unittest_evidence test_registry_vitest_compare test_secret_service
+        timeout-minutes: 30
+      - name: Compare two independent Rust test runs
+        id: rust_reliability
+        timeout-minutes: 50
+        run: scripts/with-secret-service python3 scripts/flake_check.py "$RUNNER_TEMP/harness-flakes"
+      - name: Compare interrupted Rust evidence
+        if: always() && !cancelled()
+        timeout-minutes: 2
+        env:
+          PRODUCER_OUTCOME: ${{ steps.rust_reliability.outcome }}
+        run: python3 -I scripts/compare_partial_flakes.py "$RUNNER_TEMP/harness-flakes"
+      - name: Stage bounded reliability reports
+        if: always() && !cancelled()
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          set -uo pipefail
+          source="$RUNNER_TEMP/harness-flakes"
+          destination="$RUNNER_TEMP/harness-flakes-upload"
+          mkdir -p "$destination"
+          shopt -s nullglob
+          result=0
+          for file in "$source"/summary.json "$source"/inventory.json "$source"/attempt-*.xml "$source"/cargo-test-*.json "$source"/doctest-*.json "$source"/cargo-test-*.json.partial "$source"/doctest-*.json.partial "$source"/*.log; do
+            [[ -e "$file" ]] || continue
+            limit=52428800
+            [[ "$file" == *.log || "$file" == */summary.json || "$file" == */cargo-test-*.json* || "$file" == */doctest-*.json* ]] && limit=4194304
+            if [[ -L "$file" || ! -f "$file" ]] || (( $(wc -c < "$file") > limit )); then
+              echo "Evidence exceeds its bound or is not a regular file: $file" >&2
+              result=1
+              continue
+            fi
+            cp -- "$file" "$destination/" || result=1
+          done
+          exit "$result"
+      - name: Preserve reliability reports
+        if: always() && !cancelled()
+        timeout-minutes: 5
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: harness-rust-reliability
+          path: ${{ runner.temp }}/harness-flakes-upload/
+          retention-days: 14
+          if-no-files-found: warn
+  registry-reliability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 125
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        timeout-minutes: 5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        timeout-minutes: 10
+        with:
+          node-version: "24"
+      - name: Prepare pinned tools and registry fixtures
+        timeout-minutes: 20
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/registry-flakes" "$RUNNER_TEMP/nextest-bin"
+          curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+            https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.124/cargo-nextest-0.9.124-x86_64-unknown-linux-gnu.tar.gz \
+            --output "$RUNNER_TEMP/cargo-nextest-registry.tar.gz"
+          printf '%s  %s\n' cf3694155011e6e19a7306448b7984e5d0d781417a31478996a9018b7ec78e25 "$RUNNER_TEMP/cargo-nextest-registry.tar.gz" | shasum -a 256 --check --status
+          tar -xzf "$RUNNER_TEMP/cargo-nextest-registry.tar.gz" -C "$RUNNER_TEMP/nextest-bin" cargo-nextest
+          echo "$RUNNER_TEMP/nextest-bin" >> "$GITHUB_PATH"
+          rustup toolchain install 1.99.1 --profile minimal --target wasm32-unknown-unknown
+          rustup default 1.99.1
+          cargo install worker-build --version 0.8.7 --locked
+          npm ci --ignore-scripts
+          npm --prefix registry ci --ignore-scripts
+          npm --prefix registry run build
+      - name: Verify Vitest evidence reporter
+        if: always() && !cancelled()
+        timeout-minutes: 10
+        run: PYTHONPATH=scripts python3 -B -m unittest test_registry_vitest_reporter
+      - name: Prepare evidence directory
+        if: always() && !cancelled()
+        timeout-minutes: 1
+        run: mkdir -p "$RUNNER_TEMP/registry-flakes"
+      - name: Inventory registry Rust tests
+        if: always() && !cancelled()
+        timeout-minutes: 6
+        working-directory: registry
+        run: python3 -I ../scripts/bounded_report.py stdout "$RUNNER_TEMP/registry-flakes/rust-inventory.json" 52428800 -- cargo nextest list --locked --lib --ignore-default-filter --message-format json --user-config-file none
+      - name: Run registry Rust tests, first attempt
+        id: rust_first
+        if: always() && !cancelled()
+        timeout-minutes: 8
+        working-directory: registry
+        shell: bash
+        run: |
+          printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = true\n' "$RUNNER_TEMP/registry-flakes/rust-1.xml.fifo" > "$RUNNER_TEMP/registry-flakes/rust-1.toml"
+          python3 -I ../scripts/bounded_report.py fifo-xml "$RUNNER_TEMP/registry-flakes/rust-1.xml" 52428800 -- cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-1.toml" --user-config-file none --no-tests fail --no-fail-fast
+      - name: Run registry Rust tests, second attempt
+        id: rust_second
+        if: always() && !cancelled()
+        timeout-minutes: 8
+        working-directory: registry
+        shell: bash
+        run: |
+          printf '[profile.ci.junit]\npath = "%s"\nstore-failure-output = true\n' "$RUNNER_TEMP/registry-flakes/rust-2.xml.fifo" > "$RUNNER_TEMP/registry-flakes/rust-2.toml"
+          EJM_HARNESS_JUNIT_REFERENCE="$RUNNER_TEMP/registry-flakes/rust-1.xml" python3 -I ../scripts/bounded_report.py fifo-xml "$RUNNER_TEMP/registry-flakes/rust-2.xml" 52428800 -- cargo nextest run --locked --lib --ignore-default-filter --profile ci --config-file "$RUNNER_TEMP/registry-flakes/rust-2.toml" --user-config-file none --no-tests fail --no-fail-fast
+      - name: Compare registry Rust outcomes
+        if: always() && !cancelled()
+        timeout-minutes: 1
+        env:
+          FIRST_OUTCOME: ${{ steps.rust_first.outcome }}
+          SECOND_OUTCOME: ${{ steps.rust_second.outcome }}
+        run: python3 -I scripts/registry_rust_compare.py "$RUNNER_TEMP/registry-flakes/rust-inventory.json" "$RUNNER_TEMP/registry-flakes/rust-1.xml" "$RUNNER_TEMP/registry-flakes/rust-2.xml" "$RUNNER_TEMP/registry-flakes/rust-summary.json"
+      - name: Run registry schema tests, first attempt
+        id: schema_first
+        if: always() && !cancelled()
+        timeout-minutes: 3
+        working-directory: registry
+        run: python3 -I ../scripts/registry_unittest_evidence.py run "$RUNNER_TEMP/registry-flakes/schema-1.json" 'test_*.py'
+      - name: Run registry schema tests, second attempt
+        id: schema_second
+        if: always() && !cancelled()
+        timeout-minutes: 3
+        working-directory: registry
+        run: EJM_REGISTRY_SCHEMA_REFERENCE="$RUNNER_TEMP/registry-flakes/schema-1.json" python3 -I ../scripts/registry_unittest_evidence.py run "$RUNNER_TEMP/registry-flakes/schema-2.json" 'test_*.py'
+      - name: Compare registry schema outcomes
+        if: always() && !cancelled()
+        timeout-minutes: 1
+        env:
+          FIRST_OUTCOME: ${{ steps.schema_first.outcome }}
+          SECOND_OUTCOME: ${{ steps.schema_second.outcome }}
+        shell: bash
+        run: |
+          python3 -I scripts/registry_unittest_evidence.py compare "$RUNNER_TEMP/registry-flakes/schema-1.json" "$RUNNER_TEMP/registry-flakes/schema-2.json"
+          [[ "$FIRST_OUTCOME" == success && "$SECOND_OUTCOME" == success ]]
+      - name: Collect registry Worker inventory
+        if: always() && !cancelled()
+        timeout-minutes: 5
+        working-directory: registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          collector=$(mktemp .registry-inventory.XXXXXX.mjs)
+          trap 'rm -f -- "$collector"' EXIT
+          cp ../scripts/registry_vitest_inventory.mjs "$collector"
+          python3 -I ../scripts/bounded_report.py stdout "$RUNNER_TEMP/registry-flakes/worker-inventory.json" 4194304 -- node "$collector"
+      - name: Collect auth Worker inventory
+        if: always() && !cancelled()
+        timeout-minutes: 5
+        working-directory: registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          collector=$(mktemp .registry-inventory.XXXXXX.mjs)
+          trap 'rm -f -- "$collector"' EXIT
+          cp ../scripts/registry_vitest_inventory.mjs "$collector"
+          python3 -I ../scripts/bounded_report.py stdout "$RUNNER_TEMP/registry-flakes/auth-inventory.json" 4194304 -- node "$collector" vitest.auth.config.ts
+      - name: Run registry Worker tests, first attempt
+        id: worker_first
+        if: always() && !cancelled()
+        timeout-minutes: 4
+        working-directory: registry
+        run: EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/worker-1.json.fifo" python3 -I ../scripts/bounded_report.py fifo-jsonl "$RUNNER_TEMP/registry-flakes/worker-1.json" 4194304 -- node node_modules/vitest/vitest.mjs run --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
+      - name: Run registry Worker tests, second attempt
+        id: worker_second
+        if: always() && !cancelled()
+        timeout-minutes: 4
+        working-directory: registry
+        run: EJM_REGISTRY_VITEST_REFERENCE="$RUNNER_TEMP/registry-flakes/worker-1.json" EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/worker-2.json.fifo" python3 -I ../scripts/bounded_report.py fifo-jsonl "$RUNNER_TEMP/registry-flakes/worker-2.json" 4194304 -- node node_modules/vitest/vitest.mjs run --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
+      - name: Compare registry Worker outcomes
+        if: always() && !cancelled()
+        timeout-minutes: 1
+        env:
+          FIRST_OUTCOME: ${{ steps.worker_first.outcome }}
+          SECOND_OUTCOME: ${{ steps.worker_second.outcome }}
+        run: python3 -I scripts/registry_vitest_compare.py "$RUNNER_TEMP/registry-flakes/worker-inventory.json" "$RUNNER_TEMP/registry-flakes/worker-1.json" "$RUNNER_TEMP/registry-flakes/worker-2.json" registry "$RUNNER_TEMP/registry-flakes/worker-summary.json"
+      - name: Run auth Worker tests, first attempt
+        id: auth_first
+        if: always() && !cancelled()
+        timeout-minutes: 4
+        working-directory: registry
+        run: EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/auth-1.json.fifo" python3 -I ../scripts/bounded_report.py fifo-jsonl "$RUNNER_TEMP/registry-flakes/auth-1.json" 4194304 -- node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
+      - name: Run auth Worker tests, second attempt
+        id: auth_second
+        if: always() && !cancelled()
+        timeout-minutes: 4
+        working-directory: registry
+        run: EJM_REGISTRY_VITEST_REFERENCE="$RUNNER_TEMP/registry-flakes/auth-1.json" EJM_REGISTRY_VITEST_EVIDENCE="$RUNNER_TEMP/registry-flakes/auth-2.json.fifo" python3 -I ../scripts/bounded_report.py fifo-jsonl "$RUNNER_TEMP/registry-flakes/auth-2.json" 4194304 -- node node_modules/vitest/vitest.mjs run --config vitest.auth.config.ts --retry=0 --reporter=default --reporter=../scripts/registry_vitest_reporter.mjs
+      - name: Compare auth Worker outcomes
+        if: always() && !cancelled()
+        timeout-minutes: 1
+        env:
+          FIRST_OUTCOME: ${{ steps.auth_first.outcome }}
+          SECOND_OUTCOME: ${{ steps.auth_second.outcome }}
+        run: python3 -I scripts/registry_vitest_compare.py "$RUNNER_TEMP/registry-flakes/auth-inventory.json" "$RUNNER_TEMP/registry-flakes/auth-1.json" "$RUNNER_TEMP/registry-flakes/auth-2.json" registry "$RUNNER_TEMP/registry-flakes/auth-summary.json"
+      - name: Preserve bounded registry diagnostics
+        if: always() && !cancelled()
+        timeout-minutes: 5
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: harness-registry-reliability
+          path: |
+            ${{ runner.temp }}/registry-flakes/*-summary.json
+            ${{ runner.temp }}/registry-flakes/schema-*.json
+          retention-days: 14
+          if-no-files-found: warn

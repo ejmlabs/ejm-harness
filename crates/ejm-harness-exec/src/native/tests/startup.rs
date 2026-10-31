@@ -2,7 +2,7 @@
 
 use std::{
     fs::{File, TryLockError},
-    path::{Path, PathBuf},
+    path::Path,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -29,13 +29,9 @@ impl NativeOwnerAdmission for Admissions {
 }
 
 #[tokio::test]
-#[ignore = "requires EJM_NATIVE_STARTUP_HELPER pointing to native_owner_helper"]
 async fn startup_lock_wait_preserves_readiness_and_executor_bounds() -> Result<()> {
-    let helper = PathBuf::from(
-        std::env::var_os("EJM_NATIVE_STARTUP_HELPER").context("set EJM_NATIVE_STARTUP_HELPER")?,
-    );
-    ensure!(helper.is_absolute(), "test helper path must be absolute");
-    let temporary = tempfile::tempdir()?;
+    let helper = super::helper_path("EJM_NATIVE_STARTUP_HELPER")?;
+    let temporary = super::private_tempdir()?;
     let root = temporary.path().canonicalize()?.join("state");
     let directory = wire::directory(&root, "startup-wait")?;
     let startup = wire::stable_lock(&directory, "startup.lock")?;
@@ -254,7 +250,7 @@ async fn startup_exit_retries_only_clean_exit_and_remains_bounded() -> Result<()
         ("/usr/bin/true", 2, "repeatedly retired"),
         ("/usr/bin/false", 1, "failed before startup"),
     ] {
-        let temporary = tempfile::tempdir()?;
+        let temporary = super::private_tempdir()?;
         let root = temporary.path().canonicalize()?.join("state");
         let admissions = Arc::new(Admissions(AtomicUsize::new(0)));
         let owner = NativeOwner::new(&root, "startup-exit")?
