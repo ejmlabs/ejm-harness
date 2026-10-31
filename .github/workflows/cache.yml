@@ -1,0 +1,10 @@
+name: Warm trusted gate build caches
+on:
+  push:
+    branches: [main]
+permissions: {}
+jobs:
+  warm:
+    permissions:
+      contents: read
+    uses: ejmlabs/.github/.github/workflows/warm-cache.yml@863bd1355dfda0a7d098435913d6acbf6f9e2adb
