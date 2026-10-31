@@ -12,14 +12,15 @@ finding with the file and line, the condition that triggers it, and what a user 
    specific object?
 5. Is input checked for size before parsing and parsed into typed values at the boundary?
 6. Does every missing identity, key, setting, or policy answer deny? Does no error path allow?
+   Does production startup reject development defaults?
 7. Can untrusted text choose a tool, recipient, URL, grant, or approver anywhere? (It must not.)
 8. Is model and tool output escaped or rendered as text, with control sequences stripped?
 9. Does each URL a user or model can influence go through the shared outbound client?
 10. Does sign-in and credential storage go through the product's one auth package?
 11. Is each approval bound to the exact action and consumed once by a live human?
 12. Is each native restriction described as enforced, monitored, or unsupported?
-13. Is each new action pinned to a full SHA, and each new package pinned exactly, at least two
-    weeks old, checked for name, publisher, and license, and covered by the lockfile?
+13. Is each new action pinned to a full SHA, and each new package pinned exactly, old enough
+    under the dependency age rule, checked for name, publisher, and license, and locked?
 14. Do workflow permissions stay read-only by default, with no secrets reachable by PR code?
 15. Do site responses send the shared CSP and headers?
 16. Does a test exercise the denial, the hostile input, or the escape attempt, not only success?

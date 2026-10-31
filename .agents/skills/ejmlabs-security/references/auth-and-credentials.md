@@ -6,12 +6,13 @@ not in a host.
 
 ## Ownership
 
-- One package per product owns sign-in, sessions, renewal, and credential storage: the shared auth
-  crate for the harness and its hosts, or a maintained library such as Better Auth for services.
+- One package per product owns sign-in, sessions, renewal, and credential storage: the product's
+  shared auth package, or a maintained library such as Better Auth for services.
 - A host owns only what the user sees, the browser launch, and the loopback listener.
 - Keep OAuth primitives, JWT checks, HTTP parsing, and TLS in maintained libraries. Never write
   them by hand.
 - Never collect, copy, or reuse credentials that belong to another vendor's official client.
+- Link accounts by verified issuer and subject, never by email or display name.
 
 ## Sessions and cookies
 

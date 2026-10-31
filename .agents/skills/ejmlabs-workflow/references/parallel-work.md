@@ -18,13 +18,8 @@ When several agents share one task:
 
 ## Sibling repositories
 
-The ejmlabs repositories depend on each other by path and by pinned revision:
-
-| Owner                                                         | Consumers                        |
-| ------------------------------------------------------------- | -------------------------------- |
-| `ejm-harness` (engine, auth, coding tools, SDKs)              | `ejm-cli`, `ejm-ide`             |
-| `ejm-ui` (tokens, components, site tooling, `ejm-tui`)        | every site, `ejm-cli`, `ejm-ide` |
-| `.github` (gates, community files, lint layer, shared skills) | every repository                 |
+Repositories can depend on each other by path and by pinned revision. The repository's AGENTS.md
+or a repository skill names who owns each shared piece; this skill holds only the rules.
 
 - Never edit a sibling repository from another repository's task without its owner's agreement.
   When a sibling breaks your build, tell its session and wait, or work against its pinned
@@ -36,8 +31,8 @@ The ejmlabs repositories depend on each other by path and by pinned revision:
 
 ## Machine limits
 
-- Check free disk and memory before large builds. Keep Cargo jobs at two on constrained
-  machines (`CARGO_BUILD_JOBS=2`, `CARGO_INCREMENTAL=0` for full gates).
-- When a disk fills, clean only this repository's build output (`cargo clean`, its
-  `target/debug/incremental`, its `node_modules`). Never delete another project's files.
+- Check free disk and memory before large builds. On a constrained shared machine, cap build
+  parallelism; CI and dedicated machines use every core.
+- When a disk fills, clean only this repository's build output. Never delete another project's
+  files.
 - Bound concurrent jobs and child agents. Keep the machine responsive for the person using it.

@@ -20,7 +20,8 @@ Read when you add, update, replace or remove a dependency, tool pin or toolchain
   `cargo --locked`).
 - Never hand-edit a lockfile. Regenerate it with the package manager.
 - New or updated versions are at least two weeks old, unless the update fixes a security
-  advisory that affects us.
+  advisory that affects us; say which in the PR. This is the one age rule. Automated update
+  cooldowns, toolchain bumps and the security and stack skills all follow it.
 - Pin toolchains and tools in the repository (`rust-toolchain.toml`, `.nvmrc` or `engines`,
   `requires-python`, the strict lint layer versions). A missing tool or a stale lock is a failed
   gate, not a skipped check.
@@ -33,8 +34,9 @@ Read when you add, update, replace or remove a dependency, tool pin or toolchain
 - License: permissive licenses (MIT, Apache-2.0, BSD, ISC, Zlib, OFL for fonts) are fine.
   Anything else, or a license change, needs the owner's review. Keep `THIRD_PARTY_NOTICES`
   current when you ship a dependency's code or assets.
-- Rust uses `cargo-deny` for advisories, licenses, bans and sources. A deny exception names the
-  exact crate, version, upstream constraint and removal condition.
+- Audit the lockfile with the repository's pinned scanner. An exception names the exact package
+  and version or advisory, the upstream constraint and the removal condition. Rust audits are in
+  `ejmlabs-rust`, when the repository has it.
 
 ## Recording exceptions
 

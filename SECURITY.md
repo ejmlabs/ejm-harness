@@ -22,4 +22,4 @@ Include the affected revision/version, scope, prerequisites, reproducible steps,
 
 Review credential handling, authorization and approval boundaries, workspace path/symlink isolation, untrusted package and repository content, command execution, network input, dependency changes, and CI/release permissions. Test realistic attack paths. Do not infer safety from a passing scanner. Maintainers must review public history and release artifacts for private data before changing visibility.
 
-Use minimal workflow permissions and immutable action pins. Never execute PR code with model or release credentials. Each PR head needs a human readiness decision before checks or AI run, followed by current maintainer approval and passing required checks. See [Contributing](CONTRIBUTING.md).
+Use minimal workflow permissions and immutable action pins. Never run PR code with release or deploy credentials. Checks run for a PR head only after a human admits it, and the PR merges only with a maintainer's approval and passing required checks. See [Contributing](CONTRIBUTING.md).

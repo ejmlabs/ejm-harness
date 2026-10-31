@@ -57,8 +57,8 @@ Bands may nest; the nearest wins. Children use only semantic names, so they read
 | `text-stat`                       | A large standalone number                  |
 | `tabular-nums`                    | Numbers in tables, facts rows and versions |
 
-Tailwind's `text-xs` and up stay available for dense app UI. Headings wrap balanced; prose wraps
-pretty. Preload both fonts with `fontPreloads` from `@ejm/ui`.
+Tailwind's `text-xs` and up stay available for dense app UI. Body lines stay within
+`max-w-measure` (68ch). Headings wrap balanced; prose wraps pretty. Preload both fonts with `fontPreloads` from `@ejm/ui`.
 
 ## Space, radius and elevation
 
@@ -81,3 +81,15 @@ pretty. Preload both fonts with `fontPreloads` from `@ejm/ui`.
   text that can be the Largest Contentful Paint).
 - Stagger with `--ejm-i` on each child. The index stops at 8, so an entrance stays under 1.2s.
 - Every animation utility is wrapped in `prefers-reduced-motion: no-preference`.
+
+## Themes
+
+- `theme-boot.js` runs before any CSS, so the first frame has the right theme. Without a saved
+  choice the system preference decides.
+- The theme control sits last in the header tools. `?theme=dark` and `?theme=light` are test
+  overrides and are never saved.
+
+## Terminal interfaces
+
+- Build from `ejm-tui` blocks. No boxes, frames or painted backgrounds; group with space and one
+  hairline rule. Every state has a word or glyph and works under `NO_COLOR`.

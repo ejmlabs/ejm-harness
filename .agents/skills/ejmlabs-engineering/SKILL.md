@@ -26,7 +26,7 @@ code beats locally clever code.
 - Before you add a file, helper, module or structure, find how the codebase already does the same
   job and copy that shape: naming, layout, error style, test placement.
 - When none exists, choose one, record it in the repository's conventions (its contributing
-  guide or engineering skill) before you use it, and apply it everywhere it fits.
+  guide or engineering skill) before you use it, and apply it to new code.
 - Never add a second shape for something the codebase already does one way. Never copy a shared
   helper; extend it, keeping each call site's error text and failure behavior.
 
@@ -81,13 +81,12 @@ See [references/dependencies.md](references/dependencies.md) for pins, licenses 
 
 A refactor changes structure, not behavior. Keep output, messages, check order, limits,
 cancellation, cleanup, wire and storage formats, command names and public paths. When code moves,
-the old path re-exports it. A bug found during a refactor is its own change.
+the old path re-exports it only while a caller outside this change still uses it. A bug found
+during a refactor is its own change.
 
 ## Velocity
 
 - Small, single-purpose PRs that each pass the gate alone.
 - Focused checks while editing; the full gate once before handoff.
-- Campground rule: leave the area you touch better than you found it, within scope. Record larger
-  follow-ups instead of starting an unrelated rewrite.
 - Decide reversible choices quickly with a sensible default; ask only when the choice changes
   correctness, security, spending or the requested outcome.

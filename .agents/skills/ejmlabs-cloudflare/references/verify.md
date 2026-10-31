@@ -7,7 +7,7 @@ unverified.
 ## Local visual check
 
 Serve the built `dist` on a loopback port. Use the repository's preview port and command when
-it has one (ejmlabs.com uses 4827):
+it has one:
 
 ```sh
 python3 -m http.server 4827 --directory dist --bind 127.0.0.1
@@ -16,7 +16,7 @@ python3 -m http.server 4827 --directory dist --bind 127.0.0.1
 Run it in the background, then look at the pages:
 
 - Each changed route at 375 px and desktop width, in light and dark. A repository skill may
-  add widths (the IDE site also checks 320, 768 and 1440).
+  add widths.
 - No horizontal overflow: `document.documentElement.scrollWidth` equals `clientWidth` at
   375 px.
 - Keyboard: the skip link first, visible focus, the theme toggle reachable.
@@ -70,7 +70,7 @@ After the deploy, over HTTPS on the canonical host:
 3. A missing route returns the 404 page with status 404.
 4. Each download returns 200 and the bytes the build produced (size, and SHA-256 where listed).
 5. The response headers match the build (below).
-6. The console is empty on each changed route.
+6. The console is empty on each changed route, in both themes.
 7. Unwanted alternate hosts (`workers.dev`, preview URLs) do not serve the site.
 
 ## Compare live headers with `dist/_headers`
@@ -105,5 +105,6 @@ State, separately:
 
 - Local: the commands that ran and their results, and which widths and themes you looked at.
 - Deploy: the Worker name, commit, and previous and new version ids.
-- Live: the routes, downloads and headers you checked, in which browser, and what you saw.
+- Live: the URL and commit you checked, the routes, downloads and headers, in which browser, and
+  what you saw.
 - Not checked: everything else, named.

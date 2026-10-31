@@ -20,8 +20,8 @@ profile = "minimal"
 - Quality tools have exact versions (for example `cargo-deny` and `cargo-machete`), installed
   with `cargo install --locked --version X NAME`. The contributor guide and CI name the same
   versions; change every site in one patch.
-- Choose a toolchain or tool release that has been out at least two weeks. Automated
-  dependency updates use a cooldown of at least seven days.
+- Choose a toolchain or tool release that meets the dependency age rule in `ejmlabs-engineering`,
+  and give automated dependency updates a cooldown that matches it.
 - A missing tool or a stale lock is a failed gate, not a skipped step.
 
 ## Lint layer
@@ -97,6 +97,8 @@ skip = [
 
 - A workspace that depends on a sibling checkout by path uses only that sibling's public API.
   Never edit the sibling from here; tell its owning session what you need.
+- Run `cargo fmt --package NAME` instead of `--all`: `--all` also formats the local path
+  dependencies, which belong to another repo.
 - After a sibling bump, refresh this repo's lock and build. A removed, renamed or retyped public
   item in a library you own is announced to every host that depends on it.
 

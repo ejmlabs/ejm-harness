@@ -30,39 +30,27 @@ here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ## ShellCheck
 
 - Every script passes `bash -n` and `shellcheck` with the shared `.shellcheckrc` at the repository
-  root (`enable=all`, `external-sources=true`, only `SC2250` off). The file is synced from the
-  shared lint layer; never edit it in a consumer repository.
-- `enable=all` turns on the optional checks. Test with `[[ ]]`, not `[ ]` (SC2292). Do not hide a
-  command's status inside `$(...)` or `< <(...)` (SC2312): run it on its own line first.
+  root (`enable=all`, `external-sources=true`; `SC2250`, `SC2310`, `SC2311` and `SC2312` off). The
+  file is synced from the shared lint layer; never edit it in a consumer repository.
+- `enable=all` turns on the optional checks. Test with `[[ ]]`, not `[ ]` (SC2292).
 - Suppress one code on the line before, with a reason:
   `# shellcheck disable=SC2329 # called through need()`. Never a file-wide disable.
 - Fix, do not suppress, a code that names a real hazard: SC2086 (word splitting), SC2012 (parsing
   `ls`), SC2064 (trap text expanded too early).
 
-## Quoting and arrays
+## Quoting, temp files and traps
 
-- Quote every expansion: `"$var"`, `"$(cmd)"`, `"${list[@]}"`. Use `$*` only inside a message.
-- A list of paths, packages, or arguments is an array, never a space-separated string:
-  `args=(--locked --group dev)`, then `uv run "${args[@]}" ruff check .`.
-- Read lines with `while IFS= read -r line; do ...; done <"$file"`. Always `read -r`. Paths from
-  `find` travel with `-print0` and `read -r -d ''` or `xargs -0`.
-- Declare function variables `local`. Print data with `printf '%s\n' "$value"`, not `echo`.
-
-## Never parse ls
-
-- Loop over a glob and guard the no-match case: `for f in "$dir"/*.age; do [[ -e "$f" ]] || continue`.
-- Compare ages with `[[ "$a" -nt "$b" ]]` and sizes with `stat`, never by reading `ls -l` or `ls -t`.
-
-## Temp files and traps
-
-- `tmp=$(mktemp -d)`, then `trap cleanup EXIT` on the next line, where `cleanup` removes it.
-  Never a fixed name in `/tmp`.
-- One EXIT trap per script: a second `trap ... EXIT` replaces the first. Put all cleanup in one
-  function. Single-quote any inline trap text so it expands when it runs.
+- Quote every expansion: `"$var"`, `"$(cmd)"`, `"${list[@]}"`. A list of paths or arguments is an
+  array, never a space-separated string. Declare function variables `local`. Print data with
+  `printf '%s\n' "$value"`, not `echo`.
+- Read lines with `while IFS= read -r line; do ...; done <"$file"`. Paths from `find` travel with
+  `-print0` and `read -r -d ''` or `xargs -0`. Loop over a glob and guard the no-match case.
+  Compare ages with `-nt`, never by parsing `ls`.
+- `tmp=$(mktemp -d)`, then `trap cleanup EXIT` on the next line. Never a fixed name in `/tmp`.
+  One EXIT trap per script: a second replaces the first, so put all cleanup in one function.
 - Build secrets under `umask 077` in a private directory you own and have checked is not a
-  symlink. Remove a key file in the EXIT cleanup.
-- Write a file that others read to a temporary name in the same directory, then `mv` it over the
-  target, so no reader sees a partial file. Refuse to write through a symlink.
+  symlink. Write a file that others read to a temporary name in the same directory, then `mv` it
+  over the target. Refuse to write through a symlink.
 
 ## Safe to run twice
 
@@ -72,30 +60,25 @@ here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
   on drift). Never overwrite a live file that differs from the managed copy; keep and report it.
 - Prefer idempotent commands: `mkdir -p`, `install -D -m 644`, `ln -sfn`, and a marker check
   (`grep -qxF "$marker" file ||`) before you append.
-- Download a pinned version with `curl -fsSL --max-time 60`, check its `sha256sum` before use, and
-  check the installed version after.
+- Download a pinned version with `curl -fsSL --max-time 60`, check its `sha256sum` before use.
 
-## Processes and waits
+## Processes, output and tests
 
-- `pkill -f` and `pgrep -f` match whole command lines, including the shell that runs them when the
-  pattern is in that shell's own arguments (`bash -c`, `ssh host '...'`, `sudo sh -c`). Bracket
-  one character: `pkill -f '[w]atch\.sh'`. The pattern still matches `watch.sh`, but not the
-  literal text `[w]atch\.sh` in the calling shell. Use `pkill -x name` for an exact process name.
+- `pkill -f` and `pgrep -f` match whole command lines, including the calling shell's own. Bracket
+  one character: `pkill -f '[w]atch\.sh'`. Use `pkill -x name` for an exact process name.
 - Bound every wait: `curl -m 3`, `timeout 30 cmd`, and a retry loop with a fixed count.
-
-## Output and tests
-
 - Diagnostics go to stderr, results to stdout. `|| true` only where a failure is expected.
-- Test a script in a scratch directory (`mktemp -d` plus an EXIT trap), never on the real machine.
-  Assert with `fail() { echo "FAIL: $*" >&2; exit 1; }` and cover the rerun: zero changes.
+- Test a script in a scratch directory, never on the real machine, and cover the rerun: zero
+  changes.
 
 ## When to switch to Python
 
-Write Python instead (see the `ejmlabs-python` skill) when the job parses JSON, TOML, or other
-structure beyond one `jq` or `sed` expression; needs maps, nested data, or per-item error handling
-and retries; calls an HTTP API beyond a single `curl`; has logic that needs unit tests; or embeds
-another language in a heredoc. A long script that is mostly a list of commands may stay in bash.
+Write Python instead (the `ejmlabs-python` skill, when the repository has it) when the job parses
+JSON, TOML, or other structure beyond one `jq` or `sed` expression; needs maps, nested data, or
+per-item error handling and retries; calls an HTTP API beyond a single `curl`; has logic that
+needs unit tests; or embeds another language in a heredoc.
 
 ## Read next
 
-- [references/forms.md](references/forms.md): when you write option parsing, an idempotent step, a temp directory, an atomic publish, or a process match.
+- [references/forms.md](references/forms.md): option parsing, an idempotent step, a temp
+  directory, an atomic publish, a process match, a regression check.

@@ -30,9 +30,10 @@ each redirect hop is checked again.
 
 - Each site takes its CSP and security headers from the shared header source (the design system's
   site package or the repository's one header module). Never hand-edit a generated header file.
-- The house baseline (`ejmlabs-cloudflare` holds the full header set) is `default-src 'self'`,
-  `script-src 'self'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'none'`, and
-  `frame-ancestors 'none'`. Stricter is always allowed.
+- The house baseline is `default-src 'self'`, `script-src 'self'`, `object-src 'none'`,
+  `base-uri 'self'`, `form-action 'none'`, and `frame-ancestors 'none'`. Stricter is always
+  allowed. If the repository has the `ejmlabs-cloudflare` skill, its headers reference holds the
+  full header set.
 - Never put `'unsafe-inline'` or `'unsafe-eval'` in `script-src`. Use nonces only for a page that
   must keep inline script.
 - Send the policy as an HTTP header. `frame-ancestors` and `sandbox` do not work in a `<meta>` tag.
@@ -42,8 +43,8 @@ each redirect hop is checked again.
   with no network.
 - In server-rendered HTML, escape every user value. Serve scripts and styles from files, not inline.
 
-## Check after a deploy
+## Check headers
 
 - Run the repository's header check in its gate when it has one.
-- After a deploy, fetch the live URL with `curl -sI` and check the status and every security
-  header. Then load it in a browser and read the console.
+- The live check after a deploy is in the repository's deploy skill. If it has the
+  `ejmlabs-cloudflare` skill, its verify reference holds it.

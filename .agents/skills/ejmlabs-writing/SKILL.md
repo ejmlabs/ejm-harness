@@ -1,30 +1,18 @@
 ---
 name: ejmlabs-writing
-description: Use before you write any prose in an ejmlabs repository or reply, including docs, README, CHANGELOG, comments, commit and PR text, UI copy, error messages, help text, site copy, or any claim about speed, security or compatibility.
+description: Use before you write docs, a README or CHANGELOG, user-facing copy (UI text, errors, help, site copy), or commit and PR text in an ejmlabs repository, including any claim about speed, security or compatibility.
 ---
 
 # Writing at ejmlabs
 
 Plain, exact words a reader can act on. Nothing that is not true.
 
-## Orwell's six rules
-
-Apply them to replies, summaries, status text, errors, logs, docs, comments and generated files.
-
-1. Never use a worn-out metaphor, simile or figure of speech.
-2. Use a short word where it means the same as a long one.
-3. Cut every word that adds no meaning.
-4. Use the active voice when it is clearer.
-5. Use an everyday word instead of jargon or a foreign phrase.
-6. Break any of these rules before you write something unclear or misleading.
-
 ## House style
 
 - Never use em dashes. Use a period, comma, colon or parentheses. Keep exact quotes, code and data
   as they are.
-- Sentence case for headings, titles, buttons and labels.
-- Project names are lowercase in prose: ejmlabs, ejm-cli, ejm-harness, ejm-ide, ejm-ui, gerry.
-  Public pages read "cli by ejmlabs", "harness by ejmlabs". Follow the repository's Names table.
+- Sentence case for headings, titles, buttons and labels. Short words, active voice, no filler.
+- Project names are lowercase in prose. Follow the repository's Names table.
 - Write for the reader's next action: what happened, what it means for them, what to do.
 - Link every repository, PR, issue, document, site and release you mention. Use known or
   retrieved URLs only; never guess one.
@@ -55,10 +43,9 @@ Apply them to replies, summaries, status text, errors, logs, docs, comments and 
   internal paths or stack traces to users.
 - Do not add word-count gates or tests that match incidental wording.
 
-## Commits, PRs and reports
+## Commits and PRs
 
-- Titles are short imperative sentences in sentence case: "Write gerry in lowercase, like the
-  other project names".
-- Bodies say why the change exists and what was verified, including what was not.
-- Reports to the user lead with the outcome, then the evidence, then the open risks. No filler,
-  no restating the request.
+- Titles are short imperative sentences in sentence case, with no type prefix: "Add a retry limit
+  to the sync client".
+- Bodies say why the change exists and what was verified, including what was not. Lead with the
+  outcome, then the evidence, then the open risks.

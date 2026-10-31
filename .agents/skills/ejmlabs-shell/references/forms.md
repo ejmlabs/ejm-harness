@@ -91,8 +91,8 @@ publish() { # publish <file> <dir>
 
 ## Files without ls
 
-Write a command's output to a file first, so its failure stops the script; a process substitution
-hides the status (SC2312).
+Write a command's output to a file first, so its failure stops the script. A `< <(...)` process
+substitution hides the command's status from `set -e`.
 
 ```bash
 newest=''
@@ -124,6 +124,10 @@ for _ in $(seq 12); do
 done
 [[ "$healthy" = 1 ]] || { echo "service not healthy after 60 s" >&2; exit 1; }
 ```
+
+`pkill -f` and `pgrep -f` match whole command lines, including the shell that runs them when the
+pattern is in that shell's own arguments (`bash -c`, `ssh host '...'`, `sudo sh -c`). The pattern
+`[w]atch\.sh` still matches `watch.sh`, but not its own literal text in the calling shell.
 
 ## A pinned, verified download
 

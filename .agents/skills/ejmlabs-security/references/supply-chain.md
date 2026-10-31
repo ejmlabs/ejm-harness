@@ -10,14 +10,14 @@ permissions, or its secrets; respond to a leaked credential; or prepare a reposi
 1. Check the exact package name and its publisher. A near-miss name is a typosquat until proven
    otherwise.
 2. Review its security record, license and redistribution terms, and transitive dependencies.
-3. Pick an exact release at least two weeks old, unless the update fixes a security advisory that
-   affects us. Say which in the PR.
+3. Pick an exact release that meets the age rule in the dependencies reference of
+   `ejmlabs-engineering`.
 
 ## Pins and locks
 
-- npm manifests use exact versions, never `^`, `~`, or ranges. Cargo resolves exactly through the
-  committed `Cargo.lock`, and every build and test uses `--locked`. Python resolves through the
-  committed `uv.lock` with `--locked`.
+- npm manifests use exact versions, never `^`, `~`, or ranges. Python resolves through the
+  committed `uv.lock` with `--locked`. Rust locking is in `ejmlabs-rust`, when the repository has
+  it.
 - Quality tools have an exact version and a documented install command. A pin that appears in
   several places (docs, workflow, tool file) changes in all of them in one patch.
 - One package manager and one lockfile per ecosystem. Commit every lockfile. Never hand-edit one.
@@ -26,10 +26,9 @@ permissions, or its secrets; respond to a leaked credential; or prepare a reposi
 
 ## Audits and exceptions
 
-- Rust: `cargo deny --locked --all-features check` (advisories, sources, licenses, duplicate
-  versions) and `cargo machete` for unused dependencies.
-- Other ecosystems: the repository's pinned scanner run on the exact candidate lockfile. A
-  repository may require a scanner that keeps the dependency inventory local.
+- Run the repository's pinned scanner on the exact candidate lockfile. A repository may require
+  a scanner that keeps the dependency inventory local. Rust audits are in `ejmlabs-rust`, when
+  the repository has it.
 - The advisory database needs the network. A network failure leaves the audit unverified, not green.
 - Prefer upgrading to converge versions over adding an exception.
 - An exception names the exact package and version or advisory, the upstream constraint that forces
@@ -48,9 +47,10 @@ permissions, or its secrets; respond to a leaked credential; or prepare a reposi
 - Default workflow tokens are read-only. Each job asks only for the permissions it uses.
 - Never use `pull_request_target` with code from a fork or branch. Never give PR code a model,
   release, deploy, or source-read credential.
-- CI and AI review spend nothing until a human maintainer admits the exact head commit.
-- Model keys live only as secrets of a protected environment restricted to `main`, never as
-  repository or organization secrets. A missing key fails the check closed.
+- CI spends nothing until the gate admits the exact head commit.
+- Model, release and deploy credentials live only as secrets of a protected environment
+  restricted to `main`, never as repository or organization secrets. A missing credential fails
+  the job closed.
 - Private source access uses an expiring, fine-grained token with read access to one repository.
   Never a broad personal token. A successful checkout does not prove the token's scope or expiry.
 

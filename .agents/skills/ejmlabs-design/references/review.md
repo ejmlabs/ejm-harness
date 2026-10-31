@@ -1,7 +1,8 @@
 # Review a visible change
 
 Look at the built result, not the source. Keep scripts and screenshots in a scratch folder
-outside the repository.
+outside the repository. A text-only change needs only the console check; the rest of this page is
+for layout, style and behavior changes.
 
 ## Screenshots
 
