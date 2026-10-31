@@ -4,6 +4,21 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ## [Unreleased]
 
+### Security
+
+- Override the development tooling's transitive minimatch to 11.0.1 for
+  GHSA-g3hv-75wg-m249. eslint, @eslint/config-array and
+  @typescript-eslint/typescript-estree declare `^10`, so the override forces a
+  major version outside their ranges; `npm run lint` passes with it. Remove the
+  override when those packages accept minimatch 11.0.1 or later. No package,
+  worker or site is published.
+
+### Changed
+
+- The PR template describes the current gate: a maintainer's own PR is admitted
+  when it is not a draft, and other PRs need Ready for review or `gate:approve`.
+  The `/ready` and `/approve` comments it named no longer do anything.
+
 ## [0.1.1] - 2026-10-26
 
 First public release of the worker and SDK sources. The `0.1.0` source notes below
