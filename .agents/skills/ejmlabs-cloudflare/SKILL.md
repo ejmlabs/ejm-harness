@@ -14,8 +14,8 @@ in a real browser. A repository skill may add stricter rules, never weaker ones.
   bindings for backends. Another cloud needs a reviewed host decision recorded in the repository.
 - Each site or service has its own Worker, named in its wrangler config. Change only that Worker;
   never touch other Workers, zones, DNS or account settings.
-- With a `.github/workflows/deploy.yml` caller, CI deploys: each push to main builds without
-  secrets, deploys staging, then production once staging succeeds; never deploy by hand then.
+- With a `.github/workflows/deploy.yml` caller, CI deploys each push to main: staging, then
+  production. Never deploy by hand then; follow [references/ci-deploys.md](references/ci-deploys.md).
   Without the caller, deploy by hand with the owner's wrangler login; never create a token.
 
 ## Config
@@ -48,8 +48,7 @@ in a real browser. A repository skill may add stricter rules, never weaker ones.
 
 ## Build and deploy
 
-- Deploy only the merge commit on main, never a working tree, branch or old build. With CI
-  deploys, check staging live, then production.
+- Deploy only the merge commit on main, never a working tree, branch or old build.
 - Build in a fresh scratch directory from clean clones: the site at the merge commit and ejm-ui
   at the revision the repository pins (`.github/ui-source.json`). Never build from a sibling
   checkout; it may hold uncommitted work.
@@ -78,6 +77,8 @@ in a real browser. A repository skill may add stricter rules, never weaker ones.
 
 ## Read next
 
+- [references/ci-deploys.md](references/ci-deploys.md): the CI deploy, its refusals and
+  failures, owner setup.
 - [references/build-and-deploy.md](references/build-and-deploy.md): config details, clean-clone
   build, deploy commands, version ids, rollback.
 - [references/verify.md](references/verify.md): local preview, the live check, live headers.
