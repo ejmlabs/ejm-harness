@@ -8,4 +8,4 @@ List checks run, results, and any missing platform evidence. Describe security a
 
 ## Maintainer admission
 
-A human maintainer must post `/ready FULL_HEAD_SHA` before CI or AI runs. After review, post `/approve FULL_HEAD_SHA`. New commits need fresh decisions. See CONTRIBUTING.md.
+A maintainer's own same-repository PR is admitted when it is not a draft. Any other PR needs a maintainer to mark it Ready for review or add `gate:approve`. Admission applies to one head commit, so a new commit is admitted again. See CONTRIBUTING.md.

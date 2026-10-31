@@ -1,0 +1,130 @@
+# CI deploys
+
+Read this in a repository with a `.github/workflows/deploy.yml` caller: before you merge a change
+that ships, while you follow a deploy, and when one fails.
+
+This file is synced from `ejmlabs/.github` at the commit this repository's callers pin, and the
+Repository standards check holds the copy to that commit. So it describes the deploy this
+repository runs now. The repository's own docs add only its site facts: the Worker names,
+hostnames, config path, the checks to run before a merge and what to look at live. They link
+here for the rest instead of restating it.
+
+## What a push to main runs
+
+`deploy.yml` calls the shared `deploy-site.yml`, pinned to the same `ejmlabs/.github` commit as
+`pr.yml` and `release.yml`. Never edit it by hand: the standards check requires the exact
+canonical text except for the pin. Each push to main runs three jobs in order.
+
+1. `build` checks out that main commit, and ejm-ui at the revision in `.github/ui-source.json`
+   when the site uses it. With `contents: read` and no secrets, it runs the repository's
+   executable `.github/site-build` if there is one, else the site's commands in `SITES` in
+   `scripts/deploy.py` of `ejmlabs/.github`. It uploads the Wrangler config and the build output
+   as one artifact.
+2. `staging` deploys that artifact with `wrangler deploy --env staging`.
+3. `production` runs once staging succeeds and deploys the same files with the top-level config.
+
+The human decision is the merge: `gate:approve` and the required checks. GitHub asks for no
+approval unless the owner put a required reviewer on the `production` environment. Then the job
+shows "Waiting for review" until a person approves it. An agent never approves a deployment and
+never changes the environment to skip one.
+
+Each job queues per repository in push order. A deploy that has started is never cancelled, so
+Wrangler never stops midway. A newer main commit replaces an older one that is still waiting, so
+the latest merge is the one that deploys.
+
+## What a deploy refuses
+
+A deploy job trusts nothing in the artifact. It checks out the reviewed commit itself and stops
+before Wrangler runs when:
+
+- the `staging` or `production` environment is missing, or its deployment branch policy is
+  anything other than exactly one branch, `main`;
+- the artifact's Wrangler config differs from the reviewed commit by a single byte (for ejm-ide,
+  the whole `distribution` directory, which holds its Worker). Change the config in source, never
+  in a build step;
+- the config names another Cloudflare account or declares a Wrangler `build` command, its
+  `assets.directory` is outside the site's declared output, or its `main` is not committed source;
+- `env.staging` lacks its own Worker name and routes. Without them, `--env staging` would deploy
+  to the production custom domain.
+
+Wrangler runs from the lockfile in `deploy/` of `ejmlabs/.github` at the pin, never from the
+repository's own `wrangler` dependency. Read the version from the banner in the deploy log. It
+gets the `CLOUDFLARE_API_TOKEN` secret of the job's environment and no GitHub token.
+
+## Before the merge
+
+A merge to main deploys, so finish the checks first. Run the repository's checks from a clean
+build (see [build-and-deploy.md](build-and-deploy.md)), read the list of files that will be
+published, and run a Wrangler dry run for each environment the change touches:
+
+```sh
+npx --no-install wrangler deploy --config wrangler.jsonc --env "" --dry-run
+npx --no-install wrangler deploy --config wrangler.jsonc --env staging --dry-run
+```
+
+A dry run checks configuration and packaging. It proves nothing about permission or live
+behavior.
+
+## After the merge
+
+Never run `wrangler deploy` from a workstation while the caller exists. Follow the run:
+
+```sh
+gh run list --workflow deploy.yml --branch main --limit 3
+gh run watch RUN_ID --exit-status
+```
+
+When the staging job finishes, check staging live the way [verify.md](verify.md) and the
+repository's docs say, then production once its job finishes. Record the merge SHA, the ejm-ui
+pin when the site has one, the run URL, and the `Current Version ID` each deploy job prints.
+
+## When a run fails
+
+Read the failing step's log before you act. Rerun a failed job once only for a runner or network
+failure.
+
+| Where it stops                                                     | Cause                                                            | What to do                                              |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------- |
+| `Build the site without credentials`                               | The site does not build at that commit                           | Fix it on main through the gate                         |
+| `Require the ... environment's protections`                        | The environment is missing or its branch policy is not `main`    | Report it for the owner setup below; change nothing     |
+| `Deploy stopped: ValueError: CLOUDFLARE_API_TOKEN is not set`      | The environment has no token                                     | Report it for the owner setup below                     |
+| `Deploy stopped: ValueError:` with any other message               | A refusal listed above                                           | Fix the config or build in source through the gate      |
+| A Wrangler authentication or permission error                      | The token is wrong, expired or lacks a right                     | Report it to the owner; never create or paste a token   |
+| Wrangler waits on a prompt, most often about a DNS record          | A DNS record for the hostname exists outside Wrangler            | Stop, and give the owner the hostname and the record    |
+
+Never weaken WAF, bot or Access rules, and never loosen an environment, to get a deploy through.
+
+## Owner setup
+
+The owner does this once per repository, and again to rotate the token. An agent never creates
+or changes environments, secrets or tokens.
+
+- `python3 scripts/set_deploy_token.py` in `ejmlabs/.github` asks once for a Cloudflare API
+  token and checks it with Cloudflare. It then creates or repairs `staging` and `production` with
+  the main-only branch policy in every site repository (or one, with `--repository NAME`) and
+  stores the token as `CLOUDFLARE_API_TOKEN` in each. It keeps any reviewer the owner set.
+- The token needs Workers scripts, routes and custom domains on `ejmlabs.com`, plus R2 read for a
+  site that binds a bucket.
+
+## Staging names
+
+Staging serves `staging.<production host>`, for example `staging.ejmlabs.com` and
+`staging.ui.ejmlabs.com`. Its Worker is by convention the production Worker's name plus
+`-staging`. Cloudflare issues the custom domain's certificate, deeper subdomains included. Pick a
+hostname that has no DNS record yet: an existing record makes Wrangler prompt, and CI cannot
+answer. Staging is public and serves the latest main.
+
+## Roll back
+
+Follow the rollback in [build-and-deploy.md](build-and-deploy.md): redeploy the last verified
+Worker version under the same authorization as a deploy, with `--env staging` for the staging
+Worker, then land a revert on main. The revert deploys through this same pipeline. Until it does,
+main and live differ; say so in the report.
+
+## When the pipeline changes
+
+The pipeline lives in `ejmlabs/.github`. A change there reaches a repository only when a PR moves
+its pins. That PR also runs `python3 scripts/sync_agents.py` from the new commit, so this file and
+the house rules arrive with the behavior they describe. The Repository standards check fails any
+PR whose shared skills or house rules differ from the pinned commit. Never edit a synced copy;
+change the template in `ejmlabs/.github`.
