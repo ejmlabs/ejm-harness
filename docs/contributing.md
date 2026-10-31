@@ -63,67 +63,38 @@ as unverified evidence instead of describing a partial run as green.
 
 ## Shared workflows and source releases
 
-Both canonical workflow callers and the release `standards-ref` pin reviewed
-shared revision `6717b433c462e01abaed86e2118e4843827598cb`. Update all
-three sites together through a protected PR. The shared repository owns the
-workflow implementation, standards and release validator; this repository
-owns its product gates and release metadata. Product repositories consume the
-harness public APIs. No product runtime becomes a harness dependency.
+`pr.yml` and `release.yml` call the shared workflows in `ejmlabs/.github`. Every `uses` pin is
+the same full 40-character SHA, and the `standards-ref` input in `release.yml` equals it. The
+Repository standards check fails when any of them differ, and a draft release checks
+`standards-ref` again against that commit's own `release.yml`. A pin move is one protected PR that
+changes every pin and `standards-ref` together. Dependabot ignores `ejmlabs/.github`, so the pins
+move only by hand. The shared repository owns the workflow implementation, standards and release
+validator; this repository owns its product gates and release metadata. Product repositories
+consume the harness public APIs. No product runtime becomes a harness dependency.
 
-This update replaces `c4f2873ef0eef5bc3c7d75cf71fa3489a911d134`. It retains
-the complete two-pass Codex review guard, fixed Linux D-Bus setup, three-OS
-quality matrix and separate registry gate. Linux quality installs `pkg-config`
-and `libdbus-1-dev` before the existing gate, using a fixed trusted workflow
-step. Existing product gate commands, permissions, secret names and human
-admission rules are unchanged. Runtime sources, manifests, locks and public
-SDK contracts do not change.
+The gate admits work from pull request fields, labels and maintainer permissions, never from
+comment text. No model review runs.
 
-The target also supports CLI harness selection and an optional UI source pin.
-This harness profile selects no sibling harness. It has no
-`.github/ui-source.json`, so the optional UI checkout, source archive and
-locked npm install stay inactive. Adding such a pin later needs its own
-review; this update adds no UI dependency or package installation.
-
-The planned UI adoption retains exact install metadata from protected owner
-revision `79a1aa8b1075f834717bc0c0299dc2c41a22b966` under
-`review/dependency-sources/ejm-ui/`. Its chunk manifest records each original
-mode, blob, size and SHA-256. These 13 complete files are inert review data,
-with ordinary nonexecutable fixture modes. Never import, execute, install or
-package them. Narrow formatter and lint exclusions preserve their exact bytes;
-first-party checks remain active. This preparation selects no UI pin and
-does not establish a complete source supplement for a later owner revision.
+- A maintainer's own same-repository non-draft PR admits itself when it is opened, reopened,
+  pushed or marked Ready for review.
+- Any other PR, such as Dependabot's or one from an author who is not a maintainer, is admitted
+  when a current human maintainer marks it Ready for review or adds `gate:approve`, which also
+  records a bot approval for that head.
+- `gate:revoke`, or converting the PR to draft, stops the run for that head.
+- A new commit needs a new admission: the push for a maintainer's PR, a new Ready or
+  `gate:approve` for any other.
+- Fork PRs are not admitted. A maintainer who has reviewed an outside change pushes it to a branch
+  in this repository.
+- Re-running failed jobs is allowed and keeps the admission. Fix code in a new commit.
+- The required statuses are **Quality** and **Repository standards**, plus one approving review.
 
 ### Review source context
 
-The [canonical source manifest](../.github/review-context/manifest.json) binds
-the actual `c4f2873` to `6717` transition to full Git commit, tree and blob IDs,
-original modes, sizes and SHA-256 digests. Generate both revisions only with
-the shared `scripts/export_review_context.py`. Its 32 source files and one
-manifest fit the combined 750,000-byte cap. They are nonexecutable offline
-review data. Never import or execute them. Existing narrow Ruff and Prettier
-exclusions apply only to `.github/review-context`; prior snapshots remain in
-Git history. Shared snapshots retain `Copyright (c) 2026 ejmlabs contributors`
-and the same permission and warranty terms as the [MIT license](../LICENSE).
-
-Fresh exact-head human readiness and separate approval remain required before
-costly work and merging. A changed caller must pass the existing Linux, macOS
-and Windows quality jobs, registry and standards checks, two complete actual
-Codex Sol 6.1 medium reviews, and the protected approval gates.
-
-[PR #15](https://github.com/ejmlabs/ejm-harness/pull/15) adopted these pins on
-protected main `1542f7c2c97d247df0d4744103d0e5e02660fbb0`.
-Its [admitted run](https://github.com/ejmlabs/ejm-harness/actions/runs/39344288127)
-passed all three OS quality jobs, registry, standards and two complete actual
-Codex Sol 6.1 medium reviews with no findings. It merged with all protections
-enforced. That run used the previous `c4f2873` shared caller. A fresh admitted
-follow-up, [PR #16](https://github.com/ejmlabs/ejm-harness/pull/16), verified the
-installed `6717b433` caller in
-[run 39347428993](https://github.com/ejmlabs/ejm-harness/actions/runs/39347428993).
-Its first attempt passed Linux, macOS, Windows, registry, standards and two
-complete actual Codex Sol 6.1 medium reviews with no findings. The exact reviewed
-tree merged normally as `039139129be2e957535478968c416e8c1d057fe8`, with
-protections unchanged. This closes installed-caller acceptance, not the
-remaining native key-service, host or release gates.
+`.github/review-context/` and `review/dependency-sources/ejm-ui/` are inert offline data from the
+removed model review and a planned `ejm-ui` adoption. The gate neither reads nor requires them.
+Never import, execute, install or package them. Narrow formatter and lint exclusions keep their
+bytes exact, and removing them is a separate decision. This repository has no
+`.github/ui-source.json`, so no UI source is checked out. Adding one needs its own review.
 
 ### Draft release validation
 
@@ -138,7 +109,8 @@ verified exact source archives, checksums and provenance. A separate
 [duplicate dispatch](https://github.com/ejmlabs/.github/actions/runs/39341034364)
 refused its existing version before writes. The pilot created a source-only draft.
 Those shared results do not establish a harness draft, binary, package or
-deployment. Harness PR #16 supplies the separate installed-caller evidence.
+deployment. [Harness PR #16](https://github.com/ejmlabs/ejm-harness/pull/16) supplies the
+separate installed-caller evidence.
 
 The dated `0.1.1` [source notes](../CHANGELOG.md) are prepared for review.
 No harness draft is announced. After their normal protected merge, freeze the

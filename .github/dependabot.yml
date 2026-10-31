@@ -11,6 +11,9 @@ updates:
     groups:
       compatible-updates:
         update-types: [minor, patch]
+    ignore:
+      # The ejmlabs/.github pins in pr.yml and release.yml move by hand, together with standards-ref, in one PR.
+      - dependency-name: "ejmlabs/.github"
   - package-ecosystem: "cargo"
     directory: "/"
     schedule:
