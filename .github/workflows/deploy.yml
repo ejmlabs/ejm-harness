@@ -1,0 +1,12 @@
+name: Deploy site
+on:
+  push:
+    branches: [main]
+permissions: {}
+jobs:
+  deploy:
+    permissions:
+      contents: read
+      actions: read
+    uses: ejmlabs/.github/.github/workflows/deploy-site.yml@b342040333247eff9a5066db64b4dd4207e267e2
+    secrets: inherit

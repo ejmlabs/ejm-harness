@@ -46,9 +46,47 @@ for example through `wrangler dev -c site/wrangler.jsonc`.
 
 ## Deploy
 
-Deploy after the PR merges, from a clean clone at the merge commit, as part of finishing
-through ship ([ejmlabs-cloudflare](../ejmlabs-cloudflare/SKILL.md)). Run
-`wrangler deploy -c site/wrangler.jsonc` from the repository root, then confirm the live
-response over the edge. A freshly created custom domain can be unreachable from a machine that
-cached a miss, so test with `curl --resolve` against another ejmlabs.com edge address before
-assuming a failure. Do not touch the other ejmlabs Workers.
+A push to main deploys the site. `.github/workflows/deploy.yml` is the canonical caller of the
+shared `deploy-site.yml` in `ejmlabs/.github`, pinned with `pr.yml` and `release.yml`. Never edit
+it by hand: the Repository standards check requires it to match `scripts/standards.py` there
+except for the pin. The merge, after the gate and its required checks, is the human decision.
+Nobody approves a deploy afterward. The run then:
+
+1. Builds with `contents: read` and no secrets. The site has no build step, so the job archives
+   `site/wrangler.jsonc` and `site/public` from the main commit.
+2. Deploys staging with `wrangler deploy --env staging`: the Worker `ejmlabs-harness-staging` at
+   `harness-staging.ejmlabs.com`.
+3. Deploys production once staging succeeds, with the same files and the top-level config: the
+   Worker `ejmlabs-harness` at `harness.ejmlabs.com`.
+
+The deploy takes `site/wrangler.jsonc` from the reviewed commit and refuses a build whose copy
+differs, so change the config in source. Keep `env.staging` with its own Worker name and routes,
+or staging would inherit the production domain. Deploy jobs run Wrangler 4.153.0, pinned in
+`deploy/package.json` of `ejmlabs/.github`, not the `registry/` dependency. They use the
+`CLOUDFLARE_API_TOKEN` secret of the `staging` and `production` GitHub environments.
+
+Never run `wrangler deploy` from a workstation, create a token or change the environments. A
+local `wrangler deploy -c site/wrangler.jsonc --dry-run` is fine.
+
+### Owner setup before the first deploy
+
+The shared deploy fails closed until the owner has done these:
+
+- Run `python3 scripts/set_deploy_token.py` in `ejmlabs/.github`. It creates the `staging` and
+  `production` environments, each with a custom deployment branch policy of exactly `main`, and
+  stores the `CLOUDFLARE_API_TOKEN` secret in each, for every site repository at once. The token
+  needs Worker and custom-domain rights on the account that owns `ejmlabs.com`.
+
+If a DNS record for `harness-staging.ejmlabs.com` exists outside Wrangler, Wrangler prompts in CI
+and nobody can answer. Stop and give the owner the exact command to run.
+
+### After each merge
+
+Staging is public and serves the latest main. Finishing through ship covers the live check:
+confirm the deploy run succeeded, check staging over the edge, then production the same way.
+Record the source SHA and the Worker version ID. A freshly created custom domain can be
+unreachable from a machine that cached a miss, so test with `curl --resolve` against another
+ejmlabs.com edge address before assuming a failure. Do not touch the other ejmlabs Workers.
+
+To roll back, redeploy an earlier Worker version in Cloudflare, or revert on main. Never serve a
+source branch with failed gates.
