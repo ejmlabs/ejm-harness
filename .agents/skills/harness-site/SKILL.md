@@ -61,7 +61,7 @@ Nobody approves a deploy afterward. The run then:
 
 The deploy takes `site/wrangler.jsonc` from the reviewed commit and refuses a build whose copy
 differs, so change the config in source. Keep `env.staging` with its own Worker name and routes,
-or staging would inherit the production domain. Deploy jobs run Wrangler 4.151.3, pinned in
+or staging would inherit the production domain. Deploy jobs run Wrangler 4.153.0, pinned in
 `deploy/package.json` of `ejmlabs/.github`, not the `registry/` dependency. They use the
 `CLOUDFLARE_API_TOKEN` secret of the `staging` and `production` GitHub environments.
 
@@ -72,11 +72,10 @@ local `wrangler deploy -c site/wrangler.jsonc --dry-run` is fine.
 
 The shared deploy fails closed until the owner has done these:
 
-- Run `python3 scripts/configure_repositories.py` in `ejmlabs/.github`. For a repository with
-  `deploy.yml` on main, it creates the `staging` and `production` environments, each with a
-  custom deployment branch policy of exactly `main`.
-- Add the `CLOUDFLARE_API_TOKEN` secret to each environment. The token needs Worker and
-  custom-domain rights on the account that owns `ejmlabs.com`.
+- Run `python3 scripts/set_deploy_token.py` in `ejmlabs/.github`. It creates the `staging` and
+  `production` environments, each with a custom deployment branch policy of exactly `main`, and
+  stores the `CLOUDFLARE_API_TOKEN` secret in each, for every site repository at once. The token
+  needs Worker and custom-domain rights on the account that owns `ejmlabs.com`.
 
 If a DNS record for `harness-staging.ejmlabs.com` exists outside Wrangler, Wrangler prompts in CI
 and nobody can answer. Stop and give the owner the exact command to run.
