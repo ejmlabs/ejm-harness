@@ -1,9 +1,0 @@
-/* Complete default component sources. */
-@import "./base.css";
-@source "./control-recipes.mjs";
-@source "./components";
-@source "./layout";
-@source "./shell";
-@source "./hooks";
-@source "./motion";
-@source not "./**/*.test.{ts,tsx}";

@@ -1,7 +1,0 @@
-@import "@ejm/ui/styles.css" source(none);
-/* One complete ordered utility sheet per route, linked in the server-rendered head. */
-@source "./frame.tsx";
-@source "./island.tsx";
-@source "./tokens.tsx";
-@source "./windows.tsx";
-@source "./routes/{home,components,layout,application-layout,tokens,hooks,shell,not-found}.tsx";

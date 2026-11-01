@@ -1,8 +1,0 @@
-/* Public passive product preview profile. */
-@source "./previews/HarnessView.tsx";
-@source "./previews/harness-parts.tsx";
-@source "./islands/harness-preview*.tsx";
-@source "./islands/Showcase.tsx";
-@source "./islands/LazyPreview.tsx";
-@source "./ShowcaseFrame.tsx";
-@source not "./**/*.test.{ts,tsx}";

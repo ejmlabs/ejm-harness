@@ -19,6 +19,10 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ### Changed
 
+- Remove the retired review inputs under `review/dependency-sources/` and
+  `.github/review-context/`, and the Prettier, ESLint and Ruff exclusions that kept their
+  bytes exact. The model review they fed is gone, nothing read them, and their two
+  `package-lock.json` snapshots drew Dependabot alerts for files nothing installs.
 - The harness.ejmlabs.com site in `site/` is rebuilt on ejm-ui: `ejmlabs({ project: 'harness' })`,
   `Hero`, `Section` and `DocsLayout` pages, and the simulated harness window from `@ejm/demos`.
   The copied design kit and `scripts/sync-design-kit.sh` are removed. The page text and routes
