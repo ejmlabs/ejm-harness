@@ -49,7 +49,7 @@ pub(crate) fn bounded_sampling_failure(mut detail: String) -> String {
 }
 
 #[cfg(target_os = "linux")]
-pub(crate) use linux::{Sampler, supported};
+pub(crate) use linux::{Sampler, group_running, supported};
 #[cfg(target_os = "macos")]
 pub(crate) use macos::{Sampler, supported};
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
@@ -72,6 +72,21 @@ mod linux {
 
     pub(crate) fn supported() -> bool {
         true
+    }
+
+    /// Whether a process of `group` has not exited. Zombies have exited: they
+    /// hold nothing, and an init that reaps slowly or never must not stall
+    /// cleanup.
+    pub(crate) fn group_running(group: u32) -> bool {
+        let Ok(entries) = std::fs::read_dir("/proc") else {
+            return true;
+        };
+        entries
+            .filter_map(Result::ok)
+            .filter_map(|entry| entry.file_name().to_str()?.parse::<u32>().ok())
+            .any(|pid| {
+                Sampler::read_record(pid).is_ok_and(|bytes| super::running_in_group(&bytes, group))
+            })
     }
 
     impl Default for Sampler {
@@ -109,7 +124,7 @@ mod linux {
             Ok(processes)
         }
 
-        fn read(&self, pid: u32) -> io::Result<ProcessInfo> {
+        fn read_record(pid: u32) -> io::Result<Vec<u8>> {
             let file = File::open(format!("/proc/{pid}/stat"))?;
             let mut bytes = Vec::with_capacity(512);
             file.take((MAX_STAT_BYTES + 1) as u64)
@@ -117,6 +132,11 @@ mod linux {
             if bytes.len() > MAX_STAT_BYTES {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "stat too large"));
             }
+            Ok(bytes)
+        }
+
+        fn read(&self, pid: u32) -> io::Result<ProcessInfo> {
+            let bytes = Self::read_record(pid)?;
             let (observed_pid, process) = super::parse_linux_stat(&bytes, self.page_bytes)
                 .ok_or_else(|| {
                     io::Error::new(io::ErrorKind::InvalidData, "invalid process stat")
@@ -236,15 +256,31 @@ mod native {
     }
 }
 
-// Keep the parser available to fixtures on other hosts.
+// Keep the parsers available to fixtures on other hosts.
 #[cfg(any(target_os = "linux", test))]
-fn parse_linux_stat(bytes: &[u8], page_bytes: u64) -> Option<(u32, ProcessInfo)> {
+fn parse_stat(bytes: &[u8]) -> Option<procfs_core::process::Stat> {
     use procfs_core::{FromRead, process::Stat};
 
     if bytes.len() > MAX_STAT_BYTES {
         return None;
     }
-    let stat = Stat::from_read(bytes).ok()?;
+    Stat::from_read(bytes).ok()
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn exited(state: char) -> bool {
+    matches!(state, 'Z' | 'X' | 'x')
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn running_in_group(bytes: &[u8], group: u32) -> bool {
+    parse_stat(bytes)
+        .is_some_and(|stat| u32::try_from(stat.pgrp) == Ok(group) && !exited(stat.state))
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn parse_linux_stat(bytes: &[u8], page_bytes: u64) -> Option<(u32, ProcessInfo)> {
+    let stat = parse_stat(bytes)?;
     let pid = u32::try_from(stat.pid).ok()?;
     let parent = u32::try_from(stat.ppid).ok()?;
     Some((
@@ -253,7 +289,7 @@ fn parse_linux_stat(bytes: &[u8], page_bytes: u64) -> Option<(u32, ProcessInfo)>
             parent: (parent != 0).then_some(parent),
             start: stat.starttime,
             memory: stat.rss.saturating_mul(page_bytes),
-            zombie: matches!(stat.state, 'Z' | 'X' | 'x'),
+            zombie: exited(stat.state),
         },
     ))
 }
@@ -264,7 +300,7 @@ fn parse_linux_stat(bytes: &[u8], page_bytes: u64) -> Option<(u32, ProcessInfo)>
     reason = "Parser fixtures assert the presence of valid records."
 )]
 mod tests {
-    use super::{MAX_STAT_BYTES, bounded_sampling_failure, parse_linux_stat};
+    use super::{MAX_STAT_BYTES, bounded_sampling_failure, parse_linux_stat, running_in_group};
 
     #[test]
     fn sampling_failure_details_keep_a_bounded_utf8_prefix() {
@@ -283,6 +319,7 @@ mod tests {
         let mut fields = vec!["0".to_owned(); 35];
         fields[0] = state.to_owned();
         fields[1] = parent.to_string();
+        fields[2] = pid.to_string();
         fields[19] = start.to_string();
         fields[21] = rss.to_string();
         bytes.extend_from_slice(format!(") {}\n", fields.join(" ")).as_bytes());
@@ -309,6 +346,19 @@ mod tests {
             assert_eq!(process.memory, 0);
             assert!(process.zombie);
         }
+    }
+
+    #[test]
+    fn linux_group_membership_ignores_exited_processes_and_other_groups() {
+        // The fixture record puts the process in the group named by its own ID.
+        for state in ["R", "S", "D", "T"] {
+            assert!(running_in_group(&stat(42, b"job", state, 1, 2, 3), 42));
+        }
+        for state in ["Z", "X", "x"] {
+            assert!(!running_in_group(&stat(42, b"job", state, 1, 2, 3), 42));
+        }
+        assert!(!running_in_group(&stat(42, b"job", "R", 1, 2, 3), 7));
+        assert!(!running_in_group(b"42 (job) R 1", 42));
     }
 
     #[test]

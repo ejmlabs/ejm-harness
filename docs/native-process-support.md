@@ -69,7 +69,7 @@ The adapter supplies native process ownership:
 
 | Platform        | Mechanism                              | Cleanup                                                                                            |
 | --------------- | -------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| macOS and Linux | A fresh Unix process group before exec | Signal the group and reap the root. The executor also kills identity-checked sampled descendants.  |
+| macOS and Linux | A fresh Unix process group before exec | Signal the group, reap the root, wait up to 1 s for it to exit. Also kill sampled descendants.     |
 | Windows         | A kill-on-close Job Object             | Spawn suspended, assign to the Job, then resume. Confirm empty Job membership, then reap the root. |
 
 `wait()` and `try_wait()` report the direct child's status. Always finish with

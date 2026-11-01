@@ -36,6 +36,14 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
   when it is not a draft, and other PRs need Ready for review or `gate:approve`.
   The `/ready` and `/approve` comments it named no longer do anything.
 
+### Fixed
+
+- Unix command cleanup waits up to one second for every killed process in the command's group to
+  exit before it releases the caller's retained guard and the admission lease. Under load a
+  descendant could still be running when they were released.
+- `ejm-harness-exec` builds on its own. It now enables the rustix `std` feature it uses, which it
+  had relied on another crate in the build to enable.
+
 ## [0.1.1] - 2026-10-26
 
 First public release of the worker and SDK sources. The `0.1.0` source notes below

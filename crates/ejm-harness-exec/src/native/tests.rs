@@ -712,6 +712,11 @@ async fn placement_change_after_prepare_blocks_effects_and_does_not_block_query(
             action: Action::Prepare,
         };
         wire::send(&mut transport, &hello).await.unwrap();
+        // Raise the limit after the hello, as the client does. A launch carries
+        // the caller's environment and can exceed the handshake limit.
+        transport
+            .codec_mut()
+            .set_max_frame_length(wire::MAX_FRAME_BYTES);
         let operation = match wire::receive(&mut transport).await.unwrap() {
             Reply::Prepared(operation) => Some(operation),
             _ => None,
