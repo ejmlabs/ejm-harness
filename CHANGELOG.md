@@ -20,6 +20,10 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
   The copied design kit and `scripts/sync-design-kit.sh` are removed. The page text and routes
   (`/` and `/docs/host-auth/`) are unchanged. The ejm-ui revision is recorded in
   `.github/ui-source.json`.
+- `./scripts/check` now runs under bash and checks `site/` (types, build, page checks and
+  headers) with `npm --prefix site ci --ignore-scripts` and `npm --prefix site run check`. It
+  fails with the setup step when `../ejm-ui` or its dependencies are missing. It also checks
+  `scripts/install-hooks` syntax, which the old `sh -n` call skipped.
 - The PR template describes the current gate: a maintainer's own PR is admitted
   when it is not a draft, and other PRs need Ready for review or `gate:approve`.
   The `/ready` and `/approve` comments it named no longer do anything.

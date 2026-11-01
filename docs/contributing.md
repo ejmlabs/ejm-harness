@@ -34,6 +34,16 @@ uv sync --project sdk/python --group dev --locked
 ./scripts/install-hooks
 ```
 
+The site in `site/` links `@ejm/*` from a sibling ejm-ui checkout, so the gate needs
+[ejmlabs/ejm-ui](https://github.com/ejmlabs/ejm-ui) at `../ejm-ui` on the revision named in
+`.github/ui-source.json`, with its dependencies installed:
+
+```sh
+git clone https://github.com/ejmlabs/ejm-ui ../ejm-ui
+git -C ../ejm-ui checkout --detach REVISION   # the revision in .github/ui-source.json
+npm --prefix ../ejm-ui ci --ignore-scripts
+```
+
 Run the same required gate locally, in pre-commit, and in CI:
 
 ```sh
@@ -48,17 +58,20 @@ failure stops the gate. Existing dependency trees are reused; rerun the matching
 
 The gate checks crate boundaries and skill references, rustfmt, Clippy, Rust
 tests and builds, rustdoc, unused dependencies, dependency advisories, licenses,
-generated wire types, ESLint, Prettier, TypeScript, Ruff, mypy, and SDK fixtures.
-It does not publish packages or call hosted models. Rust process and compiler
-jobs are capped at two by the repository configuration.
+generated wire types, the site's types, build, page checks and headers, ESLint,
+Prettier, TypeScript, Ruff, mypy, and SDK fixtures. The site step runs
+`npm --prefix site ci --ignore-scripts` and `npm --prefix site run check`. CI installs
+`../ejm-ui` from the revision in main's `.github/ui-source.json`. The gate does not publish
+packages or call hosted models. Rust process and compiler jobs are capped at two by the
+repository configuration.
 
 `./scripts/check-registry` is the separate required gate for the registry. It
 checks both workers, auth fixtures, schema, dependencies, and deployment dry runs.
 Run it when changing the registry; CI runs both gates after human admission.
 
 Use focused tests while editing. Run the required gate once the patch is ready.
-A missing tool or stale lock is a failed gate, not a skipped check. The advisory
-check needs access to the RustSec database. Report network or platform limits
+A missing tool, a missing `../ejm-ui` or a stale lock is a failed gate, not a skipped check.
+The advisory check needs access to the RustSec database. Report network or platform limits
 as unverified evidence instead of describing a partial run as green.
 
 ## Shared workflows and source releases
@@ -94,8 +107,8 @@ comment text. No model review runs.
 `.github/review-context/` and `review/dependency-sources/ejm-ui/` are inert offline data from the
 removed model review and a planned `ejm-ui` adoption. The gate neither reads nor requires them.
 Never import, execute, install or package them. Narrow formatter and lint exclusions keep their
-bytes exact, and removing them is a separate decision. This repository has no
-`.github/ui-source.json`, so no UI source is checked out. Adding one needs its own review.
+bytes exact, and removing them is a separate decision. `.github/ui-source.json` is unrelated to
+that data: it names the ejm-ui revision the site builds against, as [Set up](#set-up) says.
 
 ### Draft release validation
 

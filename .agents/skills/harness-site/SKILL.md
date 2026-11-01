@@ -41,8 +41,11 @@ the pinned revision before editing a page.
 
 ## Check
 
-From `site/`: `npm ci --ignore-scripts`, then `npm run check` (types, the build with its page
-checks, and `ejm-site-headers dist/_headers --check`). Run Prettier on changed files. Look at every
+`./scripts/check` runs the site check when `site/package.json` exists, so a missing `../ejm-ui`
+checkout or its dependencies fails the gate with the setup step named. Set up that checkout as
+[the contributor contract](../../../docs/contributing.md#set-up) says. To run the site check
+alone, from `site/`: `npm ci --ignore-scripts`, then `npm run check` (types, the build with its
+page checks, and `ejm-site-headers dist/_headers --check`). Run Prettier on changed files. Look at every
 route at 375 px and desktop widths, in light and dark, and confirm `scrollWidth` equals
 `clientWidth` at 375 px. Check the console for policy errors, for example by serving `site/dist`.
 After a build, `node scripts/perf.mjs site/dist --baseline site/perf-baseline.json` from the
