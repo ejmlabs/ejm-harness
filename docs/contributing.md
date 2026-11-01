@@ -107,8 +107,12 @@ comment text. No model review runs.
 `.github/review-context/` and `review/dependency-sources/ejm-ui/` are inert offline data from the
 removed model review and a planned `ejm-ui` adoption. The gate neither reads nor requires them.
 Never import, execute, install or package them. Narrow formatter and lint exclusions keep their
-bytes exact, and removing them is a separate decision. `.github/ui-source.json` is unrelated to
-that data: it names the ejm-ui revision the site builds against, as [Set up](#set-up) says.
+bytes exact, and removing them is a separate decision.
+
+`.github/ui-source.json` pins the ejm-ui revision the site builds against, as [Set up](#set-up)
+says. Shared CI reads it from protected main, never from a pull request, and checks that
+revision out beside this repository as `../ejm-ui` for Quality and the site deploy. A pin change
+merges in its own PR before the site change that needs it.
 
 ### Draft release validation
 

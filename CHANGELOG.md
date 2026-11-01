@@ -4,6 +4,10 @@ Changes follow [Semantic Versioning](https://semver.org/). Each repository is ve
 
 ## [Unreleased]
 
+- Pin the shared UI source to ejm-ui `21f22d5`, the systemic kit with closed components,
+  `Section` and the one-plugin site setup, the same revision ejm-ide pins. The site rebuild
+  builds against it.
+
 ### Security
 
 - Override the development tooling's transitive minimatch to 11.0.1 for
