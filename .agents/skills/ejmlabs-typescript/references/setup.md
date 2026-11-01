@@ -24,16 +24,14 @@ it when you touch it.
 - Add only environment options: target, lib, module, jsx, types, paths.
 - A repo alias such as `"@/*": ["./src/*"]` is for imports across folders. Inside a folder, use
   relative paths.
-- A consumer that links ejm-ui with `file:` adds these `paths`. Without them `tsc` finds two
-  copies of the React types and fails inside `@ejm/ui`. Point them at the folder that holds
-  `node_modules` (`../node_modules/...` for a site in a subfolder).
+- A consumer of ejm-ui also extends `@ejm/ui/tsconfig.json`, after strictest. The base sets the
+  environment options and the `paths` that give linked and installed packages one copy of the
+  React and Vite types. Write no `paths` for `react`, `react-dom` or `vite` of your own.
 
 ```jsonc
-"paths": {
-  "react": ["./node_modules/@types/react"],
-  "react/*": ["./node_modules/@types/react/*"],
-  "react-dom": ["./node_modules/@types/react-dom"],
-  "react-dom/*": ["./node_modules/@types/react-dom/*"]
+{
+  "extends": ["@tsconfig/strictest/tsconfig.json", "@ejm/ui/tsconfig.json"],
+  "include": ["src", "vite.config.ts"],
 }
 ```
 
@@ -86,6 +84,8 @@ save-exact=true
 ```
 
 - `react`, `react-dom` and `@types/react` match the versions ejm-ui uses.
+- A consumer of ejm-ui also lists `vite`, a peer of `@ejm/ui`. It lists no Tailwind or Vite React
+  plugin: `@ejm/ui` depends on them.
 - Keep `dist`, `.ejm-ssg` and `node_modules` in `.gitignore`. Tailwind skips ignored paths;
   without the entry it scans the last build and the stylesheet grows each time.
 
@@ -98,30 +98,40 @@ save-exact=true
    `@ejm/core` and `@ejm/tokens` yourself: `@ejm/ui` needs them at an exact version.
 3. Pin the ejm-ui source by full commit SHA in `.github/ui-source.json`. Regenerate the lockfile
    when the pin moves.
-4. Add the React `paths` above and `resolve.dedupe` below. Two copies of React break hooks.
+4. Extend `@ejm/ui/tsconfig.json` and use the preset below. Together they give the linked
+   packages one copy of React and its types. Add no `resolve.dedupe` or React `paths`.
 
-## vite.config.ts for a site
+## vite.config.ts
+
+A site is one preset. `ejmlabs({ project })` adds Tailwind, React, one copy of React, the design
+guard, the shared head and headers, the built-page check, prerendering and the build options.
 
 ```ts
-import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
-import { ejmSite } from "@ejm/site/vite";
-import { ejmSsg } from "@ejm/ssg/vite";
+import { ejmlabs } from "@ejm/site/vite";
+
+export default defineConfig({ plugins: [ejmlabs({ project: "cli" })] });
+```
+
+An app uses `ejmUi()` (Tailwind, React, one copy of React and the design guard) and sets the
+build options itself.
+
+```ts
+import { defineConfig } from "vite";
+import { ejmUi } from "@ejm/ui/vite";
 
 export default defineConfig({
-  resolve: { dedupe: ["react", "react-dom"] },
-  plugins: [tailwindcss(), react(), ejmSite({ project: "cli" }), ejmSsg({ site: "src/site.tsx" })],
+  plugins: [ejmUi()],
   build: { target: "es2022", cssMinify: "lightningcss" },
 });
 ```
 
-- Keep the `vite` and plugin imports before the `@ejm/*` imports. TypeScript 6.0.3 has crashed
-  on the reverse order.
-- An app drops `ejmSite` and `ejmSsg`. Dev and preview servers bind to `127.0.0.1`.
-- The entry stylesheet is one line, `@import "@ejm/ui/styles-site.css" source(none);` for a site
-  (`@ejm/ui/styles.css` for an app), plus the docs, app, static or terminal partial for every
-  folder whose components you render.
+- Keep the `vite` import before the `@ejm/*` imports. TypeScript 6.0.3 has crashed on the
+  reverse order.
+- Add no Tailwind or React plugin and no `resolve.dedupe`; the preset carries them. Your own
+  plugins go in the same list. Dev and preview servers bind to `127.0.0.1`.
+- The entry stylesheet is one line for a site or an app, `@import "@ejm/ui/styles.css";`, with
+  no `source(none)` and no `@source`. A product demo adds its `@ejm/demos` stylesheet after it.
 - Import deep paths in modules that run on first load (`@ejm/ui/font-preloads`,
   `@ejm/ui/layout/Hero`). Route entries load heavy pages with `load: () => import('./pages/X')`.
 - `theme-boot.js` is an external file and `_headers` comes from `@ejm/site`. Never inline the

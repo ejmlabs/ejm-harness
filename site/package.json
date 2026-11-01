@@ -1,0 +1,31 @@
+{
+  "name": "ejm-harness-site",
+  "private": true,
+  "type": "module",
+  "description": "harness.ejmlabs.com, built on ejm-ui",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "ejm-ssg dev",
+    "build": "ejm-ssg build",
+    "typecheck": "tsc -p tsconfig.json --pretty false",
+    "check": "npm run typecheck && npm run build && ejm-site-headers dist/_headers --check"
+  },
+  "dependencies": {
+    "@ejm/core": "file:../../ejm-ui/packages/core",
+    "@ejm/demos": "file:../../ejm-ui/packages/demos",
+    "@ejm/site": "file:../../ejm-ui/packages/site",
+    "@ejm/ssg": "file:../../ejm-ui/packages/ssg",
+    "@ejm/tokens": "file:../../ejm-ui/packages/tokens",
+    "@ejm/ui": "file:../../ejm-ui/packages/ui",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "vite": "^8.3.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^5.9.0"
+  }
+}

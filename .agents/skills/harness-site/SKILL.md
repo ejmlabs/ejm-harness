@@ -1,6 +1,6 @@
 ---
 name: harness-site
-description: Change or deploy the static harness.ejmlabs.com site in site/, including the ejmlabs design kit copy, shared headers, honest release claims, and Cloudflare publishing.
+description: Change or deploy the harness.ejmlabs.com site in site/, built on ejm-ui with ejm-ssg, including its pin, honest release claims, and Cloudflare publishing.
 ---
 
 # harness.ejmlabs.com site
@@ -9,25 +9,26 @@ The site is a static, assets-only Cloudflare Worker named `ejmlabs-harness` on t
 domain `harness.ejmlabs.com`. Its config is `site/wrangler.jsonc`. It is separate from the
 `registry/` Workers and has no backend, database, or secrets.
 
-## Follow the kit
+## Built on ejm-ui
 
-The ejmlabs design kit at `../ejmlabs/design-kit` is canonical and its rules change. Read
-its current docs before editing the page instead of relying on this summary: `SITES.md`,
-`CATALOG.md`, `web/PATTERNS.md`, and `UI.md`.
+`site/` is an ejm-ui site: `ejmlabs({ project: 'harness' })` is its whole Vite plugin list,
+`tsconfig.json` extends `@ejm/ui/tsconfig.json`, and `src/styles.css` imports `@ejm/ui/styles.css`
+and `@ejm/demos/styles.css`. Read ejm-ui's `ADOPTION.md` and `packages/ui/src/layout/README.md` at
+the pinned revision before editing a page.
 
-- Run `scripts/sync-design-kit.sh` to copy the kit files the site needs into
-  `site/public/design-kit`. Never hand-edit that copy. It is excluded from Prettier.
-- Build the page from the kit's patterns and components. Do not write page CSS or inline
-  styles. A missing pattern is added to the kit, not to this site.
-- Validate the page with the kit's checker, `node ../ejmlabs/design-kit/scripts/check-site.mjs`
-  on the built HTML, and follow the kit's rules for shared header, theme toggle, motion,
-  analytics, and project demos.
-- The kit's color balance applies: Sage leads, Paper and Mist carry the page, Forest is a rare
-  accent. The ejmlabs wordmark is vector artwork and is never retyped. Sage is not text color.
-- Headers come from the kit (`web/_headers`), not from harness-specific choices. Keep a
-  strict policy and loosen a directive only for a concrete need the kit approves.
-- Another session adopts the kit across the ejmlabs project sites and may be editing `site/`.
-  Check `git status`, coordinate with it, and commit only your own paths.
+- The `@ejm/*` packages are `file:` links to a sibling `../ejm-ui` checkout at the revision in
+  `.github/ui-source.json`. Run `npm ci --ignore-scripts` in that checkout first. Move the pin in
+  its own PR, then regenerate `site/package-lock.json` against it.
+- Pages are `Hero` and `Section` (or `DocsLayout` for a guide) from `@ejm/ui`. The design guard
+  rejects `className`, `style`, local CSS and stylesheet links in `site/src`. A missing pattern is
+  added to ejm-ui, never to this site.
+- The product words and routes live here: `src/pages/Home.tsx`, `src/pages/HostAuthGuide.tsx`,
+  and the route list in `src/site.tsx`. Keep guide prose inside `Static` so it stays out of the
+  browser bundle.
+- `ejmSite()` writes `_headers`, the favicon set and the theme script into `dist`. Do not keep a
+  copy in `public/`. To extend the policy, pass `headers` to `ejmlabs()`.
+- The build fails unless every page has one `h1`, ordered headings, the skip link first,
+  `main#main`, and `rel="external"` on links to another host.
 
 ## Claims and copy
 
@@ -40,9 +41,15 @@ its current docs before editing the page instead of relying on this summary: `SI
 
 ## Check
 
-Run Prettier on changed files. Check the page at 375 px and desktop widths, in light and dark,
-and confirm `scrollWidth` equals `clientWidth` at 375 px. Check the console for policy errors,
-for example through `wrangler dev -c site/wrangler.jsonc`.
+`./scripts/check` runs the site check when `site/package.json` exists, so a missing `../ejm-ui`
+checkout or its dependencies fails the gate with the setup step named. Set up that checkout as
+[the contributor contract](../../../docs/contributing.md#set-up) says. To run the site check
+alone, from `site/`: `npm ci --ignore-scripts`, then `npm run check` (types, the build with its
+page checks, and `ejm-site-headers dist/_headers --check`). Run Prettier on changed files. Look at every
+route at 375 px and desktop widths, in light and dark, and confirm `scrollWidth` equals
+`clientWidth` at 375 px. Check the console for policy errors, for example by serving `site/dist`.
+After a build, `node scripts/perf.mjs site/dist --baseline site/perf-baseline.json` from the
+ejm-ui checkout fails when a route is a second or more slower than its recorded baseline.
 
 ## Deploy
 
@@ -52,8 +59,10 @@ setup and what to do when a run fails are in the shared
 
 - Production is the Worker `ejmlabs-harness` at `harness.ejmlabs.com`. Staging is the Worker
   `ejmlabs-harness-staging` at `staging.harness.ejmlabs.com`. The config is `site/wrangler.jsonc`.
-- The site has no build step, so the deploy archives `site/wrangler.jsonc` and `site/public` from
-  the main commit.
+- The deploy builds `site/` with `npm ci --ignore-scripts` and `npm run build` against ejm-ui at
+  the revision in `.github/ui-source.json`, then archives `site/wrangler.jsonc` and `site/dist`.
+  The shared deploy must build and pack `site/dist` before the site can merge; until it does, a
+  merge would publish an empty `site/dist`.
 - The deploy's Wrangler is not the `registry/` dependency.
 - A local `wrangler deploy -c site/wrangler.jsonc --dry-run` is fine.
 

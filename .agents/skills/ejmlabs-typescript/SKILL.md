@@ -55,7 +55,8 @@ only, and a measured performance gate that never moves to fit a change.
 - Import only paths listed in each `@ejm/*` package's `exports`; never copy shared source into a
   product. A missing component, token or behavior goes into ejm-ui, then rebuild the consumers.
 - Sites add no local CSS, inline styles or visual `className`. The `ejmSite` plugin fails on them.
-- Linked packages need one React at build and type check time. See references/setup.md.
+- Use the ejm-ui Vite preset, `@ejm/ui/tsconfig.json` and the one stylesheet. They keep one
+  React. See references/setup.md.
 
 ## Builds and performance
 

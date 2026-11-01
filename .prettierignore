@@ -13,7 +13,8 @@ registry/.wrangler/
 registry/auth/.wrangler/
 registry/Cargo.lock
 site/.wrangler/
-site/public/design-kit/
+site/dist/
+site/.ejm-ssg/
 /.github/review-context/
 /review/dependency-sources/ejm-ui/
 /.agents/skills/ejmlabs-*/
