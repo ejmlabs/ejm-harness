@@ -299,6 +299,3 @@ fixture shared the original helper and preserved cwd, environment and streams.
 Strict executor Clippy passed. Native Windows verification remains pending CI.
 The earlier 1,000-agent measurement predates this authentication exchange; it
 must not be described as measuring protocol 3 overhead.
-
-[Filesystem review source](../review/dependency-sources/ejm-rightkit-fs/README.md)
-supplies the exact pinned lock/privacy implementation for offline review.

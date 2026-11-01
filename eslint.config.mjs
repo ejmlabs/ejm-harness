@@ -12,7 +12,6 @@ export default tseslint.config(
       "registry/build/**",
       "registry/.wrangler/**",
       "registry/auth/.wrangler/**",
-      "review/dependency-sources/ejm-ui/**",
       "sdk/typescript/src/protocol.ts",
     ],
   },

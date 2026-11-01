@@ -15,6 +15,4 @@ registry/Cargo.lock
 site/.wrangler/
 site/dist/
 site/.ejm-ssg/
-/.github/review-context/
-/review/dependency-sources/ejm-ui/
 /.agents/skills/ejmlabs-*/

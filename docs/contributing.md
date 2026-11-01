@@ -102,12 +102,7 @@ comment text. No model review runs.
 - Re-running failed jobs is allowed and keeps the admission. Fix code in a new commit.
 - The required statuses are **Quality** and **Repository standards**, plus one approving review.
 
-### Review source context
-
-`.github/review-context/` and `review/dependency-sources/ejm-ui/` are inert offline data from the
-removed model review and a planned `ejm-ui` adoption. The gate neither reads nor requires them.
-Never import, execute, install or package them. Narrow formatter and lint exclusions keep their
-bytes exact, and removing them is a separate decision.
+### Shared UI source
 
 `.github/ui-source.json` pins the ejm-ui revision the site builds against, as [Set up](#set-up)
 says. Shared CI reads it from protected main, never from a pull request, and checks that
