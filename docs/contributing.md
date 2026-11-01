@@ -142,7 +142,7 @@ change. No public site publication or native platform certification is claimed.
 
 ### Site deploys
 
-A push to main deploys `site/`, staging then production.
+A push to main deploys `site/` to staging, then to production once a maintainer approves it.
 [harness-site](../.agents/skills/harness-site/SKILL.md) holds the site's Workers and checks. The
 [CI deploys reference](../.agents/skills/ejmlabs-cloudflare/references/ci-deploys.md) holds the
 pipeline, the owner setup and rollback.

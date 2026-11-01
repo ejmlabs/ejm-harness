@@ -15,7 +15,8 @@ in a real browser. A repository skill may add stricter rules, never weaker ones.
 - Each site or service has its own Worker, named in its wrangler config. Change only that Worker;
   never touch other Workers, zones, DNS or account settings.
 - With a `.github/workflows/deploy.yml` caller, CI deploys each push to main: staging, then
-  production. Never deploy by hand then; follow [references/ci-deploys.md](references/ci-deploys.md).
+  production once a maintainer approves. Never deploy by hand then; see
+  [references/ci-deploys.md](references/ci-deploys.md).
   Without the caller, deploy by hand with the owner's wrangler login; never create a token.
 
 ## Config
@@ -77,8 +78,7 @@ in a real browser. A repository skill may add stricter rules, never weaker ones.
 
 ## Read next
 
-- [references/ci-deploys.md](references/ci-deploys.md): the CI deploy, its refusals and
-  failures, owner setup.
+- [references/ci-deploys.md](references/ci-deploys.md): the CI deploy, refusals, failures, setup.
 - [references/build-and-deploy.md](references/build-and-deploy.md): config details, clean-clone
   build, deploy commands, version ids, rollback.
 - [references/verify.md](references/verify.md): local preview, the live check, live headers.
