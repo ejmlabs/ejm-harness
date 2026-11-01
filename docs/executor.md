@@ -203,11 +203,16 @@ The deadline is reported as monitored because a native process in an
 uninterruptible kernel operation may defer termination.
 
 On Unix, commands enter their own process group before exec. Cleanup signals
-that group, escalates to kill, and waits for the direct child. Observed
-descendants are also killed after checking their recorded identities, including
-children whose original parent has exited. Background children are cleaned up
-even after an otherwise successful command. The caller cannot leave a daemon
-behind by appending `&`.
+that group, escalates to kill, waits for the direct child, and then waits up to
+one second for the rest of the group to finish exiting. A killed descendant
+keeps running until the kernel completes its exit, and the retained guard and
+lease are released only after that. On Linux an exited zombie does not count,
+so a host whose init reaps slowly does not delay cleanup. After the second,
+cleanup is best effort, as for a process stuck in an uninterruptible kernel
+operation. Observed descendants are also killed after checking their recorded
+identities, including children whose original parent has exited. Background
+children are cleaned up even after an otherwise successful command. The caller
+cannot leave a daemon behind by appending `&`.
 
 Windows commands start suspended, join a kill-on-close Job Object, and resume
 only after assignment. Cleanup kills the Job, reaps the root, and retains the

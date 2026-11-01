@@ -33,7 +33,7 @@ rightkit-fs = { workspace = true, features = ["fs"] }
 sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
 
 [target.'cfg(unix)'.dependencies]
-rustix = { workspace = true, features = ["process", "param"] }
+rustix = { workspace = true, features = ["std", "process", "param"] }
 
 [target.'cfg(windows)'.dependencies]
 processkit = { version = "=3.3.4", default-features = false, features = ["process-control"] }

@@ -4,18 +4,34 @@
 //! kill-on-close Job Object before its code runs. This is process lifecycle
 //! control, not a filesystem or network sandbox.
 
+#[cfg(unix)]
+use std::time::Duration;
 use std::{io, process::ExitStatus};
 
 #[cfg(unix)]
-use rustix::process::{Pid, Signal, kill_process_group};
+use rustix::process::{Pid, Signal, kill_process_group, test_kill_process_group};
 use tokio::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command};
+#[cfg(unix)]
+use tokio::time::{Instant, sleep};
+
+/// How long Unix cleanup waits for killed group members to finish exiting. A
+/// member that nothing reaps, or one stuck in the kernel, ends the wait.
+#[cfg(unix)]
+const GROUP_EXIT_GRACE: Duration = Duration::from_secs(1);
+/// The first pause between group checks. Each pause doubles up to the cap, so a
+/// member stuck in the kernel costs a few dozen checks, not hundreds.
+#[cfg(unix)]
+const GROUP_EXIT_POLL: Duration = Duration::from_millis(1);
+#[cfg(unix)]
+const GROUP_EXIT_POLL_MAX: Duration = Duration::from_millis(25);
 
 /// A child and its native process group, retained by one supervisor.
 ///
 /// Dropping this value initiates termination but cannot wait for cleanup. Keep
 /// it, its pipe tasks, and any host leases alive until [`Self::kill`] completes.
-/// Windows cleanup confirms that the Job Object is empty. Unix group signals
-/// are best effort; the executor also checks its sampled descendants.
+/// Windows cleanup confirms that the Job Object is empty. Unix cleanup waits up
+/// to one second for the killed group to exit and is best effort after that;
+/// the executor also checks its sampled descendants.
 pub struct OwnedChild {
     child: Child,
     #[cfg(unix)]
@@ -116,7 +132,10 @@ impl OwnedChild {
     /// Windows retains the Job Object until a successful membership query says
     /// it is empty. Failed termination or membership queries keep cleanup
     /// pending and are retried, so a supervisor cannot release host leases while
-    /// the tree may still run. Keep the Tokio runtime alive while this waits.
+    /// the tree may still run. Unix also waits, for at most one second, until
+    /// no process remains in the group, because a killed descendant keeps
+    /// running until the kernel finishes its exit. Keep the Tokio runtime alive
+    /// while this waits.
     ///
     /// # Errors
     /// Returns a termination or wait error after native cleanup has completed.
@@ -154,6 +173,10 @@ impl OwnedChild {
             result
         };
         #[cfg(unix)]
+        if status.is_ok() {
+            self.wait_for_group_exit().await;
+        }
+        #[cfg(unix)]
         if termination.is_ok() && status.is_ok() {
             // Cleanup consumed this group identity. A later Drop must not
             // signal an unrelated group after the OS has reused the number.
@@ -174,6 +197,20 @@ impl OwnedChild {
         }
     }
 
+    /// Poll until the signalled group has no process left. The caller has
+    /// reaped the root, so only killed descendants can keep the group alive.
+    #[cfg(unix)]
+    async fn wait_for_group_exit(&self) {
+        let Some(group) = self.group else { return };
+        let deadline = Instant::now() + GROUP_EXIT_GRACE;
+        let mut pause = GROUP_EXIT_POLL;
+        // No event reports a non-child's exit, so poll to a deadline.
+        while Instant::now() < deadline && group_running(group).await {
+            sleep(pause).await;
+            pause = (pause * 2).min(GROUP_EXIT_POLL_MAX);
+        }
+    }
+
     #[cfg(unix)]
     fn signal(&self, signal: Signal) -> io::Result<()> {
         if let Some(group) = self.group {
@@ -184,6 +221,32 @@ impl OwnedChild {
         }
         Ok(())
     }
+}
+
+/// Whether the group still has a process that has not exited.
+#[cfg(unix)]
+async fn group_running(group: Pid) -> bool {
+    // A signal-0 probe answers the common empty group with one cheap call.
+    if test_kill_process_group(group).is_err() {
+        return false;
+    }
+    // It also succeeds for a zombie that init has not reaped yet.
+    live_member(group).await
+}
+
+/// Linux reads the group's process states, because zombies have exited.
+#[cfg(target_os = "linux")]
+async fn live_member(group: Pid) -> bool {
+    let group = group.as_raw_nonzero().get().unsigned_abs();
+    tokio::task::spawn_blocking(move || crate::processes::group_running(group))
+        .await
+        .unwrap_or(true)
+}
+
+/// Other Unix hosts cannot tell a zombie apart here, so they wait out the grace.
+#[cfg(all(unix, not(target_os = "linux")))]
+fn live_member(_group: Pid) -> std::future::Ready<bool> {
+    std::future::ready(true)
 }
 
 impl Drop for OwnedChild {

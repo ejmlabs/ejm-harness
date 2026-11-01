@@ -514,6 +514,19 @@ async fn observed_process_budget_abuse_is_stopped_and_released() {
     wait_for_cleanup(&governor, &pids).await;
 }
 
+/// Replace the pid file in one rename, so a reader never sees a partial write
+/// from a fixture that was killed mid-write.
+fn write_pids(path: &Path, pids: &[u32]) {
+    let text = pids
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(" ");
+    let partial = path.with_extension("partial");
+    std::fs::write(&partial, text).unwrap();
+    std::fs::rename(&partial, path).unwrap();
+}
+
 fn parse_pids(text: &str) -> Vec<u32> {
     text.split_whitespace()
         .map(|part| part.parse().unwrap())
@@ -588,16 +601,11 @@ fn fixture() {
                     .unwrap();
                 pids.push(child.id());
                 children.push(child);
-            }
-            if let Some(path) = pid_file {
-                std::fs::write(
-                    path,
-                    pids.iter()
-                        .map(ToString::to_string)
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                )
-                .unwrap();
+                // Record after each spawn. A process budget can kill this fixture
+                // before its last spawn, and the test still needs the pids so far.
+                if let Some(path) = &pid_file {
+                    write_pids(path, &pids);
+                }
             }
             if mode != "orphan" {
                 for mut child in children {
