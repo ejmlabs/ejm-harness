@@ -379,13 +379,24 @@ async fn staged_demand_precedes_helper_readiness_and_spawn_failure_releases_witn
         governor
             .install_target(2, OperatingTarget::from_limits(governor.limits()), None)
             .unwrap();
-        assert!(task.await.unwrap().is_err());
+        let error = task.await.unwrap().unwrap_err();
+        assert!(error.to_string().contains("start native execution owner"));
         assert!(probe.observed.load(Ordering::Acquire));
         assert_eq!(governor.snapshot().running, 0);
         assert_eq!(governor.snapshot().queued, 0);
         let directory = wire::directory(&root, "fixture").unwrap();
         let witness = wire::stable_lock(&directory, "owner.lock").unwrap();
-        witness.try_lock().unwrap();
+        // A concurrent fork can retain the descriptor until close-on-exec.
+        // Require release within the test deadline.
+        loop {
+            match witness.try_lock() {
+                Err(TryLockError::WouldBlock) => tokio::task::yield_now().await,
+                result => {
+                    result.unwrap();
+                    break;
+                }
+            }
+        }
     })
     .await
     .unwrap();
