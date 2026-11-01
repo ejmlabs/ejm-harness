@@ -53,8 +53,8 @@ ejm-ui checkout fails when a route is a second or more slower than its recorded 
 
 ## Deploy
 
-A push to main deploys staging, then production. The pipeline, what a deploy refuses, the owner
-setup and what to do when a run fails are in the shared
+A push to main deploys staging, then production once a maintainer approves it. The pipeline,
+what a deploy refuses, the owner setup and what to do when a run fails are in the shared
 [CI deploys reference](../ejmlabs-cloudflare/references/ci-deploys.md). This site's facts:
 
 - Production is the Worker `ejmlabs-harness` at `harness.ejmlabs.com`. Staging is the Worker

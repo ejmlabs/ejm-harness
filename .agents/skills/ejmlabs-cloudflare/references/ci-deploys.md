@@ -23,12 +23,14 @@ canonical text except for the pin. Each push to main runs three jobs in order.
 2. `staging` deploys that artifact with `wrangler deploy --env staging`.
 3. `production` runs once staging succeeds and deploys the same files with the top-level config.
 
-The human decision is the merge: `gate:approve` and the required checks. The `production`
-environment needs no reviewer. If the owner keeps one, each production job shows "Waiting for
-review" until a person approves it. Approving is a human action: an agent approves a deployment
-only when the user explicitly asks, and only after the check in
-[Production ahead of main](#production-ahead-of-main). An agent never changes an environment to
-skip a review.
+Two human decisions ship a change. The merge (`gate:approve` and the required checks) sends it
+to staging. A maintainer releases it to production: the `production` environment requires a
+maintainer as a reviewer, so each production job waits for review until one approves it under
+Review deployments. Release the newest run. A production job deploys only while its commit is
+still main's head, so an older run that is approved late fails instead of rolling production
+back. Approving is a human action: an agent approves a deployment only when the user explicitly
+asks, and only after the check in [Production ahead of main](#production-ahead-of-main). An
+agent never changes an environment to skip a review.
 
 Each job queues per repository in push order. A deploy that has started is never cancelled, so
 Wrangler never stops midway. A newer main commit replaces an older one that is still waiting, so
@@ -41,6 +43,7 @@ before Wrangler runs when:
 
 - the `staging` or `production` environment is missing, or its deployment branch policy is
   anything other than exactly one branch, `main`;
+- `production` has no required reviewer, or the job's commit is no longer main's head;
 - the artifact's Wrangler config differs from the reviewed commit by a single byte (for ejm-ide,
   the whole `distribution` directory, which holds its Worker). Change the config in source, never
   in a build step;
@@ -85,8 +88,8 @@ pin when the site has one, the run URL, and the `Current Version ID` each deploy
 ## Production ahead of main
 
 A deploy by hand from a branch leaves production serving a build that main does not have, and the
-next production job from main rolls it back. Before you approve a production job, or before the
-owner removes a reviewer, confirm which main build is live:
+next production job from main rolls it back. Before you approve a production job, confirm which
+main build is live:
 
 1. Find the last production job on main that succeeded
    (`gh api repos/ejmlabs/REPO/deployments?environment=production`, then each deployment's
@@ -114,6 +117,8 @@ failure.
 | ------------------------------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------- |
 | `Build the site without credentials`                               | The site does not build at that commit                           | Fix it on main through the gate                         |
 | `Require the ... environment's protections`                        | The environment is missing or its branch policy is not `main`    | Report it for the owner setup below; change nothing     |
+| `Deploy stopped: ValueError: The production environment must ...`  | Production has no required reviewer                              | Report it for the owner setup below; change nothing     |
+| `Deploy stopped: ValueError: Main has moved past this commit ...`  | An older run was approved after a newer commit reached main      | Nothing to fix; release the newest production run       |
 | `Deploy stopped: ValueError: CLOUDFLARE_API_TOKEN is not set`      | The environment has no token                                     | Report it for the owner setup below                     |
 | `Deploy stopped: ValueError:` with any other message               | A refusal listed above                                           | Fix the config or build in source through the gate      |
 | A Wrangler authentication or permission error                      | The token is wrong, expired or lacks a right                     | Report it to the owner; never create or paste a token   |
@@ -130,8 +135,10 @@ or changes environments, secrets or tokens.
   token and checks it with Cloudflare. It then creates or repairs `staging` and `production` with
   the main-only branch policy in every site repository (or one, with `--repository NAME`) and
   stores the token as `CLOUDFLARE_API_TOKEN` in each. It keeps any reviewer the owner set.
-- Production needs no reviewer. The owner removes one under the environment's settings once
-  production serves a build of main (see [Production ahead of main](#production-ahead-of-main)).
+- In Settings, Environments, `production`, the owner adds at least one maintainer under Required
+  reviewers and leaves "Prevent self-review" off, so a maintainer can release their own merge.
+  Production deploys fail until a reviewer is set. `set_deploy_token.py` and
+  `configure_repositories.py` keep the reviewers a human set and warn when there are none.
 - The token needs Workers scripts, routes and custom domains on `ejmlabs.com`, plus R2 read for a
   site that binds a bucket.
 

@@ -27,7 +27,8 @@ the merge commit, not your working tree.
 1. The PR merged through the gate (see `ejmlabs-workflow`). Read the merge commit:
    `gh pr view N --json mergeCommit --jq .mergeCommit.oid`.
 2. The repository has no `deploy.yml` caller, or the user asked for this manual deploy. With
-   the caller, CI deploys staging and then production; follow [ci-deploys.md](ci-deploys.md).
+   the caller, CI deploys staging, then production once a maintainer approves; follow
+   [ci-deploys.md](ci-deploys.md).
 3. You know the Worker name and config path from the repository's deploy skill or README.
 
 ## Sequence

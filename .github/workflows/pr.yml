@@ -11,6 +11,6 @@ jobs:
       pull-requests: write
       statuses: write
       actions: write
-    uses: ejmlabs/.github/.github/workflows/governance.yml@340178d4bf7d7c1fc8fbbe6ab5731ff2e54825a1
+    uses: ejmlabs/.github/.github/workflows/governance.yml@90287bb91b735a9d29706e604c8142917ab7ffd6
     secrets:
       EJM_HARNESS_TOKEN: ${{ secrets.EJM_HARNESS_TOKEN }}
