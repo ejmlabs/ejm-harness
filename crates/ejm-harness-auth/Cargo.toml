@@ -29,7 +29,7 @@ zeroize = "1.9"
 base64 = "0.22"
 oauth2 = { version = "5.0", default-features = false }
 subtle = "2.6"
-aws-lc-rs = "=1.18.2"
+aws-lc-rs = "=1.19.0"
 keyring-core = "=1.0.1"
 which = "=8.0.6"
 
