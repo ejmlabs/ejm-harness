@@ -2,37 +2,38 @@
 
 ## Overview
 
-A reusable Rust engine for coding agents. Run sessions through one resource
-governor, keep a durable event journal, and extend the engine from Rust,
-TypeScript, or Python. [ejm-cli](https://github.com/ejmlabs/ejm-cli) and
-[ejm-ide](https://github.com/ejmlabs/ejm-ide) are separate hosts. The engine runs
-locally without a hosted workspace account or server.
+ejm-harness is a reusable Rust engine for coding agents. Run sessions through
+one shared resource governor, write an event log to disk, and extend the engine
+from Rust, TypeScript, or Python. [ejm-cli](https://github.com/ejmlabs/ejm-cli)
+and [ejm-ide](https://github.com/ejmlabs/ejm-ide) are separate hosts. The engine
+runs locally without a hosted workspace account or server.
 
 ## Status
 
-This is development source at version 0.1.1. Package registry releases, prebuilt
-workers, and a live extension registry have not been published. Local fixtures
-use replay providers and make no paid model requests. See [the changelog](CHANGELOG.md)
-and [release policy](RELEASING.md) for release status and gates.
+This repository holds development source at version 0.1.1. Published packages,
+prebuilt workers, and a live extension registry do not exist yet. Local test
+fixtures use replay providers and make no paid model requests. Read
+[the changelog](CHANGELOG.md) and [the release policy](RELEASING.md) for release
+status and gates.
 
 ## Requirements
 
 - Rust 1.99.1 with rustfmt and Clippy. `rust-toolchain.toml` pins this toolchain.
-- Node 24 or later for repository development and TypeScript extensions. The
-  TypeScript SDK itself supports Node 20 or later with a compatible Rust worker.
-- Python 3.11 or later for the Python SDK, and uv for its development tools.
+- Node 24 or later for repository work and TypeScript extensions. The TypeScript
+  SDK runs on Node 20 or later with a compatible Rust worker.
+- Python 3.11 or later for the Python SDK, plus uv for development tools.
 
-Persistent credentials use macOS Keychain, Windows Credential Manager, or an
-unlocked Linux Secret Service. Linux development builds also need `pkg-config`
-and D-Bus development headers. The official Claude Code provider requires its
-separately installed unmodified client.
+Saved credentials use macOS Keychain, Windows Credential Manager, or an unlocked
+Linux Secret Service. Linux builds also need `pkg-config` and D-Bus development
+headers. To use the official Claude Code provider, install its unmodified client
+separately.
 
-Rust hosts do not require Node or Python. The [contributor guide](docs/contributing.md)
-lists the tools needed for the full quality gate.
+Rust hosts do not need Node or Python. The [contributor guide](docs/contributing.md)
+lists every tool the full quality gate needs.
 
 ## Quick start
 
-From a source checkout, build the worker and run a local TypeScript example:
+Build the worker from a source checkout and run the local TypeScript example:
 
 ```sh
 export CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS=2
@@ -43,13 +44,13 @@ export EJM_HARNESS_WORKER_PATH="$PWD/target/debug/ejm-harness-worker"
 node examples/sdk_typescript.mjs
 ```
 
-The default provider returns `Demo: ...` without credentials or model charges.
-The SDK does not download a worker during installation.
+The default replay provider answers `Demo: ...` with no credentials or paid
+model requests. Installing the SDK does not download a worker.
 
 ## Usage
 
-During source development, depend on `crates/ejm-harness` from a Rust project.
-Add `ejm-harness-coding` when the host needs the standard file tools.
+From source, depend on `crates/ejm-harness` in your Rust project. Add
+`ejm-harness-coding` if your host needs standard file tools.
 
 ```rust
 use std::sync::Arc;
@@ -73,11 +74,11 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
-The replay provider replies with `Demo: Hello`. Hosted providers support Chat
+The replay provider answers `Demo: Hello`. Hosted providers support Chat
 Completions, Anthropic Messages, OpenAI Responses, and an official Claude Code
-subscription adapter. Credentials and tool grants
-remain host configuration. Use `Provider`, `Tool`, `ContextPolicy`, and `RunStrategy`
-to substitute behavior at the engine boundaries.
+subscription adapter. The host supplies credentials and tool grants. Use
+`Provider`, `Tool`, `ContextPolicy`, and `RunStrategy` to swap behavior at engine
+boundaries.
 
 - [TypeScript SDK](sdk/typescript/README.md)
 - [Python SDK](sdk/python/README.md)
@@ -91,18 +92,18 @@ to substitute behavior at the engine boundaries.
 
 ## Development
 
-Read [AGENTS.md](AGENTS.md) and [the technical contributor guide](docs/contributing.md).
-Feature and bugfix work uses the initialized OpenSpec workflow.
+Read [AGENTS.md](AGENTS.md) and [the contributor guide](docs/contributing.md).
+Feature and bugfix work follows the OpenSpec workflow.
 
 ```sh
 ./scripts/check
 ./scripts/check-registry
 ```
 
-The workspace gate checks Rust, dependency policy, generated protocols, and both
-SDKs. The separate registry gate covers the Cloudflare workers, schema, auth
-fixtures, and registry dependencies. Gates do not publish or deploy anything.
-Report failed or unavailable steps as unverified.
+`./scripts/check` checks Rust code, dependency policy, generated protocols, and
+both SDKs. `./scripts/check-registry` checks the Cloudflare workers, schema,
+auth fixtures, and registry dependencies. Neither gate publishes or deploys
+anything. Report failed or unavailable steps as unverified.
 
 ## Documentation
 
@@ -113,24 +114,24 @@ Report failed or unavailable steps as unverified.
 | SDK protocol and recovery          | [SDK guide](docs/sdk.md)                                |
 | Shared admission and native limits | [Execution guarantees](docs/executor.md)                |
 | Context, recovery, and evaluation  | [Engineering decisions](docs/harness-engineering.md)    |
-| Capacity measurements and limits   | [Benchmark evidence](docs/benchmarks.md)                |
+| Measured capacity and limits       | [Benchmark evidence](docs/benchmarks.md)                |
 | Undeployed registry service        | [Registry runbook](registry/README.md)                  |
 
 ## Contributing
 
 Start with [the contribution policy](CONTRIBUTING.md), then follow
-[the technical setup and quality rules](docs/contributing.md). Changes need
-maintainer admission, current approval, and the required checks before merging.
+[the setup and quality rules](docs/contributing.md). Each change needs
+maintainer admission, current approval, and passing checks before it merges.
 
 ## Security
 
-Read [SECURITY.md](SECURITY.md) for supported versions and private vulnerability
-reporting. Coding tools reject protected repository metadata and harness state,
-including symlink aliases. A repository cannot grant itself a tool.
+Read [SECURITY.md](SECURITY.md) for supported versions and how to report security
+bugs privately. Coding tools reject protected repository metadata and harness
+state, including symlinks. A repository cannot grant itself a tool.
 
-Native shell commands and enabled extension code run as the current user. They
-are not sandboxed. Admission reservations and sampled process usage do not prove
-kernel isolation. See [execution guarantees](docs/executor.md) before granting
+Native shell commands and enabled extensions run as the current user without
+kernel sandboxing. Resource reservations and sampled process usage do not prove
+kernel isolation. Read [execution guarantees](docs/executor.md) before you grant
 native access.
 
 ## Support
@@ -140,5 +141,5 @@ credentials and private session data out of public issues.
 
 ## License
 
-The code is licensed under [MIT](LICENSE). Bundled third-party assets retain
-their own license notices. Both SDK distributions include the MIT license text.
+This code uses the [MIT](LICENSE) license. Bundled third-party files keep their
+own license notices. Both SDK packages include the MIT license text.
