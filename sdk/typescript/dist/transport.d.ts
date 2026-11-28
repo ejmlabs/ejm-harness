@@ -35,5 +35,6 @@ export declare abstract class Transport {
     private sendFrame;
     private read;
     private receive;
+    private failInput;
     private fail;
 }

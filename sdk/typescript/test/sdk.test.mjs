@@ -6,7 +6,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { Harness, defineTool, toolOutput } from "../dist/index.js";
+import { Harness, HarnessError, defineTool, toolOutput } from "../dist/index.js";
+import { MAX_NORMAL_PENDING } from "../dist/limits.js";
 
 const workerPath =
   process.env.EJM_HARNESS_WORKER_PATH ??
@@ -529,6 +530,63 @@ test("admission bounds an oversized burst while preserving cancellation capacity
     assert.ok(results.filter((result) => result.status === "fulfilled").length >= 100);
     await cancelling;
     assert.equal((await f.harness.status()).active_agents, 0);
+  } finally {
+    await f.close();
+  }
+});
+
+const WORKER_INPUT_TIMEOUT_MS = 2_000;
+
+test("worker input pipe write failure disconnects pending and queued requests", async () => {
+  const f = await fixture();
+  try {
+    const exited = once(f.harness.process, "close");
+    f.harness.process.stdin.destroy();
+    const requests = Array.from({ length: MAX_NORMAL_PENDING + 1 }, () => f.harness.status());
+    const [first, ...queuedOrPending] = await within(
+      Promise.allSettled(requests),
+      WORKER_INPUT_TIMEOUT_MS,
+    );
+    assert.equal(first.status, "rejected");
+    const failure = first.reason;
+    assert.ok(failure instanceof HarnessError, String(failure));
+    assert.equal(failure.code, "disconnected");
+    assert.equal(failure.message, "worker input pipe failed");
+    assert.equal(failure.cause.code, "ERR_STREAM_DESTROYED");
+    for (const result of queuedOrPending) {
+      assert.equal(result.status, "rejected");
+      assert.equal(result.reason, failure);
+    }
+    await within(exited, WORKER_INPUT_TIMEOUT_MS);
+    await assert.rejects(within(f.harness.status(), WORKER_INPUT_TIMEOUT_MS), (error) => {
+      assert.equal(error, failure);
+      return true;
+    });
+  } finally {
+    await f.close();
+  }
+});
+
+test("worker input pipe error event disconnects the transport and preserves the cause", async () => {
+  const f = await fixture();
+  try {
+    const exited = once(f.harness.process, "close");
+    const cause = Object.assign(new Error("synthetic write EPIPE"), { code: "EPIPE" });
+    const request = f.harness.status();
+    f.harness.process.stdin.emit("error", cause);
+    let failure;
+    await assert.rejects(within(request, WORKER_INPUT_TIMEOUT_MS), (error) => {
+      assert.ok(error instanceof HarnessError, String(error));
+      assert.equal(error.code, "disconnected");
+      assert.equal(error.cause, cause);
+      failure = error;
+      return true;
+    });
+    await within(exited, WORKER_INPUT_TIMEOUT_MS);
+    await assert.rejects(within(f.harness.status(), WORKER_INPUT_TIMEOUT_MS), (error) => {
+      assert.equal(error, failure);
+      return true;
+    });
   } finally {
     await f.close();
   }
