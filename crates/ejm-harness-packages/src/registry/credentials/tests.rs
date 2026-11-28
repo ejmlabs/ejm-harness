@@ -30,6 +30,7 @@ impl VaultKeyStore for Keys {
 
 const ORIGIN: &str = "https://registry.example.invalid/";
 const RETIRED: &str = "https://harness.meetgerry.ai/";
+const LEGACY_FIXTURE_TOKEN: &str = "legacy-fixture-token";
 
 struct Fixture {
     _directory: tempfile::TempDir,
@@ -52,9 +53,8 @@ impl Fixture {
         })
     }
     fn legacy(&self, origin: &str) -> Result<Vec<u8>> {
-        let bytes = serde_json::to_vec(
-            &serde_json::json!({"origin":origin,"token":"legacy-fixture-token"}),
-        )?;
+        let bytes =
+            serde_json::to_vec(&serde_json::json!({"origin":origin,"token":LEGACY_FIXTURE_TOKEN}))?;
         #[cfg(unix)]
         {
             use std::{io::Write, os::unix::fs::OpenOptionsExt};
@@ -181,7 +181,7 @@ fn legacy_handoff_requires_confirmation_and_exact_origin() -> Result<()> {
     assert!(migrate(&fixture.vault, &fixture.root, ORIGIN)?);
     assert_eq!(
         load(&fixture.vault, &fixture.root, ORIGIN)?.expose_secret(),
-        "legacy-fixture-token"
+        LEGACY_FIXTURE_TOKEN
     );
     assert!(!migrate(&fixture.vault, &fixture.root, ORIGIN)?);
     Ok(())
@@ -212,6 +212,82 @@ fn interrupted_legacy_cleanup_never_overwrites_a_replacement_or_resets_a_lost_ke
     assert!(migrate(&fixture.vault, &fixture.root, ORIGIN).is_err());
     assert_eq!(fs::read(fixture.root.join(LEGACY))?, source);
     assert!(fixture.keys.get("fixture")?.is_none());
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn migration_retires_legacy_after_package_directory_rename() -> Result<()> {
+    let fixture = Fixture::new()?;
+    fixture.legacy(ORIGIN)?;
+    let renamed = fixture.root.with_file_name("renamed-packages");
+
+    assert!(migrate_with_before_cleanup(
+        &fixture.vault,
+        &fixture.root,
+        ORIGIN,
+        || fs::rename(&fixture.root, &renamed).context("rename fixture package directory"),
+    )?);
+    assert_eq!(
+        fs::symlink_metadata(renamed.join(LEGACY))
+            .err()
+            .map(|error| error.kind()),
+        Some(std::io::ErrorKind::NotFound)
+    );
+
+    // The vault authenticates against its original path.
+    fs::rename(&renamed, &fixture.root)?;
+    assert_eq!(
+        load(&fixture.vault, &fixture.root, ORIGIN)?.expose_secret(),
+        LEGACY_FIXTURE_TOKEN
+    );
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn migration_leaves_replaced_legacy_entry_untouched() -> Result<()> {
+    let fixture = Fixture::new()?;
+    let path = fixture.root.join(LEGACY);
+    let replacement_path = fixture.root.join("replacement.json");
+    let replacement = fixture.legacy("https://replacement.example.invalid/")?;
+    fs::rename(&path, &replacement_path)?;
+    let source = fixture.legacy(ORIGIN)?;
+    let inspected_path = fixture.root.join("inspected.json");
+
+    let Err(error) = migrate_with_before_cleanup(&fixture.vault, &fixture.root, ORIGIN, || {
+        fs::rename(&path, &inspected_path)?;
+        fs::rename(&replacement_path, &path)?;
+        Ok(())
+    }) else {
+        bail!("migration accepted a replacement legacy entry");
+    };
+    assert!(
+        error
+            .chain()
+            .any(|cause| cause.to_string() == "legacy registry session changed before cleanup"),
+        "unexpected migration error: {error:#}"
+    );
+    assert_eq!(fs::read(&path)?, replacement);
+    assert_eq!(fs::read(&inspected_path)?, source);
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn legacy_directory_is_rejected_and_left_intact() -> Result<()> {
+    let fixture = Fixture::new()?;
+    let path = fixture.root.join(LEGACY);
+    fs::create_dir(&path)?;
+
+    let Err(error) = migrate(&fixture.vault, &fixture.root, ORIGIN) else {
+        bail!("migration accepted a directory as a legacy entry");
+    };
+    assert_eq!(
+        error.to_string(),
+        "legacy registry session must be a private owner-only regular file"
+    );
+    assert!(fs::symlink_metadata(&path)?.is_dir());
     Ok(())
 }
 
