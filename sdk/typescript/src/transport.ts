@@ -67,7 +67,7 @@ export abstract class Transport {
       }
     });
     this.process.stdin.on("error", (error) => {
-      this.fail(error);
+      this.failInput(error);
     });
     this.process.stdout.once("end", () => {
       this.fail(
@@ -160,7 +160,7 @@ export abstract class Transport {
     await new Promise<void>((resolve, reject) => {
       this.process.stdin.write(frame, (error) => {
         this.outputBytes -= frame.length;
-        if (error) reject(error);
+        if (error) reject(this.failInput(error));
         else resolve();
       });
     });
@@ -191,6 +191,14 @@ export abstract class Transport {
       }
     } else if (typeof message.id === "string") this.requests.settle(message);
     else throw new HarnessError("protocol", "unknown worker message");
+  }
+
+  private failInput(cause: Error): Error {
+    if (this.failure) return this.failure;
+    const error = new HarnessError("disconnected", "worker input pipe failed");
+    error.cause = cause;
+    this.fail(error);
+    return error;
   }
 
   private fail(error: Error): void {

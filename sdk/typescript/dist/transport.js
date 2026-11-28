@@ -55,7 +55,7 @@ export class Transport {
             }
         });
         this.process.stdin.on("error", (error) => {
-            this.fail(error);
+            this.failInput(error);
         });
         this.process.stdout.once("end", () => {
             this.fail(new HarnessError("disconnected", this.reader.partial ? "worker frame was truncated" : "worker output closed"));
@@ -138,7 +138,7 @@ export class Transport {
             this.process.stdin.write(frame, (error) => {
                 this.outputBytes -= frame.length;
                 if (error)
-                    reject(error);
+                    reject(this.failInput(error));
                 else
                     resolve();
             });
@@ -172,6 +172,14 @@ export class Transport {
             this.requests.settle(message);
         else
             throw new HarnessError("protocol", "unknown worker message");
+    }
+    failInput(cause) {
+        if (this.failure)
+            return this.failure;
+        const error = new HarnessError("disconnected", "worker input pipe failed");
+        error.cause = cause;
+        this.fail(error);
+        return error;
     }
     fail(error) {
         if (this.failure)
