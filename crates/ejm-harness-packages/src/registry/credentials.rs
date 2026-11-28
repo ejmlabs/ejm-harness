@@ -1,3 +1,5 @@
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
 use std::{fs, io::Read, path::Path};
 
 use anyhow::{Context, Result, bail, ensure};
@@ -129,14 +131,33 @@ pub fn migrate_registry_token(
 }
 
 fn migrate(vault: &SecretVault, root: &Path, origin: &str) -> Result<bool> {
+    migrate_with_before_cleanup(vault, root, origin, || Ok(()))
+}
+
+fn migrate_with_before_cleanup(
+    vault: &SecretVault,
+    root: &Path,
+    origin: &str,
+    before_cleanup: impl FnOnce() -> Result<()>,
+) -> Result<bool> {
     // The legacy origin must equal this one, so a retired session is never imported.
     refuse_retired(origin)?;
     let id = identity(origin)?;
     let mut transaction = vault.lock_blocking(&CancellationToken::new())?;
-    let Some(source) = read_legacy(root)? else {
+    #[cfg(unix)]
+    let directory = open_legacy_directory(root)?;
+    #[cfg(unix)]
+    let source = read_legacy(&directory)?;
+    #[cfg(windows)]
+    let source = read_legacy(root)?;
+    let Some(source) = source else {
         return Ok(false);
     };
-    let legacy: LegacySession = serde_json::from_slice(&source)
+    #[cfg(unix)]
+    let bytes = &source.bytes;
+    #[cfg(windows)]
+    let bytes = &source;
+    let legacy: LegacySession = serde_json::from_slice(bytes)
         .map_err(|_| anyhow::anyhow!("invalid legacy registry session"))?;
     ensure!(
         identity(&legacy.origin)? == id,
@@ -164,7 +185,12 @@ fn migrate(vault: &SecretVault, root: &Path, origin: &str) -> Result<bool> {
         // A concurrent new client may already have replaced or deleted the record.
         // Its committed marker remains authoritative and prevents stale reimport.
     }
-    remove_legacy(root).context("registry vault committed; legacy cleanup failed, retry migration with older clients stopped")?;
+    before_cleanup()?;
+    #[cfg(unix)]
+    let cleanup = remove_legacy(&directory, &source.file);
+    #[cfg(windows)]
+    let cleanup = remove_legacy(root);
+    cleanup.context("registry vault committed; legacy cleanup failed, retry migration with older clients stopped")?;
     Ok(true)
 }
 
@@ -183,44 +209,121 @@ fn secret<'de, D: Deserializer<'de>>(
 }
 
 #[cfg(unix)]
-fn read_legacy(root: &Path) -> Result<Option<Zeroizing<Vec<u8>>>> {
-    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+fn open_legacy_directory(root: &Path) -> Result<fs::File> {
+    use rustix::fs::{Mode, OFlags};
+
     crate::manager::private_directory(root)?;
-    let path = root.join(LEGACY);
-    #[cfg(target_os = "macos")]
-    if path.try_exists()? {
-        rightkit_fs::private::verify_owner_only(&path)?;
-    }
-    let file = match fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(
-            (rustix::fs::OFlags::NOFOLLOW | rustix::fs::OFlags::NONBLOCK)
-                .bits()
-                .cast_signed(),
+    let before = fs::symlink_metadata(root)?;
+    let directory = fs::File::from(
+        rustix::fs::open(
+            root,
+            OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC,
+            Mode::empty(),
         )
-        .open(&path)
-    {
-        Ok(file) => file,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(_) => bail!("cannot open protected legacy registry session"),
-    };
-    let metadata = file.metadata()?;
+        .context("open legacy registry directory")?,
+    );
+    let opened = directory.metadata()?;
     ensure!(
-        metadata.is_file()
-            && metadata.nlink() == 1
-            && metadata.mode() & 0o7777 == 0o600
-            && metadata.uid() == rustix::process::geteuid().as_raw(),
+        before.is_dir() && same_inode(&before, &opened),
+        "legacy registry directory changed during open"
+    );
+    #[cfg(not(target_os = "macos"))]
+    {
+        const NON_OWNER_MODE_BITS: u32 = 6;
+        ensure!(
+            opened.uid() == rustix::process::getuid().as_raw(),
+            "package store has another owner"
+        );
+        ensure!(
+            opened.mode().trailing_zeros() >= NON_OWNER_MODE_BITS,
+            "package store must be private (chmod 700)"
+        );
+    }
+    #[cfg(target_os = "macos")]
+    verify_pinned_owner_only(&directory).context("package store must have an owner-only ACL")?;
+    Ok(directory)
+}
+
+#[cfg(unix)]
+fn same_inode(left: &fs::Metadata, right: &fs::Metadata) -> bool {
+    left.dev() == right.dev() && left.ino() == right.ino()
+}
+
+#[cfg(target_os = "macos")]
+fn verify_pinned_owner_only(file: &fs::File) -> Result<()> {
+    let opened = file.metadata()?;
+    let path = rightkit_fs::handle::final_path(file).context("resolve legacy registry handle")?;
+    // The ACL verifier takes a path, so check its identity on both sides.
+    let verify_identity = || -> Result<()> {
+        ensure!(
+            same_inode(&opened, &fs::symlink_metadata(&path)?),
+            "legacy registry ACL target changed during verification"
+        );
+        Ok(())
+    };
+    verify_identity()?;
+    rightkit_fs::private::verify_owner_only(&path)?;
+    verify_identity()
+}
+
+#[cfg(unix)]
+struct LegacySource {
+    bytes: Zeroizing<Vec<u8>>,
+    file: fs::File,
+}
+
+#[cfg(unix)]
+fn read_legacy(directory: &fs::File) -> Result<Option<LegacySource>> {
+    use rustix::{
+        fs::{FileType, Mode, OFlags, fstat, openat},
+        io::Errno,
+    };
+
+    let file = match openat(
+        directory,
+        LEGACY,
+        OFlags::RDONLY | OFlags::NOFOLLOW | OFlags::NONBLOCK | OFlags::CLOEXEC,
+        Mode::empty(),
+    ) {
+        Ok(fd) => fs::File::from(fd),
+        Err(Errno::NOENT) => return Ok(None),
+        Err(error) => return Err(error).context("cannot open protected legacy registry session"),
+    };
+    let inspected = fstat(&file)?;
+    ensure!(
+        FileType::from_raw_mode(inspected.st_mode) == FileType::RegularFile
+            && inspected.st_nlink == 1
+            && inspected.st_mode & 0o7777 == 0o600
+            && inspected.st_uid == rustix::process::geteuid().as_raw(),
         "legacy registry session must be a private owner-only regular file"
     );
-    let bytes = read_bounded(file)?;
-    let current = fs::symlink_metadata(&path)?;
     #[cfg(target_os = "macos")]
-    rightkit_fs::private::verify_owner_only(&path)?;
+    verify_pinned_owner_only(&file)?;
+    let bytes = read_bounded(&file)?;
+    #[cfg(target_os = "macos")]
+    verify_pinned_owner_only(&file)?;
+    verify_legacy_entry(
+        directory,
+        &inspected,
+        "legacy registry session changed during read",
+    )?;
+    Ok(Some(LegacySource { bytes, file }))
+}
+
+#[cfg(unix)]
+fn verify_legacy_entry(
+    directory: &fs::File,
+    inspected: &rustix::fs::Stat,
+    changed: &'static str,
+) -> Result<()> {
+    use rustix::fs::{AtFlags, statat};
+
+    let current = statat(directory, LEGACY, AtFlags::SYMLINK_NOFOLLOW).context(changed)?;
     ensure!(
-        current.dev() == metadata.dev() && current.ino() == metadata.ino(),
-        "legacy registry session changed during read"
+        current.st_dev == inspected.st_dev && current.st_ino == inspected.st_ino,
+        "{changed}"
     );
-    Ok(Some(bytes))
+    Ok(())
 }
 
 #[cfg(windows)]
@@ -236,10 +339,10 @@ fn read_legacy(root: &Path) -> Result<Option<Zeroizing<Vec<u8>>>> {
             .share_read_only(true),
     )?;
     rightkit_fs::private::verify_owner_only(&root.join(LEGACY))?;
-    Ok(Some(read_bounded(file)?))
+    Ok(Some(read_bounded(&file)?))
 }
 
-fn read_bounded(file: fs::File) -> Result<Zeroizing<Vec<u8>>> {
+fn read_bounded(file: &fs::File) -> Result<Zeroizing<Vec<u8>>> {
     ensure!(
         file.metadata()?.len() <= u64::try_from(MAX_LEGACY)?,
         "legacy registry session exceeds byte limit"
@@ -255,9 +358,18 @@ fn read_bounded(file: fs::File) -> Result<Zeroizing<Vec<u8>>> {
 }
 
 #[cfg(unix)]
-fn remove_legacy(root: &Path) -> Result<()> {
-    fs::remove_file(root.join(LEGACY))?;
-    fs::File::open(root)?.sync_all()?;
+fn remove_legacy(directory: &fs::File, inspected: &fs::File) -> Result<()> {
+    use rustix::fs::{AtFlags, fstat, unlinkat};
+
+    // The final stat and unlink are not atomic for a writer inside the private directory.
+    // Pinning the directory prevents redirection through the parent.
+    verify_legacy_entry(
+        directory,
+        &fstat(inspected)?,
+        "legacy registry session changed before cleanup",
+    )?;
+    unlinkat(directory, LEGACY, AtFlags::empty())?;
+    directory.sync_all()?;
     Ok(())
 }
 
